@@ -4,15 +4,18 @@ import cors from 'cors';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
 import type { Env } from './config/env.js';
+import type { Repository } from './data/repository.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { apiRouter } from './routes/index.js';
 
-// createApp assembles the Express application from a typed environment.
+// createApp assembles the Express application from a typed environment and the
+// active repository.
 //
 // It is a factory on purpose: index.ts wires the real runtime dependencies and
 // listens, while tests can build an isolated app instance (supertest) without
 // starting a server or touching root configuration.
 
-export function createApp(env: Env, logger: Logger): express.Express {
+export function createApp(env: Env, logger: Logger, repository: Repository): express.Express {
   const app = express();
 
   app.use(helmet());
@@ -24,8 +27,7 @@ export function createApp(env: Env, logger: Logger): express.Express {
     res.json({ ok: true });
   });
 
-  // Register API routers here as they are implemented.
-  app.use('/api', express.Router());
+  app.use('/api', apiRouter(repository, env));
 
   app.use(errorHandler);
 
