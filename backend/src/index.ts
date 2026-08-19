@@ -3,16 +3,16 @@ import helmet from 'helmet';
 import cors from 'cors';
 import { pinoHttp } from 'pino-http';
 import pino from 'pino';
+import { loadEnv } from './config/env.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
-const PORT = Number(process.env.PORT ?? 8080);
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
-
-const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
+const env = loadEnv();
+const logger = pino({ level: env.logLevel });
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: CORS_ORIGIN.split(',').map((o) => o.trim()) }));
+app.use(cors({ origin: env.corsOrigins }));
 app.use(express.json());
 app.use(pinoHttp({ logger }));
 
@@ -20,8 +20,13 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, 'lastgen api listening');
+// Register API routers here as they are implemented.
+app.use('/api', express.Router());
+
+app.use(errorHandler);
+
+app.listen(env.port, () => {
+  logger.info({ port: env.port }, 'lastgen api listening');
 });
 
 export { app };
