@@ -1,2 +1,24 @@
--- LastGen row level security policies
--- Placeholder. Enable RLS and define per-table policies here.
+-- LastGen row level security notes
+--
+-- The policies themselves live at the bottom of supabase/schema.sql so that a
+-- single file brings a database up in the right order (tables, then the
+-- owns_business helper, then the policies that depend on it). This file records
+-- the model they implement and is the place to add any policy that is not part
+-- of the base schema.
+--
+-- Model
+--   authenticated  a user reads only rows belonging to businesses whose
+--                  owner_id matches auth.uid(). Writes are limited to their own
+--                  business row and their own fuel logs.
+--   anon           reads solar_systems only, which is public reference data.
+--   service_role   bypasses RLS. The backend and the bank credit desk run under
+--                  this role, which is why portfolio and credit endpoints are
+--                  authorised in the API layer rather than in the database.
+--
+-- Enforcement that is not a policy
+--   assets_medical_flag_guard blocks any insert or update that would leave an
+--   asset SUSPENDED while its business carries medical_flag. That is a hard
+--   rule from the contract and belongs below every service path, so it is a
+--   trigger rather than application code.
+--
+-- Apply with: psql "$SUPABASE_DB_URL" -f supabase/schema.sql

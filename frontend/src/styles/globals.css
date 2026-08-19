@@ -1,17 +1,73 @@
 @import './tokens.css';
+@import './glass.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#root {
-  height: 100%;
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--lg-cream);
+    color: var(--lg-ink);
+    font-family: theme('fontFamily.sans');
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Warm paper ground. A very low contrast solar wash, no floating orbs and
+     no blur discs, just a flat print-like field the glass can sit on. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, var(--lg-cream) 0%, var(--lg-cream-2) 62%, var(--lg-cream-3) 100%);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--lg-ink);
+  }
+
+  ::selection {
+    background: var(--lg-gold-soft);
+    color: var(--lg-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--lg-green-lift);
+    outline-offset: 2px;
+  }
 }
 
-body {
-  margin: 0;
-  background: var(--lg-bg);
-  color: var(--lg-text);
+@layer utilities {
+  .font-display {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.02em;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

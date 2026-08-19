@@ -1,0 +1,134 @@
+/* Liquid glass surface.
+   Four properties make the material read as glass rather than as a translucent
+   rectangle: a blur that also lifts saturation, a 1px specular rim that is
+   bright at the top left and dark at the bottom right, an outer shadow, and a
+   faint inner highlight along the top edge. All four live here. */
+
+.lg-glass {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--lg-glass-bg-2);
+  backdrop-filter: blur(var(--lg-glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--lg-glass-blur)) saturate(180%);
+  box-shadow: var(--lg-glass-shadow-2), var(--lg-glass-inner);
+  transition:
+    box-shadow 240ms var(--lg-ease),
+    background-color 240ms var(--lg-ease);
+}
+
+/* The specular rim. Padding plus an excluding mask leaves only the 1px border
+   band of the gradient visible, so the edge catches light and the fill does not. */
+.lg-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--lg-glass-edge);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  transition: background 240ms var(--lg-ease);
+}
+
+.lg-glass > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Elevation */
+.lg-glass-1 {
+  background-color: var(--lg-glass-bg-1);
+  box-shadow: var(--lg-glass-shadow-1), var(--lg-glass-inner);
+}
+.lg-glass-2 {
+  background-color: var(--lg-glass-bg-2);
+  box-shadow: var(--lg-glass-shadow-2), var(--lg-glass-inner);
+}
+.lg-glass-3 {
+  background-color: var(--lg-glass-bg-3);
+  box-shadow: var(--lg-glass-shadow-3), var(--lg-glass-inner);
+}
+
+/* Hover lift: one elevation step up and a brighter rim. No scale, no glow. */
+.lg-glass-lift:hover {
+  box-shadow: var(--lg-glass-shadow-3), var(--lg-glass-inner);
+  background-color: var(--lg-glass-bg-3);
+}
+.lg-glass-lift:hover::before {
+  background: var(--lg-glass-edge-hi);
+}
+
+/* Dark glass. Re-tuned rather than inverted: the rim keeps a warm cream cast
+   and the body sits on ink, so it reads as the same material at night. */
+.lg-glass-dark {
+  background-color: var(--lg-glass-dark-bg-2);
+  box-shadow: var(--lg-glass-dark-shadow-2), var(--lg-glass-dark-inner);
+  color: var(--lg-cream);
+}
+.lg-glass-dark::before {
+  background: var(--lg-glass-dark-edge);
+}
+.lg-glass-dark.lg-glass-1 {
+  background-color: var(--lg-glass-dark-bg-1);
+  box-shadow: var(--lg-glass-dark-shadow-1), var(--lg-glass-dark-inner);
+}
+.lg-glass-dark.lg-glass-2 {
+  background-color: var(--lg-glass-dark-bg-2);
+  box-shadow: var(--lg-glass-dark-shadow-2), var(--lg-glass-dark-inner);
+}
+.lg-glass-dark.lg-glass-3 {
+  background-color: var(--lg-glass-dark-bg-3);
+  box-shadow: var(--lg-glass-dark-shadow-3), var(--lg-glass-dark-inner);
+}
+.lg-glass-dark.lg-glass-lift:hover {
+  box-shadow: var(--lg-glass-dark-shadow-3), var(--lg-glass-dark-inner);
+  background-color: var(--lg-glass-dark-bg-3);
+}
+.lg-glass-dark.lg-glass-lift:hover::before {
+  background: var(--lg-glass-dark-edge-hi);
+}
+
+/* Tints. A wash of colour behind the glass, kept low so the material stays
+   the subject and the tint only signals meaning. */
+.lg-tint-gold {
+  background-image: linear-gradient(0deg, var(--lg-gold-soft), var(--lg-gold-soft));
+  background-blend-mode: multiply;
+}
+.lg-tint-green {
+  background-image: linear-gradient(0deg, var(--lg-green-soft), var(--lg-green-soft));
+  background-blend-mode: multiply;
+}
+.lg-tint-burn {
+  background-image: linear-gradient(0deg, var(--lg-burn-soft), var(--lg-burn-soft));
+  background-blend-mode: multiply;
+}
+
+/* Warm cream shimmer for loading placeholders. Never a spinner. */
+.lg-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--lg-cream-2) 0%,
+    var(--lg-cream) 42%,
+    var(--lg-cream-2) 84%
+  );
+  background-size: 200% 100%;
+}
+
+/* Browsers without backdrop-filter get an opaque paper surface rather than a
+   flat translucent one that would read as broken. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lg-glass {
+    background-color: var(--lg-cream);
+  }
+  .lg-glass-dark {
+    background-color: var(--lg-ink-soft);
+  }
+}
