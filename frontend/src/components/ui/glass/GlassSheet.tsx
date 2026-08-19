@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { X } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
@@ -114,9 +114,9 @@ export function GlassSheet({
             </div>
             <Dialog.Close
               aria-label="Close"
-              className="rounded-full p-1.5 text-ink-mute transition-colors duration-200 ease-lg hover:bg-cream-2 hover:text-ink"
+              className="rounded-full p-1.5 text-ink-mute transition-colors duration-200 ease-lg hover:bg-paper-2 hover:text-ink"
             >
-              <X size={18} strokeWidth={1.5} />
+              <X size={18} weight="regular" />
             </Dialog.Close>
           </div>
 

@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { X } from '@phosphor-icons/react';
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
 import { cn } from '@/lib/cn';
 
@@ -39,9 +39,9 @@ export const DialogContent = forwardRef<
         {children}
         <DialogPrimitive.Close
           aria-label="Close"
-          className="absolute right-4 top-4 rounded-full p-1.5 text-ink-mute transition-colors duration-200 ease-lg hover:bg-cream-2 hover:text-ink"
+          className="absolute right-4 top-4 rounded-full p-1.5 text-ink-mute transition-colors duration-200 ease-lg hover:bg-paper-2 hover:text-ink"
         >
-          <X size={18} strokeWidth={1.5} />
+          <X size={18} weight="regular" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>

@@ -4,7 +4,14 @@ import { GlassCard, GlassNav } from '@/components/ui/glass';
 import { Money, StatusPill } from '@/components/lastgen';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const ROWS = [
   {
@@ -45,7 +52,6 @@ export default function Applications() {
       }
     >
       <PageIntro
-        eyebrow="Bank"
         title="Applications"
         description="Credit files waiting on a decision, each carrying a verified burn profile and a priced quote."
       />
@@ -58,7 +64,7 @@ export default function Applications() {
         </TabsList>
       </Tabs>
 
-      <GlassCard elevation={1} className="mt-4" padding="sm">
+      <GlassCard elevation={1} className="mt-8" padding="sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -79,7 +85,7 @@ export default function Applications() {
                   <Money kobo={row.burnKobo} size="sm" />
                 </TableCell>
                 <TableCell>
-                  <Money kobo={row.paymentKobo} size="sm" className="text-green" />
+                  <Money kobo={row.paymentKobo} size="sm" className="text-success" />
                 </TableCell>
                 <TableCell>
                   <StatusPill status="PENDING" size="sm" />
@@ -95,8 +101,8 @@ export default function Applications() {
         </Table>
       </GlassCard>
 
-      <GlassCard elevation={1} className="mt-4" eyebrow="Route shell" title="Applications queue">
-        <p className="text-sm leading-relaxed text-ink-soft">
+      <GlassCard elevation={1} className="mt-8" title="Applications queue">
+        <p className="leading-relaxed text-ink-soft">
           The finished queue filters by status through the credit applications endpoint, supports
           bulk triage and links each row into the credit file.
         </p>

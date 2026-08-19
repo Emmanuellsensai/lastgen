@@ -5,11 +5,9 @@ import { GlassPanel, type GlassElevation, type GlassPanelProps } from './GlassPa
 export interface GlassCardProps extends Omit<GlassPanelProps, 'title'> {
   header?: ReactNode;
   footer?: ReactNode;
-  /** Kicker above the title, small and uppercase. */
-  eyebrow?: ReactNode;
   title?: ReactNode;
   padding?: 'sm' | 'md' | 'lg';
-  /** Hover lifts elevation by one and brightens the rim over 240ms. */
+  /** Hover lifts the shadow one stop and brightens the rim over 240ms. */
   hoverable?: boolean;
 }
 
@@ -23,7 +21,6 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
   {
     header,
     footer,
-    eyebrow,
     title,
     padding = 'md',
     hoverable = false,
@@ -35,7 +32,7 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
   },
   ref,
 ) {
-  const hasHead = Boolean(header || eyebrow || title);
+  const hasHead = Boolean(header || title);
 
   return (
     <GlassPanel
@@ -48,28 +45,18 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
     >
       {hasHead ? (
         <div className="mb-4 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            {eyebrow ? (
-              <p
-                className={cn(
-                  'mb-1 text-[11px] font-medium uppercase tracking-[0.12em]',
-                  adaptive ? 'text-cream-3' : 'text-ink-mute',
-                )}
-              >
-                {eyebrow}
-              </p>
-            ) : null}
-            {title ? (
-              <h3
-                className={cn(
-                  'font-display text-lg leading-tight',
-                  adaptive ? 'text-cream' : 'text-ink',
-                )}
-              >
-                {title}
-              </h3>
-            ) : null}
-          </div>
+          {title ? (
+            <h3
+              className={cn(
+                'min-w-0 font-display text-lg leading-tight',
+                adaptive ? 'text-paper' : 'text-ink',
+              )}
+            >
+              {title}
+            </h3>
+          ) : (
+            <span />
+          )}
           {header ? <div className="shrink-0">{header}</div> : null}
         </div>
       ) : null}
@@ -77,12 +64,7 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
       {children}
 
       {footer ? (
-        <div
-          className={cn(
-            'mt-5 border-t pt-4',
-            adaptive ? 'border-cream-3/20' : 'border-line',
-          )}
-        >
+        <div className={cn('mt-5 border-t pt-4', adaptive ? 'border-paper-3/20' : 'border-line')}>
           {footer}
         </div>
       ) : null}

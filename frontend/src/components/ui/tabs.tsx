@@ -12,7 +12,7 @@ export const TabsList = forwardRef<
     <TabsPrimitive.List
       ref={ref}
       className={cn(
-        'inline-flex h-10 items-center gap-1 rounded-sm bg-cream-2 p-1',
+        'inline-flex h-10 items-center gap-1 rounded-sm bg-paper-2 p-1',
         'shadow-[inset_0_0_0_1px_var(--lg-line)]',
         className,
       )}
@@ -31,7 +31,7 @@ export const TabsTrigger = forwardRef<
       className={cn(
         'inline-flex h-8 items-center rounded-[7px] px-3 text-[13px] font-medium text-ink-mute',
         'transition-colors duration-200 ease-lg hover:text-ink',
-        'data-[state=active]:bg-cream data-[state=active]:text-ink',
+        'data-[state=active]:bg-paper data-[state=active]:text-ink',
         'data-[state=active]:shadow-[0_1px_2px_rgba(23,19,14,0.10)]',
         className,
       )}

@@ -1,18 +1,32 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AppShell, PageIntro } from '@/components/layout';
-import { GlassCard, GlassNav, GlassSheet } from '@/components/ui/glass';
+import { AppShell } from '@/components/layout';
+import { GlassCard, GlassSheet } from '@/components/ui/glass';
 import { Money, StatusPill } from '@/components/lastgen';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+
+/* Bank facing surface. The financial vocabulary stays here on purpose: this is
+   the credit officer's screen, not the business owner's. */
+const ASSESSMENT = [
+  {
+    label: 'Verified cashflow',
+    value: <Money kobo={18_187_440} size="lg" />,
+    note: '90 days of fuel purchases, 3 months verified',
+  },
+  {
+    label: 'Load profile score',
+    value: <span className="font-display tabular text-3xl text-ink">74</span>,
+    note: 'Consistent daily draw, low seasonal variance',
+  },
+  {
+    label: 'Affordability ratio',
+    value: <span className="font-display tabular text-3xl text-ink">0.92</span>,
+    note: 'Instalment against verified monthly burn',
+  },
+];
 
 export default function CreditFile() {
   const { id } = useParams<{ id: string }>();
@@ -20,89 +34,77 @@ export default function CreditFile() {
 
   return (
     <AppShell
-      nav={
-        <GlassNav
-          left={<span className="font-display text-base text-ink">Credit file</span>}
-          right={<StatusPill status="PENDING" size="sm" />}
-        />
-      }
+      subNav={{
+        title: 'Bilikisu Couture',
+        backTo: '/bank',
+        action: <StatusPill status="PENDING" size="sm" />,
+      }}
     >
-      <PageIntro
-        eyebrow="Bank"
-        title="Credit file"
-        description="Everything a credit officer needs on one screen: the burn evidence, the quote and the affordability call."
-        actions={
-          <>
-            <Button size="sm" variant="outline" onClick={() => setDeclineOpen(true)}>
+      <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:gap-10">
+        {/* Left: the proposal */}
+        <div>
+          <h2 className="font-display text-2xl text-ink">The proposal</h2>
+
+          <GlassCard
+            elevation={2}
+            padding="lg"
+            className="mt-6"
+            header={<Badge variant="success">Viable</Badge>}
+          >
+            <p className="text-sm text-ink-mute">Monthly instalment</p>
+            <Money kobo={16_690_755} size="xl" className="mt-3 block text-ink" />
+
+            <p className="mt-8 text-sm text-ink-mute">Against verified monthly burn</p>
+            <Money kobo={18_187_440} size="lg" className="mt-2 block" />
+          </GlassCard>
+
+          <GlassCard elevation={1} padding="lg" className="mt-5">
+            <dl className="grid gap-6 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-ink-mute">System</dt>
+                <dd className="mt-1 font-medium text-ink">Sunbelt Shop 2.5</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-ink-mute">Term</dt>
+                <dd className="mt-1 font-medium text-ink">18 months</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-ink-mute">Trade</dt>
+                <dd className="mt-1 font-medium text-ink">Tailor, Ibadan</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-ink-mute">Deposit</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  <Money kobo={27_400_000} size="sm" />
+                </dd>
+              </div>
+            </dl>
+          </GlassCard>
+        </div>
+
+        {/* Right: the assessment, one row per finding with room between them */}
+        <div>
+          <h2 className="font-display text-2xl text-ink">The assessment</h2>
+
+          <div className="mt-6 flex flex-col gap-5">
+            {ASSESSMENT.map((row) => (
+              <GlassCard key={row.label} elevation={2} padding="lg">
+                <p className="text-sm text-ink-mute">{row.label}</p>
+                <div className="mt-3">{row.value}</div>
+                <p className="mt-4 text-sm leading-relaxed text-ink-mute">{row.note}</p>
+              </GlassCard>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button size="lg">Approve</Button>
+            <Button size="lg" variant="outline" onClick={() => setDeclineOpen(true)}>
               Decline
             </Button>
-            <Button size="sm">Approve</Button>
-          </>
-        }
-      />
+          </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <GlassCard
-          elevation={2}
-          padding="lg"
-          eyebrow="Bilikisu Couture"
-          title="Tailor, Ibadan"
-          header={<Badge variant="gold">Ratio 0.92</Badge>}
-        >
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Verified monthly burn
-              </dt>
-              <dd className="mt-1">
-                <Money kobo={18_187_440} size="lg" />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Proposed instalment
-              </dt>
-              <dd className="mt-1">
-                <Money kobo={16_690_755} size="lg" className="text-green" />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Load profile score
-              </dt>
-              <dd className="font-display tabular mt-1 text-2xl text-ink">74</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Verified months
-              </dt>
-              <dd className="font-display tabular mt-1 text-2xl text-ink">3</dd>
-            </div>
-          </dl>
-        </GlassCard>
-
-        <GlassCard elevation={1} eyebrow="Route shell" title={`File ${id ?? 'unknown'}`}>
-          <p className="text-sm leading-relaxed text-ink-soft">
-            The finished screen loads the credit file detail, renders the fuel log evidence, the
-            schedule preview and the two decision actions. Approval mints the asset and the loan.
-          </p>
-          <Accordion type="single" collapsible className="mt-4">
-            <AccordionItem value="evidence">
-              <AccordionTrigger>Fuel log evidence</AccordionTrigger>
-              <AccordionContent>
-                Receipt scans and manual entries covering the observation window, with the vision
-                confidence score attached to each scanned line.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="schedule">
-              <AccordionTrigger>Schedule preview</AccordionTrigger>
-              <AccordionContent>
-                The first six instalments, computed with the same amortisation formula the backend
-                uses, so both sides agree to the kobo.
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </GlassCard>
+          <p className="mt-8 text-sm text-ink-mute">File reference {id ?? 'unknown'}.</p>
+        </div>
       </div>
 
       <GlassSheet

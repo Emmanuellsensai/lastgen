@@ -6,3 +6,7 @@ export { ImpactRing } from './ImpactRing';
 export type { ImpactRingProps } from './ImpactRing';
 export { Money } from './Money';
 export type { MoneyProps, MoneySize } from './Money';
+export { PhotoStrip, PLACEHOLDER_PHOTOS } from './PhotoStrip';
+export type { PhotoStripProps } from './PhotoStrip';
+export { CountUp } from './CountUp';
+export type { CountUpProps } from './CountUp';
