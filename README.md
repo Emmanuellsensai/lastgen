@@ -8,11 +8,13 @@ _Placeholder. One paragraph on the problem, who it is for, and how LastGen solve
 
 ## 2. Live frontend URL
 
-_Placeholder. Vercel deployment URL._
+https://lastgen-frontend.vercel.app/
 
 ## 3. Live backend API URL
 
-_Placeholder. Render deployment URL. The health check lives at `/health`._
+https://lastgen.onrender.com/
+
+Health check: https://lastgen.onrender.com/health
 
 ## 4. Demo video link
 
