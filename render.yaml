@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lastgen-api
+    name: lastgen-backend
     runtime: node
     plan: free
     region: oregon

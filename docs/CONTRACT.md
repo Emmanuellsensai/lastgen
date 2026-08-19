@@ -1,3 +1,4 @@
+```
 LASTGEN API CONTRACT — FROZEN
 BASE /api · Auth: Bearer <supabase_jwt> · Money in KOBO (int) · Energy in Wh (int)
 Envelope: { ok: boolean, data?: T, error?: { code, message } }
@@ -98,3 +99,4 @@ LEASE MATH (both sides must match exactly)
   payment = P * r / (1 - (1+r)^-n)        // standard amortisation
   monthlySavings = burn.monthlyKobo - quote.monthlyPaymentKobo
   A quote is only VALID if monthlySavings > 0. Reject otherwise.
+```
