@@ -84,8 +84,8 @@ Supabase or a live payment provider.
 | 1 | Domain engines | ✅ complete (7 commits) |
 | 2 | Data layer + deterministic seed | ✅ complete (6 commits) |
 | 3 | Happy-path routes | ✅ complete (7 commits) |
-| 4 | Payments + ALAT webhook | 🚧 in progress |
-| 5 | Portfolio + impact parity | ⬜ pending |
+| 4 | Payments + ALAT webhook | ✅ complete (3 commits) |
+| 5 | Portfolio + impact parity | 🚧 in progress |
 | 6 | Demo routes + README + Supabase/deploy | ⬜ pending |
 | 7 | Integration + final docs + PR prep | ⬜ pending |
 
@@ -152,18 +152,26 @@ values captured from its first build on 2026-08-19.
   suite 62/62 ✅, demo boot smoke (all `/api` happy-path 200) ✅, live boot
   smoke (401 contract error, no hang) ✅.
 
-### Phase 4 — Payments + ALAT webhook
+### Phase 4 — Payments + ALAT webhook (complete)
 - **Goal:** payment adapters completed and the ALAT webhook idempotent on
   `transactionReference` (review gate #4).
-- **Files:** `src/adapters/paymentAdapter.ts` (full interface),
-  `simulatedAdapter.ts` (deterministic in-process), `alatAdapter.ts` (HMAC
-  SHA-512 webhook signature verification), `paymentAdapterFor(env)` factory,
-  `src/routes/payments.ts` (`POST /loans/:id/pay`), `src/routes/webhooks.ts`
-  (`POST /webhooks/alat`).
-- **Tests:** `backend/test/correctness/webhook-idempotency.test.ts`, backend
-  contract suites `webhooks` and loan payment.
+- **Delivered:** `src/adapters/paymentAdapter.ts` (full seam),
+  `simulatedAdapter.ts` (SIM- references, accepts any notification),
+  `alatAdapter.ts` (HMAC-SHA512 signature verification over the raw body,
+  constant-time, demo-tolerant), `factory.ts` `paymentAdapterFor(env)`;
+  `src/routes/paymentRoutes.ts` (`POST /loans/:id/pay`),
+  `src/routes/webhookRoutes.ts` (`POST /webhooks/alat`, mounted before the auth
+  boundary, replay-safe, signature-checked). `express.json` captures the raw
+  body (`req.rawBody`) for signing.
+- **Tests:** `backend/test/correctness/webhook-idempotency.test.ts` (5),
+  `backend/test/correctness/payment-adapter.test.ts` (7),
+  `backend/test/contract/webhooks.test.ts` (4),
+  `backend/test/contract/payments.test.ts` (5).
 - **Reference:** `handlers.ts` lines 497–522 (pay) and 665–688 (webhook).
-- **Milestone:** critical review ping to team lead.
+- **Verification:** typecheck ✅, lint ✅, shared correctness 33/33 ✅, backend
+  suite 83/83 ✅, demo boot smoke (pay 200, webhook 200 + replay-safe + 400 on
+  missing reference) ✅.
+- **Milestone:** critical review ping to team lead (emitted).
 
 ### Phase 5 — Portfolio + impact parity
 - **Goal:** portfolio stats/assets/CSV export and `/impact` + `/wrapped` fed

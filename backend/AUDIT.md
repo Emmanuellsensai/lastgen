@@ -917,3 +917,27 @@ test` 62/62 green, demo boot smoke (`/health`, `/api/systems`,
 all 200; unknown route → 404 JSON), live boot smoke (no token → 401, invalid
 token → 401). `/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were
 not modified.
+
+## 17. Phase 4 — Payments + ALAT webhook (done)
+
+- **Added** the payment adapter seam: `adapters/paymentAdapter.ts`
+  (interface), `simulatedAdapter.ts` (`SIM-${Date.now()}` references, accepts
+  every notification), `alatAdapter.ts` (HMAC-SHA512 signature over the raw
+  body verified with `timingSafeEqual`; unsigned accepted only when no API key
+  is configured), `factory.ts` `paymentAdapterFor(env)`.
+- **Added** `routes/paymentRoutes.ts` `POST /loans/:id/pay` — settles through
+  the atomic `repo.payLoan` (SIMULATED + adapter reference), returns
+  `{ payment, loan, asset }`.
+- **Added** `routes/webhookRoutes.ts` `POST /webhooks/alat` — mounted before
+  the auth boundary, requires `transactionReference` (400), verifies the
+  signature, and settles via the replay-safe `repo.settleAlatWebhook`
+  (replayed references accepted and ignored). Raw body preserved via
+  `express.json({ verify })` into `req.rawBody`.
+- **Added** 21 assertions across 4 suites: webhook-idempotency (5),
+  payment-adapter (7), webhooks contract (4), payments contract (5).
+
+Verification: `pnpm --filter @lastgen/backend typecheck` clean, `pnpm lint`
+clean, shared `tests/correctness` 33/33 green, `pnpm --filter @lastgen/backend
+test` 83/83 green, demo boot smoke (pay → 200; webhook → 200; replay → 200;
+missing reference → 400). `/supabase/schema.sql`, `docs/CONTRACT.md`, and
+`/frontend` were not modified. **Critical review ping (gate #4) issued.**

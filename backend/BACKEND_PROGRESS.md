@@ -73,8 +73,8 @@ reproduce their externally observable behaviour without importing any code from
 | meterSimulator | ✅ | `services/meterSimulator.ts` (Phase 1) |
 | impactEngine | ✅ | `services/impactEngine.ts` (Phase 1) |
 | visionService | ✅ | `services/visionService.ts` (Phase 1) |
-| Payment adapters (simulated/alat) | 🚧 | Stubs only; interface completed Phase 4 |
-| ALAT webhook | ⬜ | Phase 4 |
+| Payment adapters (simulated/alat) | ✅ | Full seam + HMAC signature verification (Phase 4) |
+| ALAT webhook | ✅ | `/webhooks/alat` replay-safe on `transactionReference` (Phase 4) |
 | Repository layer | 🚧 | `repository.ts` + `inMemoryRepository.ts` (Phase 2); Supabase at Phase 6 |
 | Backend seed data | ✅ | `data/seed.ts` (Phase 2, byte-for-byte with MSW) |
 | Asset status audit migration | ✅ | `migrations/audit.sql` (Phase 0; repo writes history + realtime publication Phase 2) |
@@ -83,8 +83,8 @@ reproduce their externally observable behaviour without importing any code from
 | Auth boundary | ✅ | `makeRequireAuth` demo-skip + Supabase bearer (fail-closed) (Phase 3) |
 | Demo routes | ⬜ | Phase 6 |
 | Backend README endpoint docs | 🚧 | Scaffolded; full docs Phase 6 |
-| Contract tests (11 suites) | 🚧 | 7 live (Phase 3); webhooks/loans-pay Phase 4; portfolio/impact Phase 5; demo Phase 6 |
-| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity live (Phase 2); webhook-idempotency Phase 4; impact-parity Phase 5; integration Phase 7 |
+| Contract tests (11 suites) | 🚧 | 9 live (Phase 4); portfolio/impact Phase 5; demo Phase 6 |
+| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter live; impact-parity Phase 5; integration Phase 7 |
 | Render deployment verification | ⬜ | Phase 6 |
 
 ## 5. Implemented foundation (Phase 0)
@@ -258,6 +258,27 @@ written.
   so missing/expired credentials fail closed with `UNAUTHORIZED` (401) instead
   of hanging the request.
 
+### 6.11 Payments + ALAT webhook (Phase 4)
+
+- Adapter seam (`src/adapters/`): `PaymentAdapter` interface with
+  `makeReference()` and `verifyWebhookSignature()`. `paymentAdapterFor(env)`
+  picks the simulated (default) or ALAT adapter; routes depend on the seam,
+  never a concrete provider.
+- `simulatedAdapter` — `SIM-${Date.now()}` references (MSW parity) and accepts
+  every notification. `alatAdapter` — verifies the HMAC-SHA512 signature over
+  the raw body using the channel API key with constant-time comparison; with
+  no key configured the backend is in demo mode and unsigned notifications pass.
+- `POST /loans/:id/pay` — settles through `repo.payLoan` (source SIMULATED,
+  adapter reference), returning `{ payment, loan, asset }`; the repository's
+  atomic path updates loan, asset, next unpaid installment, payment ledger and
+  audit history together.
+- `POST /webhooks/alat` — mounted BEFORE the auth boundary (ALAT signs its own
+  notifications), parses the ALAT notification, requires `transactionReference`
+  (else `VALIDATION` 400), checks the signature, then calls the replay-safe
+  `repo.settleAlatWebhook`. A replayed reference is accepted and ignored.
+- `express.json({ verify })` preserves `req.rawBody` so the webhook signs the
+  exact bytes the provider sent.
+
 ## 7. Decision register
 
 | Decision | Choice | Rationale |
@@ -273,6 +294,8 @@ written.
 | App composition | `createApp(env, logger, repository)` factory | `app.ts` builds the Express app; `index.ts` wires the in-memory repo; tests inject their own |
 | Reset determinism | Fresh PRNG per seed build | Frontend resets drift (module-level PRNG); backend resets reproduce the first build exactly |
 | Auth failure mode | Fail closed with `UNAUTHORIZED` | Express 4 drops rejected promises; wrapping the Supabase lookup prevents hung requests |
+| Webhook signature | HMAC-SHA512 over the raw body, verified in constant time | ALAT signs notifications; the simulated adapter is demo-only and accepts everything |
+| Webhook placement | Mounted before the auth boundary | ALAT authenticates via its own signature, never a Lastgen bearer token |
 
 ## 8. Phase log
 
@@ -344,9 +367,25 @@ written.
   `/api/loans/:id/schedule` all 200; unknown route 404 JSON) ✅, live boot smoke
   (no token → 401, invalid token → 401) ✅.
 
-### Phase 4 — Payments and webhook — pending
+### Phase 4 — Payments and webhook (complete)
 
-- PaymentAdapter completion, simulated + ALAT adapters, idempotent webhook
+- Completed the payment adapter seam: `PaymentAdapter` interface, simulated
+  adapter (`SIM-` references, accepts everything), ALAT adapter (HMAC-SHA512
+  signature verification over the raw body, constant-time, demo-tolerant) and
+  the `paymentAdapterFor(env)` factory.
+- Added `POST /loans/:id/pay` (simulated settlement through the atomic
+  `payLoan` path) and `POST /webhooks/alat` (mounted before auth, requires
+  `transactionReference`, verifies the signature, replay-safe settlement).
+- `express.json({ verify })` now captures `req.rawBody` for webhook signing.
+- Added 21 assertions: webhook-idempotency (5), payment-adapter (7), webhook
+  contract (4), payments contract (5).
+- Verification: typecheck ✅, lint ✅, shared correctness ✅ (33/33), backend
+  suite ✅ (83/83), demo boot smoke (pay 200; webhook 200, replay 200,
+  missing reference 400) ✅.
+- **Critical review ping to team lead issued** — review gate #4: adapters,
+  atomic pay path, webhook idempotency.
+
+### Phase 5 — Portfolio and impact parity — pending
 
 ### Phase 5 — Portfolio and impact parity — pending
 
@@ -391,6 +430,10 @@ written.
 | `feat(backend): mount api router with contract 404` | `routes/index.ts`, `app.ts`, `index.ts`, `package.json` |
 | `test(backend): add phase 3 contract suites` | `backend/test/helpers.ts`, `backend/test/contract/*` |
 | `docs(backend): document phase 3 api surface` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
+| `feat(backend): complete payment adapter seam` | `adapters/paymentAdapter.ts`, `adapters/simulatedAdapter.ts`, `adapters/alatAdapter.ts`, `adapters/factory.ts` |
+| `feat(backend): add loan pay and alat webhook routes` | `routes/paymentRoutes.ts`, `routes/webhookRoutes.ts`, `routes/index.ts`, `app.ts`, `middleware/auth.ts` |
+| `test(backend): add webhook idempotency and payment suites` | `backend/test/correctness/webhook-idempotency.test.ts`, `backend/test/correctness/payment-adapter.test.ts`, `backend/test/contract/webhooks.test.ts`, `backend/test/contract/payments.test.ts` |
+| `docs(backend): document phase 4 payments` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
 
 ## 10. Risks and open items
 
@@ -403,6 +446,9 @@ written.
 - **Live auth needs Supabase** — bearer verification requires
   `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; until Phase 6 the live path fails
   closed with `UNAUTHORIZED` (never hangs).
+- **ALAT adapter is demo-tolerant** — without `ALAT_API_KEY` unsigned webhooks
+  are accepted. Once real ALAT credentials are configured the signature check
+  becomes mandatory. Confirm before production use.
 - **Schema not yet applied** — the audit migration and schema exist as SQL; they
   are applied to the live Supabase project in Phase 6 with credentials.
 - **Backend tests are backend-owned** — new suites live in `backend/test/`
@@ -442,7 +488,12 @@ written.
 - [x] Contract 404 + async/multer helpers (Phase 3)
 - [x] 7 Phase 3 contract suites (47 assertions) (Phase 3)
 - [x] Phase 3 verification (typecheck, lint, shared suites, backend suite, demo + live boot smoke)
-- [ ] Payments + ALAT webhook (Phase 4)
+- [x] Payment adapter seam (simulated + ALAT HMAC) + factory (Phase 4)
+- [x] `POST /loans/:id/pay` + `POST /webhooks/alat` (replay-safe) (Phase 4)
+- [x] Webhook-idempotency + payment-adapter correctness + webhook/payments contract suites (Phase 4)
+- [x] Phase 4 verification (typecheck, lint, shared suites, backend suite, demo boot smoke)
+- [x] Phase 4 critical review ping to team lead
+- [ ] Portfolio + impact parity (Phase 5)
 - [ ] Portfolio + impact parity (Phase 5)
 - [ ] Demo routes + README + deploy (Phase 6)
 - [ ] Integration suite + final PR (Phase 7)
