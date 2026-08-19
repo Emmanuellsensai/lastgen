@@ -2,9 +2,9 @@
 
 ## 1. Repo state
 
-- Current git branch: `main`
-- Output of `git status --short` (captured before this audit file was created): clean; no output.
-- Output of `git log --oneline -15`: NOT AVAILABLE from the workspace terminal bridge. The repository HEAD observed during reconnaissance is `ef8c513` (`ef8c51314cbb9e1a818eac0779a96c5104fe2fd0`).
+- Current git branch: `feat/backend`
+- Output of `git status --short` (captured before this audit file was created): Phase 1 files present and verified; commit sequence in `BACKEND_PROGRESS.md` §9.
+- Output of `git log --oneline -15`: HEAD `7dfba87` (`docs(backend): rewrite BACKEND_PROGRESS.md and refresh AUDIT.md for phase 0`), followed by the six Phase 0 commits.
 - Full recursive file tree of `/backend` (respecting `.gitignore`, excluding `node_modules`):
 
 ```text
@@ -18,6 +18,7 @@ backend/
 ├── migrations/
 │   └── audit.sql
 └── src/
+    ├── app.ts
     ├── index.ts
     ├── adapters/
     │   ├── alatAdapter.ts
@@ -36,8 +37,13 @@ backend/
     ├── routes/
     │   └── .gitkeep
     ├── services/
+    │   ├── assetStateMachine.ts
     │   ├── burnEngine.ts
-    │   └── leaseEngine.ts
+    │   ├── impactEngine.ts
+    │   ├── leaseEngine.ts
+    │   ├── loanStateMachine.ts
+    │   ├── meterSimulator.ts
+    │   └── visionService.ts
     └── types/
         └── api.ts
 ```
@@ -133,45 +139,36 @@ CORS_ORIGIN=http://localhost:5173
 ### `/backend/src/index.ts`
 
 ```ts
-import express from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
-import { pinoHttp } from 'pino-http';
+import { createApp } from './app.js';
+import { loadEnv } from './config/env.js';
 import pino from 'pino';
 
-const PORT = Number(process.env.PORT ?? 8080);
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+const env = loadEnv();
+const logger = pino({ level: env.logLevel });
 
-const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
+const app = createApp(env, logger);
 
-const app = express();
-
-app.use(helmet());
-app.use(cors({ origin: CORS_ORIGIN.split(',').map((o) => o.trim()) }));
-app.use(express.json());
-app.use(pinoHttp({ logger }));
-
-app.get('/health', (_req, res) => {
-  res.json({ ok: true });
-});
-
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, 'lastgen api listening');
+app.listen(env.port, () => {
+  logger.info({ port: env.port }, 'lastgen api listening');
 });
 
 export { app };
 ```
 
-- Confirm: does `GET /health` currently return `{ ok: true }`? **Yes.** Route:
+### `/backend/src/app.ts`
 
-```ts
-app.get('/health', (_req, res) => {
-  res.json({ ok: true });
-});
-```
+`createApp(env, logger)` builds the Express application: `helmet()`, CORS from
+the comma-separated origins, JSON parsing, `pinoHttp` logging, `GET /health`
+returning `{ ok: true }`, the `/api` router mount, and the centralized error
+handler. The factory takes `(env, logger)` explicitly so the server can be
+built and exercised in tests without binding a port.
 
-- Middleware currently wired: `helmet()`, `cors(...)`, `express.json()`, and `pinoHttp({ logger })`. A `pino` logger is instantiated.
-- As of Phase 0: `PORT`, `CORS_ORIGIN` and `LOG_LEVEL` are read through `loadEnv()` from `src/config/env.ts`. No authentication middleware, route modules, or validation middleware is wired to the API mount yet.
+- Confirm: does `GET /health` currently return `{ ok: true }`? **Yes.**
+- Middleware currently wired: `helmet()`, `cors(...)`, `express.json()`, and
+  `pinoHttp({ logger })`. `PORT`, `CORS_ORIGIN` and `LOG_LEVEL` come from
+  `loadEnv()` in `src/config/env.ts`.
+- No authentication middleware, route modules, or validation middleware is
+  wired to the API mount yet — `requireAuth` is applied in Phase 3 per route.
 
 ## 4. Dependencies actually installed
 
@@ -801,3 +798,41 @@ since the original audit:
 Verification: `pnpm typecheck` clean, `pnpm lint` clean, vitest smoke suite green,
 backend boots without Supabase keys and serves `GET /health` → 200 `{"ok":true}`.
 `/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
+
+## 13. Phase 1 state
+
+Phase 1 (domain engines) is complete on branch `feat/backend`:
+
+- **Added** `src/app.ts` — `createApp(env, logger)` factory; `index.ts` now only
+  owns process startup. Server is buildable and testable without listening.
+- **Added** `src/services/loanStateMachine.ts` — `markDelinquent`, `recover`,
+  `close` (shallow copies, `INVALID_TRANSITION` on a closed loan).
+- **Added** `src/services/assetStateMachine.ts` — single `transition` function
+  (`PAY | SUSPEND | RESTORE | MISS_PAYMENT | OVERDUE`) with the medical-flag
+  guard enforced inside every suspension path: bank `SUSPEND` throws
+  `MEDICAL_FLAG` (409); automated paths keep a flagged business in GRACE.
+- **Added** `src/services/meterSimulator.ts` — deterministic `mulberry32(20260819)`
+  + `hashString` streams, 6 daily slots, `tick`.
+- **Added** `src/services/impactEngine.ts` — 30/365/730-day windows, wrapped
+  yearly summary, months-to-ownership.
+- **Added** `src/services/visionService.ts` — Gemini receipt extraction with an
+  8-second timeout and a deterministic mock fallback.
+- **Updated** `src/config/constants.ts` — added `PETROL_PRICE_PER_LITRE_KOBO`
+  (115,000) used by the receipt mock and impact math.
+- **Filled** the correctness suites: `lease-math` (12), `asset-state-machine`
+  (16), `medical-flag-guard` (5) — 33 assertions green.
+
+Verification: `pnpm typecheck` clean, `pnpm lint` clean, `vitest run
+tests/correctness` → 33/33 green, boot smoke `GET /health` → 200 `{"ok":true}`.
+`/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
+
+## 14. Supabase Realtime (pending)
+
+Per the Phase 6 realtime decision, the backend-owned audit migration will gain:
+
+```sql
+alter publication supabase_realtime add table assets;
+```
+
+so the frontend can subscribe to `asset.status_changed` broadcasts. This is
+applied to the live project with the rest of the migrations.

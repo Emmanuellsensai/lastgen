@@ -64,14 +64,15 @@ reproduce their externally observable behaviour without importing any code from
 | Typed env config | ✅ | `config/env.ts` (Phase 0) |
 | Frozen constants | ✅ | `config/constants.ts` (Phase 0) |
 | Backend-owned API types | ✅ | `types/api.ts` (Phase 0) |
-| `/health` + `/api` mount | ✅ | `index.ts` |
+| App factory (`createApp`) | ✅ | `app.ts` (Phase 1) |
+| `/health` + `/api` mount | ✅ | `index.ts` → `app.ts` |
 | burnEngine | ✅ | `services/burnEngine.ts` |
 | leaseEngine | ✅ | `services/leaseEngine.ts` |
-| assetStateMachine | ⬜ | Phase 1 |
-| loanStateMachine | ⬜ | Phase 1 |
-| meterSimulator | ⬜ | Phase 1 |
-| impactEngine | ⬜ | Phase 1 |
-| visionService | ⬜ | Phase 1 |
+| assetStateMachine | ✅ | `services/assetStateMachine.ts` (Phase 1) |
+| loanStateMachine | ✅ | `services/loanStateMachine.ts` (Phase 1) |
+| meterSimulator | ✅ | `services/meterSimulator.ts` (Phase 1) |
+| impactEngine | ✅ | `services/impactEngine.ts` (Phase 1) |
+| visionService | ✅ | `services/visionService.ts` (Phase 1) |
 | Payment adapters (simulated/alat) | 🚧 | Stubs only; interface completed Phase 4 |
 | ALAT webhook | ⬜ | Phase 4 |
 | Repository layer (in-memory + Supabase) | ⬜ | Phase 2 |
@@ -81,7 +82,7 @@ reproduce their externally observable behaviour without importing any code from
 | Demo routes | ⬜ | Phase 6 |
 | Backend README endpoint docs | 🚧 | Scaffolded; full docs Phase 6 |
 | Contract tests (11 suites) | 🚧 | Todo stubs; filled per phase |
-| Correctness tests (5 suites) | 🚧 | lease-math smoke live; full suites Phases 1, 4, 5 |
+| Correctness tests (5 suites) | 🚧 | 3 suites live (lease-math, asset-state-machine, medical-flag-guard); remaining Phases 4, 5 |
 | Render deployment verification | ⬜ | Phase 6 |
 
 ## 5. Implemented foundation (Phase 0)
@@ -152,6 +153,54 @@ written.
   break-even month, and `QUOTE_NOT_VIABLE` (422) rejection when monthly savings
   are not positive. Matches `frontend/src/lib/lease.ts` to the kobo.
 
+### 6.3 Loan state machine (`services/loanStateMachine.ts`)
+
+- `markDelinquent(loan)` — ACTIVE → DELINQUENT, shallow copy.
+- `recover(loan)` — DELINQUENT → ACTIVE after a payment restores the asset.
+- `close(loan)` — any open loan → CLOSED; throws `INVALID_TRANSITION` (409) when
+  the loan is already closed. Returns shallow copies throughout.
+
+### 6.4 Asset state machine (`services/assetStateMachine.ts`)
+
+- `transition(asset, loan, business, action, ctx)` is the single function that
+  may change an asset status. Actions: `PAY`, `SUSPEND`, `RESTORE`,
+  `MISS_PAYMENT`, `OVERDUE`. Returns `{ asset, loan, from, to, loanFrom, loanTo,
+  reason }` so the orchestration layer can persist, write the audit trail, and
+  broadcast without reading internals.
+- Frozen transitions: ACTIVE → GRACE/OWNED; GRACE → SUSPENDED/ACTIVE/OWNED;
+  SUSPENDED → ACTIVE (payment). Payments restore GRACE/SUSPENDED assets, clear
+  `suspendedAt`/`suspendReason`, and transfer ownership the moment the balance
+  reaches zero.
+- **Medical-flag guard lives inside the machine.** The bank-facing `SUSPEND`
+  path throws `MEDICAL_FLAG` (409). Automated paths (`MISS_PAYMENT` escalation
+  and the `OVERDUE` sweep) never suspend a medical-flag business — they keep it
+  in GRACE, matching the MSW reference. There is no public suspension helper to
+  bypass.
+
+### 6.5 Meter simulator (`services/meterSimulator.ts`)
+
+- Deterministic PRNG: `mulberry32(20260819)` + `hashString(assetId)` so every
+  asset gets a stable stream.
+- `simulateReadings` generates 6 daily slots ([6, 9, 12, 15, 18, 21]) with the
+  curve `[0.18, 0.72, 1.0, 0.81, 0.24, 0.0]` scaling the system's capacity;
+  `tick` appends a slot for the current time. Parity with `frontend/src/mocks`.
+
+### 6.6 Impact engine (`services/impactEngine.ts`)
+
+- `computeImpact` — 30/365/730-day windows: litres displaced, CO₂ (2.31 kg/L
+  petrol, 2.68 kg/L diesel), naira saved (integer kobo), kWh generated, and
+  months-to-ownership from the remaining balance.
+- `computeWrapped` — yearly summary; deterministic best month and rank.
+- Single source for `/impact` and `/wrapped` in Phase 5.
+
+### 6.7 Vision service (`services/visionService.ts`)
+
+- `extractReceipt` — Gemini `gemini-1.5-flash` call with an 8-second
+  AbortController timeout; returns `{ litres, amountKobo, pricePerLitreKobo,
+  confidence }`.
+- Graceful deterministic mock fallback when `GEMINI_API_KEY` is unset so the
+  demo and correctness suites never depend on a live model.
+
 ## 7. Decision register
 
 | Decision | Choice | Rationale |
@@ -161,6 +210,10 @@ written.
 | Burn verification threshold | 14 days | Backend assignment value; MSW mock uses 30 — noted as demo-parity caveat |
 | PR strategy | One branch (`feat/backend`), one PR to `main` | Fastest path to the Friday demo; conventional commits per phase |
 | Supabase boot behaviour | Lazy client, fail fast on first DB use | Demo mode boots without keys; production still refuses to run unconfigured |
+| Demo authentication | Skip `requireAuth` in demo mode | Demo never asks for a JWT; production enforces Bearer on every contract route |
+| Persistence | In-memory repository first; Supabase at Phase 6 | Fastest path to a live demo without credentials; repository interface isolates the swap |
+| Medical-flag semantics | Bank `SUSPEND` throws `MEDICAL_FLAG`; automated paths silently stay GRACE | Matches the MSW reference exactly — the guard is enforced in every suspension path |
+| App composition | `createApp(env, logger)` factory | `app.ts` builds the Express app; `index.ts` owns process/startup; testable without listening |
 
 ## 8. Phase log
 
@@ -174,12 +227,22 @@ written.
 - Verification: `pnpm typecheck` ✅, `pnpm lint` ✅, `pnpm test` ✅ (smoke green),
   boot without Supabase keys → `GET /health` 200 `{"ok":true}` ✅
 
-### Phase 1 — Domain engines — pending
+### Phase 1 — Domain engines (complete)
 
-- `assetStateMachine` with the medical-flag guard internal to a single
-  `transition` function
-- `loanStateMachine`, `meterSimulator`, `impactEngine`, `visionService`
-- Fill correctness suites: lease-math, asset-state-machine, medical-flag-guard
+- Split app composition: `app.ts` exposes `createApp(env, logger)`, `index.ts`
+  owns process startup and imports — the server is now testable without a port.
+- Added `loanStateMachine` (delinquent/recover/close), the single-function
+  `assetStateMachine.transition` with the medical-flag guard internal to every
+  suspension path, `meterSimulator` (deterministic readings), `impactEngine`
+  (30/365/730-day windows + wrapped summary), and `visionService` (Gemini
+  receipt extraction with a mock fallback).
+- Filled the correctness suites: `lease-math` (12), `asset-state-machine` (16),
+  `medical-flag-guard` (5) — 33 assertions, all green.
+- Fixed a spec divergence found by the tests: automated suspension paths skip
+  a medical-flag business silently (stays GRACE) while the bank path throws
+  `MEDICAL_FLAG` — matching `frontend/src/mocks/handlers.ts`.
+- Verification: `pnpm typecheck` ✅, `pnpm lint` ✅, 3 correctness suites ✅
+  (33/33), boot smoke → `GET /health` 200 `{"ok":true}` ✅
 
 ### Phase 2 — Data layer — pending
 
@@ -217,6 +280,13 @@ written.
 | `feat(backend): add asset status audit migration` | `migrations/audit.sql` |
 | `docs(backend): rewrite BACKEND_PROGRESS.md as living handoff` | `backend/BACKEND_PROGRESS.md` |
 | `docs(backend): refresh AUDIT.md for phase 0 state` | `backend/AUDIT.md` |
+| `refactor(backend): split app factory from process entry point` | `app.ts`, `index.ts` |
+| `feat(backend): add loan and asset state machines` | `services/loanStateMachine.ts`, `services/assetStateMachine.ts` |
+| `feat(backend): add deterministic meter simulator and impact engine` | `services/meterSimulator.ts`, `services/impactEngine.ts`, `config/constants.ts` |
+| `feat(backend): add receipt vision service with mock fallback` | `services/visionService.ts` |
+| `test(backend): fill correctness suites for lease, state machine, medical guard` | `tests/correctness/lease-math.test.ts`, `tests/correctness/asset-state-machine.test.ts`, `tests/correctness/medical-flag-guard.test.ts` |
+| `docs(backend): document phase 1 engines and verification` | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
+| `docs: add frontend integration guide` | `GUIDE.md` |
 
 ## 10. Risks and open items
 
@@ -226,6 +296,8 @@ written.
 - **Verified-threshold divergence** — backend uses 14 days (assignment), MSW
   uses 30. Demo data may show fewer verified profiles; confirm with the team
   lead if it becomes visible in the demo.
+- **Receipts multipart** — Phase 3 route work needs `multer` added to
+  `backend/package.json` (backend-owned dependency, not a root config change).
 - **Schema not yet applied** — the audit migration and schema exist as SQL; they
   are applied to the live Supabase project in Phase 6 with credentials.
 - **`gh` CLI not authenticated** — the PR is opened manually by the team lead
@@ -244,10 +316,12 @@ written.
 - [x] Audit migration
 - [x] Vitest resolution smoke test
 - [x] Phase 0 verification (typecheck, lint, test, boot)
-- [ ] Asset state machine (Phase 1)
-- [ ] Loan state machine (Phase 1)
-- [ ] Meter simulator + impact engine (Phase 1)
-- [ ] Vision service (Phase 1)
+- [x] Asset state machine (Phase 1)
+- [x] Loan state machine (Phase 1)
+- [x] Meter simulator + impact engine (Phase 1)
+- [x] Vision service (Phase 1)
+- [x] Correctness suites: lease-math, asset-state-machine, medical-flag-guard (Phase 1)
+- [x] Phase 1 verification (typecheck, lint, tests, boot smoke)
 - [ ] Repository layer + seed (Phase 2)
 - [ ] Happy-path routes (Phase 3)
 - [ ] Payments + ALAT webhook (Phase 4)
