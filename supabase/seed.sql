@@ -1,0 +1,2 @@
+-- LastGen seed data
+-- Placeholder. Demo rows used by DEMO_MODE and the recorded walkthrough.

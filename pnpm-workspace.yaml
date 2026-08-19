@@ -1,0 +1,8 @@
+packages:
+  - 'frontend'
+  - 'backend'
+
+# Postinstall scripts are blocked by default in pnpm 10+; these two need theirs.
+allowBuilds:
+  esbuild: true
+  msw: true

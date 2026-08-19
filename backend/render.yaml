@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: lastgen-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: PORT
+        value: '8080'
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PAYMENT_ADAPTER
+        value: simulated
+      - key: ALAT_BASE_URL
+        sync: false
+      - key: ALAT_CHANNEL_ID
+        sync: false
+      - key: ALAT_API_KEY
+        sync: false
+      - key: DEMO_MODE
+        value: 'true'
+      - key: CORS_ORIGIN
+        sync: false

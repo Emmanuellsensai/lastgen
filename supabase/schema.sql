@@ -1,0 +1,3 @@
+-- LastGen schema
+-- Placeholder. Tables, enums and indexes go here.
+-- Apply with: psql "$SUPABASE_DB_URL" -f supabase/schema.sql

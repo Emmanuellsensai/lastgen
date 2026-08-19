@@ -1,0 +1,36 @@
+{
+  "name": "lastgen",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n fe,be -c cyan,magenta \"pnpm dev:fe\" \"pnpm dev:be\"",
+    "dev:fe": "pnpm --filter @lastgen/frontend dev",
+    "dev:be": "pnpm --filter @lastgen/backend dev",
+    "build": "pnpm --filter @lastgen/backend build && pnpm --filter @lastgen/frontend build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^22.18.0",
+    "@types/supertest": "^6.0.3",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2",
+    "supertest": "^7.1.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
+  }
+}

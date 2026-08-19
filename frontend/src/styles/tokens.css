@@ -1,0 +1,16 @@
+/* Design tokens. Values are placeholders until the design pass lands. */
+:root {
+  --lg-bg: #0b0f14;
+  --lg-surface: #121821;
+  --lg-border: rgba(255, 255, 255, 0.08);
+  --lg-text: #e8edf4;
+  --lg-muted: #9aa7b8;
+  --lg-accent: #4ade80;
+
+  --lg-radius-sm: 8px;
+  --lg-radius-md: 14px;
+  --lg-radius-lg: 24px;
+
+  --lg-glass-blur: 18px;
+  --lg-glass-bg: rgba(255, 255, 255, 0.06);
+}

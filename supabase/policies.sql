@@ -1,0 +1,2 @@
+-- LastGen row level security policies
+-- Placeholder. Enable RLS and define per-table policies here.
