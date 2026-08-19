@@ -83,8 +83,10 @@ reproduce their externally observable behaviour without importing any code from
 | Auth boundary | ✅ | `makeRequireAuth` demo-skip + Supabase bearer (fail-closed) (Phase 3) |
 | Demo routes | ⬜ | Phase 6 |
 | Backend README endpoint docs | 🚧 | Scaffolded; full docs Phase 6 |
-| Contract tests (11 suites) | 🚧 | 9 live (Phase 4); portfolio/impact Phase 5; demo Phase 6 |
-| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter live; impact-parity Phase 5; integration Phase 7 |
+| Portfolio endpoints | ✅ | `/portfolio/stats`, `/portfolio/assets`, `/portfolio/export` (Phase 5) |
+| Impact endpoints | ✅ | `/businesses/:id/impact`, `/businesses/:id/wrapped` (Phase 5) |
+| Contract tests (11 suites) | 🚧 | 10 live (Phase 5); demo Phase 6 |
+| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter, impact-parity live; integration Phase 7 |
 | Render deployment verification | ⬜ | Phase 6 |
 
 ## 5. Implemented foundation (Phase 0)
@@ -279,6 +281,22 @@ written.
 - `express.json({ verify })` preserves `req.rawBody` so the webhook signs the
   exact bytes the provider sent.
 
+### 6.12 Portfolio + impact (Phase 5)
+
+- `Repository.impactFor(businessId, period)` gathers the burn profile, the
+  financed asset's loan and meter readings, then runs the single
+  `computeImpact` engine — the same pure function that feeds `/impact` and
+  `/wrapped`, so the two endpoints can never disagree (impact parity gate).
+- `GET /portfolio/stats` — the portfolio projection (assets financed, value,
+  repayment/par %, suspended count, displaced litres + CO2 tonnes, by-city).
+- `GET /portfolio/assets` — MSW-parity pagination: status/city filters, 25 per
+  page, `{ items, total }`.
+- `POST /portfolio/export` — envelope promising a dated CSV URL.
+- `GET /businesses/:id/impact?period=` — month (30d) / year (365d) / all (730d)
+  windows over the deterministic readings.
+- `GET /businesses/:id/wrapped?year=` — the yearly report projection with a
+  fixed `bestMonth`/`rank` (MSW parity).
+
 ## 7. Decision register
 
 | Decision | Choice | Rationale |
@@ -296,6 +314,8 @@ written.
 | Auth failure mode | Fail closed with `UNAUTHORIZED` | Express 4 drops rejected promises; wrapping the Supabase lookup prevents hung requests |
 | Webhook signature | HMAC-SHA512 over the raw body, verified in constant time | ALAT signs notifications; the simulated adapter is demo-only and accepts everything |
 | Webhook placement | Mounted before the auth boundary | ALAT authenticates via its own signature, never a Lastgen bearer token |
+| Impact source | One `computeImpact` engine behind `/impact` and `/wrapped` | Guarantees the parity gate: the two endpoints share the same numbers |
+| Impact windows | 30 / 365 / 730 days | Mirrors the MSW `impactFor` `days` switch exactly |
 
 ## 8. Phase log
 
@@ -385,11 +405,17 @@ written.
 - **Critical review ping to team lead issued** — review gate #4: adapters,
   atomic pay path, webhook idempotency.
 
-### Phase 5 — Portfolio and impact parity — pending
+### Phase 5 — Portfolio and impact parity (complete)
 
-### Phase 5 — Portfolio and impact parity — pending
-
-- Portfolio stats/assets/export; `/impact` and `/wrapped` from one engine
+- Added `Repository.impactFor` wired through `computeImpact` (burn + asset loan
+  + readings), plus portfolio and impact routers mounted after the auth
+  boundary.
+- Added 17 assertions: impact-parity (6), portfolio contract (5), impact
+  contract (6).
+- Verification: typecheck ✅, lint ✅, shared correctness ✅ (33/33), backend
+  suite ✅ (100/100), demo boot smoke (stats, assets filter, export, impact,
+  wrapped, 404) ✅.
+- **Impact parity review gate demonstrated.**
 
 ### Phase 6 — Demo, README, deploy — pending
 
@@ -434,6 +460,10 @@ written.
 | `feat(backend): add loan pay and alat webhook routes` | `routes/paymentRoutes.ts`, `routes/webhookRoutes.ts`, `routes/index.ts`, `app.ts`, `middleware/auth.ts` |
 | `test(backend): add webhook idempotency and payment suites` | `backend/test/correctness/webhook-idempotency.test.ts`, `backend/test/correctness/payment-adapter.test.ts`, `backend/test/contract/webhooks.test.ts`, `backend/test/contract/payments.test.ts` |
 | `docs(backend): document phase 4 payments` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
+| `feat(backend): add impact projection to repository seam` | `src/data/repository.ts`, `src/data/inMemoryRepository.ts` |
+| `feat(backend): add portfolio and impact routes` | `src/routes/portfolioRoutes.ts`, `src/routes/impactRoutes.ts`, `src/routes/index.ts` |
+| `test(backend): add impact parity and portfolio suites` | `backend/test/correctness/impact-parity.test.ts`, `backend/test/contract/portfolio.test.ts`, `backend/test/contract/impact.test.ts` |
+| `docs(backend): document phase 5 portfolio and impact` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
 
 ## 10. Risks and open items
 
@@ -493,7 +523,11 @@ written.
 - [x] Webhook-idempotency + payment-adapter correctness + webhook/payments contract suites (Phase 4)
 - [x] Phase 4 verification (typecheck, lint, shared suites, backend suite, demo boot smoke)
 - [x] Phase 4 critical review ping to team lead
-- [ ] Portfolio + impact parity (Phase 5)
+- [x] Portfolio + impact routes + `impactFor` seam (Phase 5)
+- [x] Impact-parity + portfolio/impact contract suites (Phase 5)
+- [x] Phase 5 verification (typecheck, lint, shared suites, backend suite, demo boot smoke)
+- [x] Impact parity review gate demonstrated
+- [ ] Demo routes + Supabase repository (Phase 6, needs envs)
 - [ ] Portfolio + impact parity (Phase 5)
 - [ ] Demo routes + README + deploy (Phase 6)
 - [ ] Integration suite + final PR (Phase 7)

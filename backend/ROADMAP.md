@@ -85,7 +85,7 @@ Supabase or a live payment provider.
 | 2 | Data layer + deterministic seed | ✅ complete (6 commits) |
 | 3 | Happy-path routes | ✅ complete (7 commits) |
 | 4 | Payments + ALAT webhook | ✅ complete (3 commits) |
-| 5 | Portfolio + impact parity | 🚧 in progress |
+| 5 | Portfolio + impact parity | ✅ complete (2 commits) |
 | 6 | Demo routes + README + Supabase/deploy | ⬜ pending |
 | 7 | Integration + final docs + PR prep | ⬜ pending |
 
@@ -173,13 +173,23 @@ values captured from its first build on 2026-08-19.
   missing reference) ✅.
 - **Milestone:** critical review ping to team lead (emitted).
 
-### Phase 5 — Portfolio + impact parity
+### Phase 5 — Portfolio + impact parity (complete)
 - **Goal:** portfolio stats/assets/CSV export and `/impact` + `/wrapped` fed
   from the single `impactEngine`.
-- **Files:** `src/routes/portfolio.ts`, `src/routes/impact.ts`.
-- **Tests:** `backend/test/correctness/impact-parity.test.ts`, backend contract
-  suites `portfolio` and `impact`.
+- **Delivered:** `Repository.impactFor` (burn + asset loan + readings through
+  `computeImpact`); `src/routes/portfolioRoutes.ts` (`GET /portfolio/stats`,
+  `GET /portfolio/assets` with status/city filters + page pagination,
+  `POST /portfolio/export`); `src/routes/impactRoutes.ts`
+  (`GET /businesses/:id/impact` with period query, `GET /businesses/:id/wrapped`
+  with year query), both mounted after the auth boundary.
+- **Tests:** `backend/test/correctness/impact-parity.test.ts` (6, reference
+  figures captured from the frontend build), `backend/test/contract/portfolio.test.ts`
+  (5), `backend/test/contract/impact.test.ts` (6).
 - **Reference:** `handlers.ts` lines 525–604.
+- **Verification:** typecheck ✅, lint ✅, shared correctness 33/33 ✅, backend
+  suite 100/100 ✅, demo boot smoke (stats, assets filter, export, impact,
+  wrapped, 404) ✅.
+- **Milestone:** impact parity gate demonstrated.
 
 ### Phase 6 — Demo routes + README + Supabase/deploy
 - **Goal:** demo controls drive the real state machine; endpoint docs

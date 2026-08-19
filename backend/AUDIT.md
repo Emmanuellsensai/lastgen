@@ -941,3 +941,25 @@ clean, shared `tests/correctness` 33/33 green, `pnpm --filter @lastgen/backend
 test` 83/83 green, demo boot smoke (pay → 200; webhook → 200; replay → 200;
 missing reference → 400). `/supabase/schema.sql`, `docs/CONTRACT.md`, and
 `/frontend` were not modified. **Critical review ping (gate #4) issued.**
+
+## 18. Phase 5 — Portfolio + impact parity (done)
+
+- **Added** `Repository.impactFor(businessId, period)` — gathers the burn
+  profile, the financed asset's loan and meter readings and runs the single
+  `computeImpact` engine. Both `/impact` and `/wrapped` consume it, so the two
+  endpoints can never disagree (parity gate).
+- **Added** `routes/portfolioRoutes.ts` — `GET /portfolio/stats`,
+  `GET /portfolio/assets` (status/city filters, 25-per-page pagination,
+  `{ items, total }`), `POST /portfolio/export`.
+- **Added** `routes/impactRoutes.ts` — `GET /businesses/:id/impact?period=`
+  (month/year/all windows), `GET /businesses/:id/wrapped?year=`. Both return
+  the contract 404 for an unknown business. Mounted after the auth boundary.
+- **Added** 17 assertions across 3 suites: impact-parity (6, reference figures
+  captured from the frontend build), portfolio contract (5), impact contract (6).
+
+Verification: `pnpm --filter @lastgen/backend typecheck` clean, `pnpm lint`
+clean, shared `tests/correctness` 33/33 green, `pnpm --filter @lastgen/backend
+test` 100/100 green, demo boot smoke (stats, assets?status=SUSPENDED, export,
+impact, wrapped?year=2025 → 200; unknown business → 404).
+`/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
+**Impact parity review gate demonstrated.**
