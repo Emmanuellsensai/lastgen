@@ -882,3 +882,38 @@ Verification: `pnpm --filter @lastgen/backend typecheck` clean, `pnpm lint`
 clean, shared `tests/correctness` 33/33 green, `pnpm --filter @lastgen/backend
 test` 15/15 green, boot smoke `GET /health` → 200 `{"ok":true}`.
 `/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
+
+## 16. Phase 3 — Happy-path routes (done)
+
+- **Added** `middleware/auth.ts` `makeRequireAuth(env)` — demo mode is
+  unauthenticated; live mode verifies Supabase bearer tokens and fails closed
+  with `UNAUTHORIZED` (401) on missing/expired credentials instead of hanging
+  (Express 4 drops rejected promises).
+- **Added** domain routers under `src/routes/`: businesses (create/get/
+  receipts/fuel-logs/burn), systems, quotes (create/get), credit
+  (applications/get/approve/decline), assets (get/meter/suspend/restore),
+  loans (get/schedule). `routes/index.ts` mounts them under `/api`, applies
+  the auth boundary, and returns the contract 404 JSON for unknown routes.
+- **Added** `routes/helpers.ts` — `asyncHandler` (rejected-promise forwarding)
+  and `singleFile` (multer in-memory single upload, 5 MB limit, mapped to
+  `VALIDATION`).
+- **Wired** `createApp(env, logger, repository)`; `index.ts` constructs the
+  in-memory repository. `multer` added to `backend/package.json`.
+- **Added** the backend contract harness (`test/helpers.ts`) and 7 contract
+  suites — businesses (7), fuel-logs (6), systems (4), quotes (8), credit (9),
+  assets (9), loans (4) — 47 assertions through Supertest, each with a fresh
+  in-memory repository.
+- **Env hygiene** — `backend/.env.example` rewritten with full documentation
+  for every variable (including `LOG_LEVEL`); `.gitignore` now explicitly
+  covers `backend/.env` / `backend/.env.local`.
+- **Auth hardening found by boot smoke** — an invalid bearer token previously
+  hung the request (rejected promise + Express 4); `requireAuth` now wraps the
+  Supabase lookup and returns the contract 401.
+
+Verification: `pnpm --filter @lastgen/backend typecheck` clean, `pnpm lint`
+clean, shared `tests/correctness` 33/33 green, `pnpm --filter @lastgen/backend
+test` 62/62 green, demo boot smoke (`/health`, `/api/systems`,
+`/api/credit/applications`, `/api/businesses/:id`, `/api/loans/:id/schedule`
+all 200; unknown route → 404 JSON), live boot smoke (no token → 401, invalid
+token → 401). `/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were
+not modified.

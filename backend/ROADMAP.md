@@ -82,9 +82,9 @@ Supabase or a live payment provider.
 | --- | --- | --- |
 | 0 | Foundation hardening | ✅ complete (7 commits) |
 | 1 | Domain engines | ✅ complete (7 commits) |
-| 2 | Data layer + deterministic seed | 🚧 in progress |
-| 3 | Happy-path routes | ⬜ pending |
-| 4 | Payments + ALAT webhook | ⬜ pending |
+| 2 | Data layer + deterministic seed | ✅ complete (6 commits) |
+| 3 | Happy-path routes | ✅ complete (7 commits) |
+| 4 | Payments + ALAT webhook | 🚧 in progress |
 | 5 | Portfolio + impact parity | ⬜ pending |
 | 6 | Demo routes + README + Supabase/deploy | ⬜ pending |
 | 7 | Integration + final docs + PR prep | ⬜ pending |
@@ -134,30 +134,34 @@ values captured from its first build on 2026-08-19.
 
 ## 4. Phases 3–7 (map)
 
-### Phase 3 — Happy-path routes
+### Phase 3 — Happy-path routes (complete)
 - **Goal:** every contract route except payments returns real data through the
   repository; no MSW-only stubs.
-- **Files:** `src/routes/businesses.ts` (create/get/receipts/fuel-logs/burn),
-  `src/routes/systems.ts`, `src/routes/quotes.ts` (create/get),
-  `src/routes/credit.ts` (applications/get/approve/decline),
-  `src/routes/assets.ts` (get/meter/suspend/restore),
-  `src/routes/loans.ts` (get/schedule). Wire routers into `createApp(env,
-  logger, repository)`. Add `multer` for the receipts multipart. `requireAuth`
-  is skipped in demo mode and enforced in production.
-- **Tests:** backend contract suites for businesses, fuel-logs, systems,
-  quotes, credit, assets, loans.
+- **Delivered:** `src/routes/businessRoutes.ts` (create/get/receipts/fuel-logs/
+  burn), `systemRoutes.ts`, `quoteRoutes.ts` (create/get), `creditRoutes.ts`
+  (applications/get/approve/decline), `assetRoutes.ts` (get/meter/suspend/
+  restore), `loanRoutes.ts` (get/schedule), `routes/index.ts` (mount + contract
+  404), `routes/helpers.ts` (async handler + single-file multer). Routers wired
+  into `createApp(env, logger, repository)`; `multer` added for receipts.
+  `makeRequireAuth(env)` skips auth in demo mode and enforces Supabase bearer
+  tokens in production, failing closed on any credential error.
+- **Tests:** 7 backend contract suites (businesses, fuel-logs, systems, quotes,
+  credit, assets, loans) — 47 assertions over `createApp` via Supertest.
 - **Reference:** `handlers.ts` lines 168–522.
-- **Commits:** one per router + one per contract suite.
+- **Verification:** typecheck ✅, lint ✅, shared correctness 33/33 ✅, backend
+  suite 62/62 ✅, demo boot smoke (all `/api` happy-path 200) ✅, live boot
+  smoke (401 contract error, no hang) ✅.
 
 ### Phase 4 — Payments + ALAT webhook
 - **Goal:** payment adapters completed and the ALAT webhook idempotent on
   `transactionReference` (review gate #4).
-- **Files:** `src/adapters/paymentAdapter.ts` (full interface: `collect`,
-  `balance`), `simulatedAdapter.ts` (deterministic), `alatAdapter.ts` (HTTP),
+- **Files:** `src/adapters/paymentAdapter.ts` (full interface),
+  `simulatedAdapter.ts` (deterministic in-process), `alatAdapter.ts` (HMAC
+  SHA-512 webhook signature verification), `paymentAdapterFor(env)` factory,
   `src/routes/payments.ts` (`POST /loans/:id/pay`), `src/routes/webhooks.ts`
   (`POST /webhooks/alat`).
 - **Tests:** `backend/test/correctness/webhook-idempotency.test.ts`, backend
-  contract suite `webhooks`.
+  contract suites `webhooks` and loan payment.
 - **Reference:** `handlers.ts` lines 497–522 (pay) and 665–688 (webhook).
 - **Milestone:** critical review ping to team lead.
 

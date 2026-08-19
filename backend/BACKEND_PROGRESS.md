@@ -79,11 +79,12 @@ reproduce their externally observable behaviour without importing any code from
 | Backend seed data | ✅ | `data/seed.ts` (Phase 2, byte-for-byte with MSW) |
 | Asset status audit migration | ✅ | `migrations/audit.sql` (Phase 0; repo writes history + realtime publication Phase 2) |
 | Backend test home | ✅ | `backend/test/` — vitest config + seed-parity live (Phase 2) |
-| API routes (all domains) | ⬜ | Phases 3–6 |
+| API routes (all domains) | ✅ | Happy-path done Phase 3; payments Phase 4; portfolio/impact Phase 5; demo Phase 6 |
+| Auth boundary | ✅ | `makeRequireAuth` demo-skip + Supabase bearer (fail-closed) (Phase 3) |
 | Demo routes | ⬜ | Phase 6 |
 | Backend README endpoint docs | 🚧 | Scaffolded; full docs Phase 6 |
-| Contract tests (11 suites) | 🚧 | Filled in `backend/test/contract/` per phase |
-| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity live (Phase 2); impact-parity + webhook-idempotency + integration per phase |
+| Contract tests (11 suites) | 🚧 | 7 live (Phase 3); webhooks/loans-pay Phase 4; portfolio/impact Phase 5; demo Phase 6 |
+| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity live (Phase 2); webhook-idempotency Phase 4; impact-parity Phase 5; integration Phase 7 |
 | Render deployment verification | ⬜ | Phase 6 |
 
 ## 5. Implemented foundation (Phase 0)
@@ -229,6 +230,34 @@ written.
   assets (ACTIVE/GRACE/ACTIVE) with 540 readings each, and the 520-asset
   portfolio (ACTIVE 319 / GRACE 43 / OWNED 140 / SUSPENDED 21 after merge).
 
+### 6.10 API surface (Phase 3)
+
+- Routers live in `src/routes/`, one factory per domain, all mounted under
+  `/api` by `apiRouter(repo, env)` in `routes/index.ts`. A final handler
+  returns the contract 404 (`Route not found`) instead of Express's HTML page.
+- `routes/helpers.ts` provides `asyncHandler` (Express 4 does not forward
+  rejected promises) and `singleFile` (multer in-memory uploads mapped to
+  contract `VALIDATION` errors).
+- Happy-path routes delivered:
+  - Businesses: `POST /businesses`, `GET /businesses/:id`,
+    `POST /businesses/:id/receipts` (multipart `file` field, 5 MB limit,
+    Gemini vision with deterministic mock fallback),
+    `POST /businesses/:id/fuel-logs`, `GET /businesses/:id/burn`
+  - Systems: `GET /systems?minKw&maxPriceKobo`
+  - Quotes: `POST /businesses/:id/quote`, `GET /quotes/:id`
+  - Credit: `GET /credit/applications?status`, `GET /credit/applications/:id`,
+    `POST /credit/applications/:id/approve`, `POST /credit/applications/:id/decline`
+  - Assets: `GET /assets/:id`, `GET /assets/:id/meter?from&to`,
+    `POST /assets/:id/suspend`, `POST /assets/:id/restore`
+  - Loans: `GET /loans/:id`, `GET /loans/:id/schedule`
+- Routes stay thin: validation and 404s come from the repository as
+  `ApiError` with contract-exact codes/messages; routes only shape the
+  `{ ok, data }` envelope and status codes.
+- Auth boundary: `makeRequireAuth(env)` returns a pass-through middleware in
+  demo mode and the Supabase bearer check otherwise. The live check is wrapped
+  so missing/expired credentials fail closed with `UNAUTHORIZED` (401) instead
+  of hanging the request.
+
 ## 7. Decision register
 
 | Decision | Choice | Rationale |
@@ -241,8 +270,9 @@ written.
 | Demo authentication | Skip `requireAuth` in demo mode | Demo never asks for a JWT; production enforces Bearer on every contract route |
 | Persistence | In-memory repository first; Supabase at Phase 6 | Fastest path to a live demo without credentials; repository interface isolates the swap |
 | Medical-flag semantics | Bank `SUSPEND` throws `MEDICAL_FLAG`; automated paths silently stay GRACE | Matches the MSW reference exactly — the guard is enforced in every suspension path |
-| App composition | `createApp(env, logger)` factory | `app.ts` builds the Express app; `index.ts` owns process/startup; testable without listening |
+| App composition | `createApp(env, logger, repository)` factory | `app.ts` builds the Express app; `index.ts` wires the in-memory repo; tests inject their own |
 | Reset determinism | Fresh PRNG per seed build | Frontend resets drift (module-level PRNG); backend resets reproduce the first build exactly |
+| Auth failure mode | Fail closed with `UNAUTHORIZED` | Express 4 drops rejected promises; wrapping the Supabase lookup prevents hung requests |
 
 ## 8. Phase log
 
@@ -293,6 +323,27 @@ written.
 
 - Businesses, fuel logs, burn, systems, quotes, credit, assets
 
+### Phase 3 — Happy-path routes (complete)
+
+- Added the auth boundary `makeRequireAuth(env)`: pass-through in demo mode,
+  Supabase bearer enforcement in production with a fail-closed wrapper.
+- Added the domain routers (businesses, systems, quotes, credit, assets, loans)
+  mounted under `/api` by `apiRouter`, plus `asyncHandler` and `singleFile`
+  helpers and the contract 404 fallback.
+- Wired `createApp(env, logger, repository)`; `index.ts` now constructs the
+  in-memory repository.
+- Added `multer` (in-memory, 5 MB) for the receipt upload route; vision
+  extraction degrades to the deterministic mock without a Gemini key.
+- Added the backend test home harness (`test/helpers.ts`) and 7 contract suites
+  (47 assertions) exercising every happy-path route through Supertest.
+- Hardened live auth: an invalid token now returns the contract 401 instead of
+  hanging the request (Express 4 drops rejected promises).
+- Verification: `pnpm --filter @lastgen/backend typecheck` ✅, `pnpm lint` ✅,
+  shared correctness ✅ (33/33), backend suite ✅ (62/62), demo boot smoke
+  (`/health`, `/api/systems`, `/api/credit/applications`, `/api/businesses/:id`,
+  `/api/loans/:id/schedule` all 200; unknown route 404 JSON) ✅, live boot smoke
+  (no token → 401, invalid token → 401) ✅.
+
 ### Phase 4 — Payments and webhook — pending
 
 - PaymentAdapter completion, simulated + ALAT adapters, idempotent webhook
@@ -333,6 +384,13 @@ written.
 | `feat(backend): add asset realtime publication to audit migration` | `migrations/audit.sql` |
 | `test(backend): add backend test home and seed-parity suite` | `backend/package.json`, `backend/vitest.config.ts`, `backend/test/correctness/seed-parity.test.ts` |
 | `docs(backend): document phase 2 data layer` | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
+| `chore(backend): document full env surface and env hygiene` | `backend/.env.example`, `.gitignore` |
+| `feat(backend): add auth demo-skip factory` | `middleware/auth.ts` |
+| `feat(backend): add business and fuel-log routes` | `routes/businessRoutes.ts`, `routes/helpers.ts` |
+| `feat(backend): add systems, quotes, credit, asset, loan routes` | `routes/systemRoutes.ts`, `routes/quoteRoutes.ts`, `routes/creditRoutes.ts`, `routes/assetRoutes.ts`, `routes/loanRoutes.ts` |
+| `feat(backend): mount api router with contract 404` | `routes/index.ts`, `app.ts`, `index.ts`, `package.json` |
+| `test(backend): add phase 3 contract suites` | `backend/test/helpers.ts`, `backend/test/contract/*` |
+| `docs(backend): document phase 3 api surface` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
 
 ## 10. Risks and open items
 
@@ -342,8 +400,9 @@ written.
 - **Verified-threshold divergence** — backend uses 14 days (assignment), MSW
   uses 30. Demo data may show fewer verified profiles; confirm with the team
   lead if it becomes visible in the demo.
-- **Receipts multipart** — Phase 3 route work needs `multer` added to
-  `backend/package.json` (backend-owned dependency, not a root config change).
+- **Live auth needs Supabase** — bearer verification requires
+  `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; until Phase 6 the live path fails
+  closed with `UNAUTHORIZED` (never hangs).
 - **Schema not yet applied** — the audit migration and schema exist as SQL; they
   are applied to the live Supabase project in Phase 6 with credentials.
 - **Backend tests are backend-owned** — new suites live in `backend/test/`
@@ -378,7 +437,11 @@ written.
 - [x] Realtime publication migration (Phase 2)
 - [x] Backend test home + seed-parity suite (Phase 2)
 - [x] Phase 2 verification (typecheck, lint, shared suites, backend suite, boot smoke)
-- [ ] Happy-path routes (Phase 3)
+- [x] Auth boundary `makeRequireAuth` (demo-skip + fail-closed live) (Phase 3)
+- [x] Happy-path routers (businesses, systems, quotes, credit, assets, loans) (Phase 3)
+- [x] Contract 404 + async/multer helpers (Phase 3)
+- [x] 7 Phase 3 contract suites (47 assertions) (Phase 3)
+- [x] Phase 3 verification (typecheck, lint, shared suites, backend suite, demo + live boot smoke)
 - [ ] Payments + ALAT webhook (Phase 4)
 - [ ] Portfolio + impact parity (Phase 5)
 - [ ] Demo routes + README + deploy (Phase 6)
