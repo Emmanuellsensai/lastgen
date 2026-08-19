@@ -37,4 +37,18 @@ create policy asset_status_history_owner on asset_status_history
     )
   );
 
+-- Realtime: publish asset updates so the frontend can react to status changes
+-- with a postgres_changes subscription. Managed Supabase projects create the
+-- publication automatically; adding the table is a no-op when it is already a
+-- member.
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    alter publication supabase_realtime add table assets;
+  end if;
+exception when duplicate_object then
+  null;
+end
+$$;
+
 commit;
