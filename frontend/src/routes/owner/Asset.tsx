@@ -1,15 +1,21 @@
 import { useParams } from 'react-router-dom';
-import { BatteryCharging, Sun, Zap } from 'lucide-react';
-import { AppShell, PageIntro } from '@/components/layout';
-import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
+import { AppShell } from '@/components/layout';
+import { GlassCard, GlassPanel } from '@/components/ui/glass';
 import { ImpactRing, Money, StatusPill } from '@/components/lastgen';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
-const TILES = [
-  { icon: Sun, label: 'Generated today', value: '31.4 kWh' },
-  { icon: Zap, label: 'Consumed today', value: '24.8 kWh' },
-  { icon: BatteryCharging, label: 'Battery state of charge', value: '78 percent' },
+const DETAIL_ROWS = [
+  { label: 'Generated today', value: '31.4 kWh' },
+  { label: 'Used today', value: '24.8 kWh' },
+  { label: 'Battery charge', value: '78 percent' },
+  { label: 'System', value: 'Harmattan Cold Chain 7.5' },
+  { label: 'Serial', value: 'LG-00001' },
+  { label: 'Installed', value: 'March 2026' },
 ];
 
 export default function Asset() {
@@ -17,56 +23,76 @@ export default function Asset() {
 
   return (
     <AppShell
-      nav={
-        <GlassNav
-          left={<span className="font-display text-base text-ink">Asset</span>}
-          right={<StatusPill status="ACTIVE" size="sm" />}
-        />
-      }
+      subNav={{
+        title: 'Your system',
+        backTo: '/burn',
+        action: <StatusPill status="ACTIVE" size="lg" />,
+      }}
     >
-      <PageIntro
-        eyebrow="Owner"
-        title="Asset"
-        description="The installed system, its meter history and where the lease stands."
-      />
+      {/* One primary status, on its own. */}
+      <GlassPanel elevation={2} className="rounded-lg p-7 md:p-10">
+        <p className="text-sm text-ink-mute">Right now</p>
+        <p className="mt-3 font-display text-4xl leading-tight text-ink md:text-5xl">
+          Running on solar
+        </p>
+        <p className="mt-5 max-w-md leading-relaxed text-ink-soft">
+          The battery is holding charge and the generator has not been needed today.
+        </p>
+      </GlassPanel>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {TILES.map((tile) => (
-          <GlassPanel key={tile.label} elevation={1} className="rounded-lg p-5">
-            <tile.icon size={20} strokeWidth={1.5} className="text-green" aria-hidden />
-            <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-              {tile.label}
-            </p>
-            <p className="font-display tabular mt-1 text-2xl text-ink">{tile.value}</p>
-          </GlassPanel>
-        ))}
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.3fr]">
-        <GlassCard elevation={1} eyebrow="Lease" title="Ownership progress">
-          <div className="flex justify-center py-1">
-            <ImpactRing value={0.42} display="42%" caption="paid down" size={150} />
-          </div>
-          <div className="mt-4 flex items-baseline justify-between">
-            <span className="text-sm text-ink-mute">Balance</span>
-            <Money kobo={387_540_000} size="md" />
-          </div>
-          <Progress value={42} className="mt-2" />
-        </GlassCard>
-
-        <GlassCard elevation={1} eyebrow="Route shell" title={`Asset ${id ?? 'unknown'}`}>
-          <p className="text-sm leading-relaxed text-ink-soft">
-            The finished screen plots 90 days of meter readings, shows the controller state, and
-            exposes the pay now action that clears a grace period. The chart placeholder below keeps
-            the layout stable while the data loads.
-          </p>
-          <div className="mt-4 space-y-2">
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/3" />
+      {/* One secondary metric. */}
+      <section className="mt-16">
+        <GlassCard elevation={1} padding="lg">
+          <div className="flex flex-wrap items-center justify-between gap-10">
+            <div>
+              <p className="text-sm text-ink-mute">Left to pay before you own it</p>
+              <Money kobo={387_540_000} size="xl" className="mt-3 block" />
+              <p className="mt-4 text-ink-soft">14 months to go.</p>
+            </div>
+            <ImpactRing value={0.42} display="42%" caption="paid off" size={148} />
           </div>
         </GlassCard>
-      </div>
+      </section>
+
+      {/* Everything else, collapsed. */}
+      <section className="mt-16">
+        <Accordion type="single" collapsible>
+          <AccordionItem value="detail">
+            <AccordionTrigger className="py-5 text-base">System detail</AccordionTrigger>
+            <AccordionContent>
+              <dl className="grid gap-6 pt-2 sm:grid-cols-2">
+                {DETAIL_ROWS.map((row) => (
+                  <div key={row.label}>
+                    <dt className="text-sm text-ink-mute">{row.label}</dt>
+                    <dd className="mt-1 font-medium text-ink">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="history">
+            <AccordionTrigger className="py-5 text-base">Generation history</AccordionTrigger>
+            <AccordionContent>
+              <p className="pt-2 leading-relaxed">
+                Ninety days of readings, plotted by day. Wired to the meter endpoint in the next
+                pass.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="payments">
+            <AccordionTrigger className="py-5 text-base">Payment history</AccordionTrigger>
+            <AccordionContent>
+              <p className="pt-2 leading-relaxed">
+                Every payment received against this system, with the reference from your bank.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
+        <p className="mt-8 text-sm text-ink-mute">System reference {id ?? 'unknown'}.</p>
+      </section>
     </AppShell>
   );
 }

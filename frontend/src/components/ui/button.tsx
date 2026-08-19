@@ -13,17 +13,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Solid green, flat fill, a darker inner border for the pressed lip.
-        primary:
-          'bg-green text-cream shadow-[inset_0_0_0_1px_var(--lg-green)] hover:bg-green-lift',
+        // Solid navy, flat fill, a darker inner border for the pressed lip.
+        primary: 'bg-navy text-paper shadow-[inset_0_0_0_1px_var(--lg-ink)] hover:bg-ink',
         secondary:
-          'bg-cream-2 text-ink shadow-[inset_0_0_0_1px_var(--lg-line-strong)] hover:bg-cream-3',
+          'bg-paper-2 text-ink shadow-[inset_0_0_0_1px_var(--lg-line-strong)] hover:bg-paper-3',
         outline:
-          'bg-transparent text-ink shadow-[inset_0_0_0_1px_var(--lg-line-strong)] hover:bg-cream-2',
-        ghost: 'bg-transparent text-ink-soft hover:bg-cream-2 hover:text-ink',
-        gold: 'bg-gold text-ink shadow-[inset_0_0_0_1px_var(--lg-gold)] hover:brightness-105',
-        danger: 'bg-burn text-cream shadow-[inset_0_0_0_1px_var(--lg-burn)] hover:brightness-105',
-        link: 'bg-transparent p-0 text-green underline underline-offset-4 hover:text-green-lift',
+          'bg-transparent text-ink shadow-[inset_0_0_0_1px_var(--lg-line-strong)] hover:bg-paper-2',
+        ghost: 'bg-transparent text-ink-soft hover:bg-paper-2 hover:text-ink',
+        blue: 'bg-blue text-paper shadow-[inset_0_0_0_1px_var(--lg-navy)] hover:brightness-105',
+        danger: 'bg-burn text-paper shadow-[inset_0_0_0_1px_var(--lg-burn)] hover:brightness-105',
+        link: 'bg-transparent p-0 text-blue underline underline-offset-4 hover:text-navy',
       },
       size: {
         sm: 'h-8 rounded-sm px-3 text-[13px]',
@@ -50,6 +49,4 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   return <Comp ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props} />;
 });
 
-// Exported for links styled as buttons.
-// eslint-disable-next-line react-refresh/only-export-components
 export { buttonVariants };

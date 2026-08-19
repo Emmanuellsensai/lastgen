@@ -10,7 +10,7 @@ export const Avatar = forwardRef<
     <AvatarPrimitive.Root
       ref={ref}
       className={cn(
-        'relative flex h-9 w-9 shrink-0 overflow-hidden rounded-full bg-cream-2',
+        'relative flex h-9 w-9 shrink-0 overflow-hidden rounded-full bg-paper-2',
         'shadow-[inset_0_0_0_1px_var(--lg-line)]',
         className,
       )}
@@ -40,7 +40,7 @@ export const AvatarFallback = forwardRef<
     <AvatarPrimitive.Fallback
       ref={ref}
       className={cn(
-        'flex h-full w-full items-center justify-center bg-green-soft text-xs font-medium text-green',
+        'flex h-full w-full items-center justify-center bg-blue-soft text-xs font-medium text-navy',
         className,
       )}
       {...props}

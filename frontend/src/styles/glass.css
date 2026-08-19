@@ -59,19 +59,38 @@
 
 /* Hover lift: one elevation step up and a brighter rim. No scale, no glow. */
 .lg-glass-lift:hover {
-  box-shadow: var(--lg-glass-shadow-3), var(--lg-glass-inner);
+  box-shadow: var(--lg-glass-shadow-lift), var(--lg-glass-inner);
   background-color: var(--lg-glass-bg-3);
 }
 .lg-glass-lift:hover::before {
   background: var(--lg-glass-edge-hi);
 }
 
-/* Dark glass. Re-tuned rather than inverted: the rim keeps a warm cream cast
-   and the body sits on ink, so it reads as the same material at night. */
+/* The landing nav at rest. Highly transparent so the page reads through it,
+   with no rim and no shadow until the user scrolls. */
+.lg-glass-clear {
+  background-color: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: none;
+}
+.lg-glass-clear::before {
+  background: transparent;
+}
+
+/* Once past the scroll threshold: the same transparency, plus a hairline rule.
+   Still no hard drop shadow. */
+.lg-glass-clear-stuck {
+  background-color: rgba(255, 255, 255, 0.42);
+  border-bottom: 1px solid rgba(10, 37, 64, 0.07);
+}
+
+/* Dark glass. Re-tuned rather than inverted: the rim keeps a cool cast and the
+   body sits on ink, so it reads as the same material at night. */
 .lg-glass-dark {
   background-color: var(--lg-glass-dark-bg-2);
   box-shadow: var(--lg-glass-dark-shadow-2), var(--lg-glass-dark-inner);
-  color: var(--lg-cream);
+  color: var(--lg-paper);
 }
 .lg-glass-dark::before {
   background: var(--lg-glass-dark-edge);
@@ -98,12 +117,12 @@
 
 /* Tints. A wash of colour behind the glass, kept low so the material stays
    the subject and the tint only signals meaning. */
-.lg-tint-gold {
-  background-image: linear-gradient(0deg, var(--lg-gold-soft), var(--lg-gold-soft));
+.lg-tint-blue {
+  background-image: linear-gradient(0deg, var(--lg-blue-soft), var(--lg-blue-soft));
   background-blend-mode: multiply;
 }
-.lg-tint-green {
-  background-image: linear-gradient(0deg, var(--lg-green-soft), var(--lg-green-soft));
+.lg-tint-navy {
+  background-image: linear-gradient(0deg, var(--lg-paper-3), var(--lg-paper-3));
   background-blend-mode: multiply;
 }
 .lg-tint-burn {
@@ -111,24 +130,25 @@
   background-blend-mode: multiply;
 }
 
-/* Warm cream shimmer for loading placeholders. Never a spinner. */
+/* Loading placeholders. Never a spinner. */
 .lg-shimmer {
   background-image: linear-gradient(
     90deg,
-    var(--lg-cream-2) 0%,
-    var(--lg-cream) 42%,
-    var(--lg-cream-2) 84%
+    var(--lg-paper-2) 0%,
+    var(--lg-paper) 42%,
+    var(--lg-paper-2) 84%
   );
   background-size: 200% 100%;
 }
 
-/* Browsers without backdrop-filter get an opaque paper surface rather than a
-   flat translucent one that would read as broken. */
+/* Browsers without backdrop-filter get an opaque surface rather than a flat
+   translucent one that would read as broken. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .lg-glass {
-    background-color: var(--lg-cream);
+  .lg-glass,
+  .lg-glass-clear {
+    background-color: var(--lg-paper);
   }
   .lg-glass-dark {
-    background-color: var(--lg-ink-soft);
+    background-color: var(--lg-ink);
   }
 }

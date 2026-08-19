@@ -7,12 +7,11 @@ export default function NotFound() {
   return (
     <AppShell>
       <PageIntro
-        eyebrow="Lost"
         title="Nothing here"
         description="That address does not match any Lastgen screen."
       />
-      <GlassCard elevation={1} title="Try one of these">
-        <div className="flex flex-wrap gap-2">
+      <GlassCard elevation={1} padding="lg" title="Try one of these">
+        <div className="mt-2 flex flex-wrap gap-3">
           <Button asChild size="sm" variant="secondary">
             <Link to="/">Home</Link>
           </Button>

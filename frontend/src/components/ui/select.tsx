@@ -1,5 +1,5 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, CaretDown, CaretUp } from '@phosphor-icons/react';
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
 import { cn } from '@/lib/cn';
 
@@ -15,9 +15,9 @@ export const SelectTrigger = forwardRef<
     <SelectPrimitive.Trigger
       ref={ref}
       className={cn(
-        'flex h-10 w-full items-center justify-between gap-2 rounded-sm bg-cream px-3 text-sm text-ink',
+        'flex h-10 w-full items-center justify-between gap-2 rounded-sm bg-paper px-3 text-sm text-ink',
         'shadow-[inset_0_0_0_1px_var(--lg-line-strong)] transition-shadow duration-200 ease-lg',
-        'focus:outline-none focus:shadow-[inset_0_0_0_2px_var(--lg-green-lift)]',
+        'focus:outline-none focus:shadow-[inset_0_0_0_2px_var(--lg-blue)]',
         'disabled:cursor-not-allowed disabled:opacity-45',
         className,
       )}
@@ -25,7 +25,7 @@ export const SelectTrigger = forwardRef<
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDown size={16} strokeWidth={1.5} className="text-ink-mute" />
+        <CaretDown size={16} weight="regular" className="text-ink-mute" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -48,11 +48,11 @@ export const SelectContent = forwardRef<
         {...props}
       >
         <SelectPrimitive.ScrollUpButton className="flex justify-center py-1 text-ink-mute">
-          <ChevronUp size={14} strokeWidth={1.5} />
+          <CaretUp size={14} weight="regular" />
         </SelectPrimitive.ScrollUpButton>
         <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
         <SelectPrimitive.ScrollDownButton className="flex justify-center py-1 text-ink-mute">
-          <ChevronDown size={14} strokeWidth={1.5} />
+          <CaretDown size={14} weight="regular" />
         </SelectPrimitive.ScrollDownButton>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
@@ -67,7 +67,7 @@ export const SelectLabel = forwardRef<
     <SelectPrimitive.Label
       ref={ref}
       className={cn(
-        'px-2 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute',
+        'px-2 py-1.5 text-[13px] font-medium text-ink-mute',
         className,
       )}
       {...props}
@@ -85,7 +85,7 @@ export const SelectItem = forwardRef<
       className={cn(
         'relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-ink',
         'outline-none transition-colors duration-200 ease-lg',
-        'data-[highlighted]:bg-green-soft data-[highlighted]:text-green',
+        'data-[highlighted]:bg-blue-soft data-[highlighted]:text-navy',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
         className,
       )}
@@ -93,7 +93,7 @@ export const SelectItem = forwardRef<
     >
       <span className="absolute left-2 flex items-center">
         <SelectPrimitive.ItemIndicator>
-          <Check size={14} strokeWidth={1.5} />
+          <Check size={14} weight="regular" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

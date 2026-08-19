@@ -2,7 +2,7 @@ import { forwardRef, type ElementType, type HTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
 export type GlassElevation = 1 | 2 | 3;
-export type GlassTint = 'none' | 'gold' | 'green' | 'burn';
+export type GlassTint = 'none' | 'blue' | 'navy' | 'burn';
 export type GlassBlur = 'sm' | 'md' | 'lg';
 
 const BLUR_PX: Record<GlassBlur, string> = {
@@ -19,8 +19,8 @@ const ELEVATION: Record<GlassElevation, string> = {
 
 const TINT: Record<GlassTint, string> = {
   none: '',
-  gold: 'lg-tint-gold',
-  green: 'lg-tint-green',
+  blue: 'lg-tint-blue',
+  navy: 'lg-tint-navy',
   burn: 'lg-tint-burn',
 };
 
