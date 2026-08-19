@@ -7,8 +7,10 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { createAssetRouter } from './assetRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
 import { createCreditRouter } from './creditRoutes.js';
+import { createImpactRouter } from './impactRoutes.js';
 import { createLoanRouter } from './loanRoutes.js';
 import { createPaymentRouter } from './paymentRoutes.js';
+import { createPortfolioRouter } from './portfolioRoutes.js';
 import { createQuoteRouter } from './quoteRoutes.js';
 import { createSystemRouter } from './systemRoutes.js';
 import { createWebhookRouter } from './webhookRoutes.js';
@@ -32,6 +34,8 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(createAssetRouter(repo));
   router.use(createLoanRouter(repo));
   router.use(createPaymentRouter(repo, adapter));
+  router.use(createPortfolioRouter(repo));
+  router.use(createImpactRouter(repo));
 
   // Contract JSON 404 instead of Express's HTML fallback.
   router.use((_req, _res, next) => next(new ApiError('NOT_FOUND', 'Route not found', 404)));
