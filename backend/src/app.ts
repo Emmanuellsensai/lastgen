@@ -20,7 +20,15 @@ export function createApp(env: Env, logger: Logger, repository: Repository): exp
 
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigins }));
-  app.use(express.json());
+  app.use(
+    express.json({
+      // Preserve the raw body so the ALAT webhook can verify its HMAC-SHA512
+      // signature over the exact bytes the provider signed.
+      verify: (req, _res, buf) => {
+        (req as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(pinoHttp({ logger }));
 
   app.get('/health', (_req, res) => {

@@ -9,6 +9,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: User;
+      /** Raw JSON body, captured by the express.json verify hook for webhook signing. */
+      rawBody?: Buffer;
     }
   }
 }

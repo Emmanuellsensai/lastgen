@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { paymentAdapterFor } from '../adapters/factory.js';
 import type { Env } from '../config/env.js';
 import type { Repository } from '../data/repository.js';
 import { makeRequireAuth } from '../middleware/auth.js';
@@ -7,14 +8,21 @@ import { createAssetRouter } from './assetRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
 import { createCreditRouter } from './creditRoutes.js';
 import { createLoanRouter } from './loanRoutes.js';
+import { createPaymentRouter } from './paymentRoutes.js';
 import { createQuoteRouter } from './quoteRoutes.js';
 import { createSystemRouter } from './systemRoutes.js';
+import { createWebhookRouter } from './webhookRoutes.js';
 
 // Assembles the /api surface from the domain routers. Mounted by createApp;
 // every phase adds its routers here in dependency order.
 
 export function apiRouter(repo: Repository, env: Env): Router {
   const router = Router();
+  const adapter = paymentAdapterFor(env);
+
+  // Provider callbacks run BEFORE the auth boundary: ALAT signs its own
+  // notifications and is never asked for a Lastgen bearer token.
+  router.use(createWebhookRouter(repo, adapter));
 
   router.use(makeRequireAuth(env));
   router.use(createBusinessRouter(repo, env));
@@ -23,6 +31,7 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(createCreditRouter(repo));
   router.use(createAssetRouter(repo));
   router.use(createLoanRouter(repo));
+  router.use(createPaymentRouter(repo, adapter));
 
   // Contract JSON 404 instead of Express's HTML fallback.
   router.use((_req, _res, next) => next(new ApiError('NOT_FOUND', 'Route not found', 404)));
