@@ -21,3 +21,6 @@ export const VERIFIED_BURN_DAYS = 14; // backend assignment threshold
 export const DEFAULT_APR_BPS = 2800;
 export const MIN_TENOR_MONTHS = 6;
 export const DEFAULT_DEPOSIT_RATIO = 0.1;
+
+/* Fuel economics (matches the deterministic seed). */
+export const PETROL_PRICE_PER_LITRE_KOBO = 115_000;
