@@ -24,6 +24,8 @@ import type {
   CreditFileStatus,
   ExportResult,
   FuelLog,
+  ImpactPeriod,
+  ImpactSummary,
   Installment,
   Loan,
   MeterReading,
@@ -105,6 +107,9 @@ export interface Repository {
 
   /* Webhook -------------------------------------------------------- */
   settleAlatWebhook(reference: string, amountKobo: number, narration: string): void;
+
+  /* Impact --------------------------------------------------------- */
+  impactFor(businessId: string, period: ImpactPeriod): ImpactSummary;
 
   /* Demo ----------------------------------------------------------- */
   missPayment(loanId: string): { loan: Loan; asset: Asset };

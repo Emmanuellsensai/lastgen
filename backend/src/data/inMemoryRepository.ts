@@ -18,8 +18,10 @@ import {
   DEFAULT_APR_BPS,
   DEFAULT_DEPOSIT_RATIO,
   MIN_TENOR_MONTHS,
+  PETROL_PRICE_PER_LITRE_KOBO,
 } from '../config/constants.js';
 import { transition } from '../services/assetStateMachine.js';
+import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
   Asset,
@@ -33,6 +35,8 @@ import type {
   CreditFileStatus,
   ExportResult,
   FuelLog,
+  ImpactPeriod,
+  ImpactSummary,
   Installment,
   Loan,
   MeterReading,
@@ -513,6 +517,25 @@ export class InMemoryRepository implements Repository {
     if (loan && loan.status !== 'CLOSED' && amountKobo > 0) {
       this.payLoan(loan.id, amountKobo, 'ALAT', reference);
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Impact                                                              */
+  /* ------------------------------------------------------------------ */
+
+  impactFor(businessId: string, period: ImpactPeriod): ImpactSummary {
+    const burn = this.burnProfileFor(businessId);
+    const asset = this.assetByBusiness(businessId);
+    const loan = asset ? this.loanByAsset(asset.id) : undefined;
+    return computeImpact({
+      litresPerDay: burn?.litresPerDay ?? 0,
+      balanceKobo: loan?.balanceKobo ?? 0,
+      monthlyPaymentKobo: loan?.monthlyPaymentKobo ?? 0,
+      petrolPricePerLitreKobo: PETROL_PRICE_PER_LITRE_KOBO,
+      readings: asset ? this.meterReadingsFor(asset.id) : [],
+      period,
+      now: this.state.now,
+    });
   }
 
   /* ------------------------------------------------------------------ */
