@@ -1,4 +1,4 @@
--- LastGen seed data
+-- Lastgen seed data
 -- Generated from frontend/src/mocks/seed.ts by frontend/scripts/gen-seed-sql.ts.
 -- Do not edit by hand: regenerate so the mock layer and the database stay in step.
 -- Apply with: psql "$SUPABASE_DB_URL" -f supabase/seed.sql

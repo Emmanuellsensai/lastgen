@@ -1,4 +1,4 @@
-# LastGen backend
+# Lastgen backend
 
 Express + TypeScript API.
 

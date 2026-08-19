@@ -30,7 +30,7 @@ export default function Wrapped() {
         </p>
         <Money kobo={579_600_000} size="xl" className="mt-2 text-green" />
         <p className="mt-4 max-w-lg text-ink-soft">
-          Adaeze Frozen Foods ranked twelfth out of every LastGen business in Lagos this year. Best
+          Adaeze Frozen Foods ranked twelfth out of every Lastgen business in Lagos this year. Best
           month was March.
         </p>
       </GlassPanel>

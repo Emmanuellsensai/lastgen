@@ -1,4 +1,4 @@
-/* LastGen design tokens.
+/* Lastgen design tokens.
    Every colour used in JSX resolves back to one of these values through
    tailwind.config.js. No raw Tailwind palette classes anywhere in the app. */
 

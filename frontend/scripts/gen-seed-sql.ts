@@ -28,7 +28,7 @@ function ts(value: string | undefined): string {
 
 const out: string[] = [];
 
-out.push('-- LastGen seed data');
+out.push('-- Lastgen seed data');
 out.push('-- Generated from frontend/src/mocks/seed.ts by frontend/scripts/gen-seed-sql.ts.');
 out.push('-- Do not edit by hand: regenerate so the mock layer and the database stay in step.');
 out.push('-- Apply with: psql "$SUPABASE_DB_URL" -f supabase/seed.sql');

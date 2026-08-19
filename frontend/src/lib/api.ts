@@ -93,7 +93,7 @@ async function request<T>(
   try {
     response = await fetch(`${ROOT}${path}${buildQuery(query)}`, { ...rest, headers });
   } catch {
-    throw new ApiRequestError('NETWORK', 'Could not reach the LastGen API.', 0);
+    throw new ApiRequestError('NETWORK', 'Could not reach the Lastgen API.', 0);
   }
 
   let envelope: ApiEnvelope<T>;

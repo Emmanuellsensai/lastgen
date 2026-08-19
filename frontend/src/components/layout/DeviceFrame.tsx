@@ -21,7 +21,7 @@ export interface DeviceFrameProps {
 export function DeviceFrame({
   children,
   screenshot,
-  alt = 'LastGen on iPhone',
+  alt = 'Lastgen on iPhone',
   width = 393,
   className,
 }: DeviceFrameProps) {

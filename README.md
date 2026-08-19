@@ -1,10 +1,10 @@
-# LastGen
+# Lastgen
 
 > Hackaholics submission. Fill in every section below before the deadline.
 
 ## 1. Project description
 
-_Placeholder. One paragraph on the problem, who it is for, and how LastGen solves it._
+_Placeholder. One paragraph on the problem, who it is for, and how Lastgen solves it._
 
 ## 2. Live frontend URL
 

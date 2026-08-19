@@ -1,6 +1,6 @@
 # Contributing
 
-These rules exist so several people (and several coding agents) can work on LastGen
+These rules exist so several people (and several coding agents) can work on Lastgen
 at the same time without overwriting each other. They are not suggestions.
 
 ## 1. Ownership is by directory

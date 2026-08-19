@@ -16,7 +16,7 @@ export function Sidebar() {
         <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-green text-cream">
           <span className="font-display text-base leading-none">L</span>
         </span>
-        <span className="font-display text-lg leading-none text-ink">LastGen</span>
+        <span className="font-display text-lg leading-none text-ink">Lastgen</span>
       </NavLink>
 
       <div className="flex flex-col gap-6">

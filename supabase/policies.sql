@@ -1,4 +1,4 @@
--- LastGen row level security notes
+-- Lastgen row level security notes
 --
 -- The policies themselves live at the bottom of supabase/schema.sql so that a
 -- single file brings a database up in the right order (tables, then the

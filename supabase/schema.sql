@@ -1,4 +1,4 @@
--- LastGen schema
+-- Lastgen schema
 -- Tables, enums, indexes and row level security for the frozen API contract.
 -- Apply with: psql "$SUPABASE_DB_URL" -f supabase/schema.sql
 --

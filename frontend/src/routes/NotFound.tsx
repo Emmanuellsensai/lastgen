@@ -9,7 +9,7 @@ export default function NotFound() {
       <PageIntro
         eyebrow="Lost"
         title="Nothing here"
-        description="That address does not match any LastGen screen."
+        description="That address does not match any Lastgen screen."
       />
       <GlassCard elevation={1} title="Try one of these">
         <div className="flex flex-wrap gap-2">

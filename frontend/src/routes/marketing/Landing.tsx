@@ -34,7 +34,7 @@ export default function Landing() {
               <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-green text-cream">
                 <span className="font-display text-base leading-none">L</span>
               </span>
-              <span className="font-display text-lg leading-none text-ink">LastGen</span>
+              <span className="font-display text-lg leading-none text-ink">Lastgen</span>
             </Link>
           }
           right={
@@ -59,7 +59,7 @@ export default function Landing() {
             The last generator you will ever buy fuel for.
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-ink-soft">
-            LastGen measures what a shop already spends on petrol, then finances a solar system
+            Lastgen measures what a shop already spends on petrol, then finances a solar system
             whose monthly instalment sits below that number. The saving pays the lease.
           </p>
 
@@ -96,7 +96,7 @@ export default function Landing() {
         </div>
 
         <div className="hidden justify-center lg:flex">
-          <DeviceFrame width={330} alt="The LastGen burn screen on iPhone">
+          <DeviceFrame width={330} alt="The Lastgen burn screen on iPhone">
             <div className="flex h-full flex-col gap-4 bg-cream px-5 pb-8 pt-20">
               <div className="flex items-center justify-between">
                 <p className="font-display text-lg text-ink">Adaeze Frozen Foods</p>
