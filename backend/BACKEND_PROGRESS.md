@@ -75,14 +75,15 @@ reproduce their externally observable behaviour without importing any code from
 | visionService | ✅ | `services/visionService.ts` (Phase 1) |
 | Payment adapters (simulated/alat) | 🚧 | Stubs only; interface completed Phase 4 |
 | ALAT webhook | ⬜ | Phase 4 |
-| Repository layer (in-memory + Supabase) | ⬜ | Phase 2 |
-| Backend seed data | ⬜ | Phase 2 |
-| Asset status audit migration | ✅ | `migrations/audit.sql` (Phase 0, consumer in Phase 1) |
+| Repository layer | 🚧 | `repository.ts` + `inMemoryRepository.ts` (Phase 2); Supabase at Phase 6 |
+| Backend seed data | ✅ | `data/seed.ts` (Phase 2, byte-for-byte with MSW) |
+| Asset status audit migration | ✅ | `migrations/audit.sql` (Phase 0; repo writes history + realtime publication Phase 2) |
+| Backend test home | ✅ | `backend/test/` — vitest config + seed-parity live (Phase 2) |
 | API routes (all domains) | ⬜ | Phases 3–6 |
 | Demo routes | ⬜ | Phase 6 |
 | Backend README endpoint docs | 🚧 | Scaffolded; full docs Phase 6 |
-| Contract tests (11 suites) | 🚧 | Todo stubs; filled per phase |
-| Correctness tests (5 suites) | 🚧 | 3 suites live (lease-math, asset-state-machine, medical-flag-guard); remaining Phases 4, 5 |
+| Contract tests (11 suites) | 🚧 | Filled in `backend/test/contract/` per phase |
+| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity live (Phase 2); impact-parity + webhook-idempotency + integration per phase |
 | Render deployment verification | ⬜ | Phase 6 |
 
 ## 5. Implemented foundation (Phase 0)
@@ -201,6 +202,33 @@ written.
 - Graceful deterministic mock fallback when `GEMINI_API_KEY` is unset so the
   demo and correctness suites never depend on a live model.
 
+### 6.8 Repository seam (`data/repository.ts` + `data/inMemoryRepository.ts`)
+
+- `Repository` is the single way routes and services touch data, expressed in
+  contract types. The in-memory implementation (Phase 2) reproduces the MSW
+  reference; `SupabaseRepository` lands on the same interface in Phase 6.
+- Every state change funnels through the real domain engines. `payLoan` is
+  atomic: the pure state machine computes the outcome first (throwing before
+  any mutation on invalid input), then loan, asset, next unpaid installment,
+  payment ledger and audit history commit together.
+- The audit trail is written on every asset status change (`changedBy` = bank,
+  demo, or alat), matching `migrations/audit.sql`.
+- Portfolio assets have no business row; the medical flag defaults to false
+  there, mirroring the MSW `canSuspend` behaviour.
+
+### 6.9 Deterministic seed (`data/seed.ts`)
+
+- Byte-for-byte port of `frontend/src/mocks/seed.ts`: mulberry32(20260819)
+  consumed in the reference order, anchored at 2026-08-19T09:00Z. Verified
+  against the captured first-build output by the seed-parity suite.
+- Unlike the frontend (module-level PRNG advances across resets), the backend
+  builds with a fresh PRNG every time, so `reset` is fully deterministic — a
+  deliberate, documented improvement over the reference.
+- Anchors 8 systems, 6 businesses (medical flag on `biz_gwarinpa_mart`),
+  217 fuel logs, 6 quotes/credit files (3 approved/3 pending), 3 installed
+  assets (ACTIVE/GRACE/ACTIVE) with 540 readings each, and the 520-asset
+  portfolio (ACTIVE 319 / GRACE 43 / OWNED 140 / SUSPENDED 21 after merge).
+
 ## 7. Decision register
 
 | Decision | Choice | Rationale |
@@ -214,6 +242,7 @@ written.
 | Persistence | In-memory repository first; Supabase at Phase 6 | Fastest path to a live demo without credentials; repository interface isolates the swap |
 | Medical-flag semantics | Bank `SUSPEND` throws `MEDICAL_FLAG`; automated paths silently stay GRACE | Matches the MSW reference exactly — the guard is enforced in every suspension path |
 | App composition | `createApp(env, logger)` factory | `app.ts` builds the Express app; `index.ts` owns process/startup; testable without listening |
+| Reset determinism | Fresh PRNG per seed build | Frontend resets drift (module-level PRNG); backend resets reproduce the first build exactly |
 
 ## 8. Phase log
 
@@ -244,10 +273,21 @@ written.
 - Verification: `pnpm typecheck` ✅, `pnpm lint` ✅, 3 correctness suites ✅
   (33/33), boot smoke → `GET /health` 200 `{"ok":true}` ✅
 
-### Phase 2 — Data layer — pending
+### Phase 2 — Data layer + deterministic seed (complete)
 
-- Repository interface + in-memory repository porting the deterministic seed
-- Backend seed (mulberry32(20260819), anchor 2026-08-19, 520 portfolio assets)
+- Added `data/repository.ts` (typed `Repository` seam in contract types) and
+  `data/inMemoryRepository.ts` (in-memory implementation driving the real state
+  machines; atomic `payLoan`; audit history written per transition).
+- Added `data/seed.ts` — byte-for-byte port of the MSW fixture with a fresh
+  PRNG per build for deterministic resets.
+- Extended `migrations/audit.sql` with the `supabase_realtime` assets
+  publication (idempotent, additive).
+- Added the backend test home: `backend/vitest.config.ts`, `test` script and
+  `test/correctness/seed-parity.test.ts` (15 assertions) proving the seed
+  reproduces the captured frontend first build and that reset is pristine.
+- Verification: `pnpm --filter @lastgen/backend typecheck` ✅, `pnpm lint` ✅,
+  shared correctness suites ✅ (33/33), `pnpm --filter @lastgen/backend test`
+  ✅ (15/15), boot smoke → `GET /health` 200 `{"ok":true}` ✅
 
 ### Phase 3 — Happy-path routes — pending
 
@@ -287,6 +327,12 @@ written.
 | `test(backend): fill correctness suites for lease, state machine, medical guard` | `tests/correctness/lease-math.test.ts`, `tests/correctness/asset-state-machine.test.ts`, `tests/correctness/medical-flag-guard.test.ts` |
 | `docs(backend): document phase 1 engines and verification` | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
 | `docs: add frontend integration guide` | `GUIDE.md` |
+| `docs: add backend roadmap` | `backend/ROADMAP.md` |
+| `feat(backend): add deterministic in-memory seed` | `data/seed.ts` |
+| `feat(backend): add repository interface and in-memory implementation` | `data/repository.ts`, `data/inMemoryRepository.ts` |
+| `feat(backend): add asset realtime publication to audit migration` | `migrations/audit.sql` |
+| `test(backend): add backend test home and seed-parity suite` | `backend/package.json`, `backend/vitest.config.ts`, `backend/test/correctness/seed-parity.test.ts` |
+| `docs(backend): document phase 2 data layer` | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
 
 ## 10. Risks and open items
 
@@ -300,6 +346,10 @@ written.
   `backend/package.json` (backend-owned dependency, not a root config change).
 - **Schema not yet applied** — the audit migration and schema exist as SQL; they
   are applied to the live Supabase project in Phase 6 with credentials.
+- **Backend tests are backend-owned** — new suites live in `backend/test/`
+  (`pnpm --filter @lastgen/backend test`); the shared `/tests/` directory is
+  only touched for the three committed correctness suites. No further `/tests/`
+  edits are expected.
 - **`gh` CLI not authenticated** — the PR is opened manually by the team lead
   from the pushed `feat/backend` branch.
 - **`.npmrc` is intentionally untracked** — the local `ignore-scripts=true`
@@ -322,7 +372,12 @@ written.
 - [x] Vision service (Phase 1)
 - [x] Correctness suites: lease-math, asset-state-machine, medical-flag-guard (Phase 1)
 - [x] Phase 1 verification (typecheck, lint, tests, boot smoke)
-- [ ] Repository layer + seed (Phase 2)
+- [x] Roadmap (`backend/ROADMAP.md`)
+- [x] Repository layer (interface + in-memory) (Phase 2)
+- [x] Deterministic seed with parity proof (Phase 2)
+- [x] Realtime publication migration (Phase 2)
+- [x] Backend test home + seed-parity suite (Phase 2)
+- [x] Phase 2 verification (typecheck, lint, shared suites, backend suite, boot smoke)
 - [ ] Happy-path routes (Phase 3)
 - [ ] Payments + ALAT webhook (Phase 4)
 - [ ] Portfolio + impact parity (Phase 5)

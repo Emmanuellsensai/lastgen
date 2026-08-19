@@ -3,41 +3,47 @@
 ## 1. Repo state
 
 - Current git branch: `feat/backend`
-- Output of `git status --short` (captured before this audit file was created): Phase 1 files present and verified; commit sequence in `BACKEND_PROGRESS.md` §9.
-- Output of `git log --oneline -15`: HEAD `7dfba87` (`docs(backend): rewrite BACKEND_PROGRESS.md and refresh AUDIT.md for phase 0`), followed by the six Phase 0 commits.
+- Output of `git status --short` (captured before this audit file was created): Phase 1 and Phase 2 files present and verified; commit sequence in `BACKEND_PROGRESS.md` §9.
+- Output of `git log --oneline -15`: HEAD `86638ec` (`docs: add frontend integration guide`), the six Phase 1 commits, and the Phase 0 commits.
 - Full recursive file tree of `/backend` (respecting `.gitignore`, excluding `node_modules`):
 
 ```text
 backend/
 ├── .env.example
-├── BACKEND_PROGRESS.md
 ├── AUDIT.md
+├── BACKEND_PROGRESS.md
+├── ROADMAP.md
 ├── README.md
 ├── package.json
 ├── tsconfig.json
+├── vitest.config.ts
 ├── migrations/
 │   └── audit.sql
-└── src/
-    ├── app.ts
-    ├── index.ts
-    ├── adapters/
-    │   ├── alatAdapter.ts
-    │   ├── paymentAdapter.ts
-    │   └── simulatedAdapter.ts
-    ├── config/
-    │   ├── constants.ts
-    │   └── env.ts
-    ├── lib/
-    │   ├── envelope.ts
-    │   └── supabase.ts
-    ├── middleware/
-    │   ├── auth.ts
-    │   ├── errorHandler.ts
-    │   └── validate.ts
-    ├── routes/
-    │   └── .gitkeep
-    ├── services/
-    │   ├── assetStateMachine.ts
+├── src/
+│   ├── app.ts
+│   ├── index.ts
+│   ├── adapters/
+│   │   ├── alatAdapter.ts
+│   │   ├── paymentAdapter.ts
+│   │   └── simulatedAdapter.ts
+│   ├── config/
+│   │   ├── constants.ts
+│   │   └── env.ts
+│   ├── data/
+│   │   ├── inMemoryRepository.ts
+│   │   ├── repository.ts
+│   │   └── seed.ts
+│   ├── lib/
+│   │   ├── envelope.ts
+│   │   └── supabase.ts
+│   ├── middleware/
+│   │   ├── auth.ts
+│   │   ├── errorHandler.ts
+│   │   └── validate.ts
+│   ├── routes/
+│   │   └── .gitkeep
+│   ├── services/
+│   │   ├── assetStateMachine.ts
     │   ├── burnEngine.ts
     │   ├── impactEngine.ts
     │   ├── leaseEngine.ts
@@ -826,13 +832,53 @@ Verification: `pnpm typecheck` clean, `pnpm lint` clean, `vitest run
 tests/correctness` → 33/33 green, boot smoke `GET /health` → 200 `{"ok":true}`.
 `/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
 
-## 14. Supabase Realtime (pending)
+## 14. Supabase Realtime (done Phase 2)
 
-Per the Phase 6 realtime decision, the backend-owned audit migration will gain:
+`migrations/audit.sql` now adds `assets` to the `supabase_realtime`
+publication, guarded so it is a no-op on managed projects where the table is
+already a member:
 
 ```sql
-alter publication supabase_realtime add table assets;
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    alter publication supabase_realtime add table assets;
+  end if;
+exception when duplicate_object then
+  null;
+end
+$$;
 ```
 
-so the frontend can subscribe to `asset.status_changed` broadcasts. This is
-applied to the live project with the rest of the migrations.
+Applied to the live project with the rest of the migrations in Phase 6, so the
+frontend can subscribe to `asset.status_changed` broadcasts.
+
+## 15. Phase 2 — Data layer + deterministic seed (done)
+
+- **Added** `src/data/seed.ts` — byte-for-byte port of
+  `frontend/src/mocks/seed.ts` on `mulberry32(20260819)` anchored at
+  2026-08-19T09:00Z. Backend resets use a fresh PRNG per build (deterministic),
+  a deliberate improvement over the frontend's drifting module-level PRNG.
+  Captured first-build reference in the seed-parity suite.
+- **Added** `src/data/repository.ts` — typed `Repository` seam over contract
+  types; all domain reads/writes flow through it.
+- **Added** `src/data/inMemoryRepository.ts` — in-memory implementation driving
+  the real lease/state-machine engines. Atomic `payLoan` (pure transition
+  computed first, then loan + asset + installment + payment + audit commit
+  together), idempotent `settleAlatWebhook` on `transactionReference`,
+  monotonic `nextId` (`${prefix}_${pad(seq,5)}`), audit history written on every
+  status change (`changedBy` bank/demo/alat), business-flag fallback for
+  portfolio assets.
+- **Updated** `migrations/audit.sql` — realtime publication for `assets`
+  (idempotent, additive).
+- **Added** the backend test home: `package.json` `test` script +
+  vitest/supertest/@types/supertest devDeps, `vitest.config.ts`
+  (`include: test/**/*.test.ts`), `test/correctness/seed-parity.test.ts`
+  (15 assertions: counts, status distributions, per-business fuel/payments,
+  demo quote/burn/credit/asset/loan, portfolio row 0 + loan + lookups, first/last
+  readings, determinism + pristine reset, portfolio-stats parity to the kobo).
+
+Verification: `pnpm --filter @lastgen/backend typecheck` clean, `pnpm lint`
+clean, shared `tests/correctness` 33/33 green, `pnpm --filter @lastgen/backend
+test` 15/15 green, boot smoke `GET /health` → 200 `{"ok":true}`.
+`/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
