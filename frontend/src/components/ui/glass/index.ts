@@ -4,5 +4,7 @@ export { GlassCard } from './GlassCard';
 export type { GlassCardProps } from './GlassCard';
 export { GlassNav } from './GlassNav';
 export type { GlassNavProps } from './GlassNav';
+export { GlassSubNav } from './GlassSubNav';
+export type { GlassSubNavProps } from './GlassSubNav';
 export { GlassSheet } from './GlassSheet';
 export type { GlassSheetProps } from './GlassSheet';

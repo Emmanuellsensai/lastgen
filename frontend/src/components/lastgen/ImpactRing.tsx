@@ -15,7 +15,7 @@ export interface ImpactRingProps {
 
 /**
  * Circular gauge for months to ownership and CO2 progress.
- * Green arc on a cream track, value centred in Fraunces.
+ * Blue arc on a paper track, value centred in Fraunces.
  */
 export function ImpactRing({
   value,
@@ -44,8 +44,8 @@ export function ImpactRing({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="var(--lg-green-lift)" />
-            <stop offset="100%" stopColor="var(--lg-green)" />
+            <stop offset="0%" stopColor="var(--lg-blue)" />
+            <stop offset="100%" stopColor="var(--lg-navy)" />
           </linearGradient>
         </defs>
         <circle
@@ -53,7 +53,7 @@ export function ImpactRing({
           cy={centre}
           r={radius}
           fill="none"
-          stroke="var(--lg-cream-3)"
+          stroke="var(--lg-paper-3)"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -85,7 +85,7 @@ export function ImpactRing({
             textAnchor="middle"
             dominantBaseline="central"
             className="fill-ink-mute"
-            style={{ fontSize: size * 0.082, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+            style={{ fontSize: size * 0.094 }}
           >
             {caption}
           </text>

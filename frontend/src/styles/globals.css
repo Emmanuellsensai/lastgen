@@ -14,25 +14,24 @@
 
   body {
     margin: 0;
-    background-color: var(--lg-cream);
+    background-color: var(--lg-paper);
     color: var(--lg-ink);
     font-family: theme('fontFamily.sans');
-    font-size: 15px;
-    line-height: 1.65;
+    font-size: 15.5px;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  /* Warm paper ground. A very low contrast solar wash, no floating orbs and
-     no blur discs, just a flat print-like field the glass can sit on. */
+  /* Paper ground. A very low contrast wash, no floating orbs and no blur
+     discs, just a flat field the glass can sit on. */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background:
-      linear-gradient(180deg, var(--lg-cream) 0%, var(--lg-cream-2) 62%, var(--lg-cream-3) 100%);
+    background: linear-gradient(180deg, var(--lg-paper) 0%, var(--lg-paper-2) 100%);
   }
 
   h1,
@@ -46,12 +45,12 @@
   }
 
   ::selection {
-    background: var(--lg-gold-soft);
+    background: var(--lg-blue-soft);
     color: var(--lg-ink);
   }
 
   :focus-visible {
-    outline: 2px solid var(--lg-green-lift);
+    outline: 2px solid var(--lg-blue);
     outline-offset: 2px;
   }
 }
@@ -69,5 +68,41 @@
 
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Vertical rhythm for landing sections. */
+  .section-y {
+    padding-top: var(--lg-section-y);
+    padding-bottom: var(--lg-section-y);
+  }
+
+  /* Wrapped story: one panel at a time. */
+  .snap-story {
+    scroll-snap-type: y mandatory;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .snap-panel {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

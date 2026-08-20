@@ -1,4 +1,4 @@
-import { CalendarClock, RotateCcw, TriangleAlert } from 'lucide-react';
+import { ArrowCounterClockwise, CalendarCheck, Warning } from '@phosphor-icons/react';
 import { AppShell, DEMO_IDS, PageIntro } from '@/components/layout';
 import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
 import { StatusPill } from '@/components/lastgen';
@@ -14,72 +14,73 @@ export default function DemoControl() {
       nav={
         <GlassNav
           left={<span className="font-display text-base text-ink">Demo control</span>}
-          right={<Badge variant="gold">Mock mode</Badge>}
+          right={<Badge variant="info">Mock mode</Badge>}
         />
       }
     >
       <PageIntro
-        eyebrow="Demo"
         title="Control"
         description="Drive the demo from one place: reset the data, push the clock forward, or miss a payment on purpose."
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <GlassCard elevation={1} hoverable eyebrow="Reset" title="Back to the seed">
-          <p className="text-sm leading-relaxed text-ink-soft">
+      <div className="grid gap-5 md:grid-cols-3">
+        <GlassCard elevation={1} hoverable padding="lg" title="Back to the seed">
+          <p className="leading-relaxed text-ink-soft">
             Rebuilds every business, asset and loan from the fixed seed, so a run always starts the
             same way.
           </p>
-          <Button size="sm" variant="secondary" className="mt-4">
-            <RotateCcw size={15} strokeWidth={1.5} />
+          <Button size="sm" variant="secondary" className="mt-6">
+            <ArrowCounterClockwise size={18} weight="regular" />
             Reset
           </Button>
         </GlassCard>
 
-        <GlassCard elevation={1} hoverable eyebrow="Advance time" title="Push the clock">
-          <p className="text-sm leading-relaxed text-ink-soft">
+        <GlassCard elevation={1} hoverable padding="lg" title="Push the clock">
+          <p className="leading-relaxed text-ink-soft">
             Moves the demo clock forward and rolls the state machine, so overdue loans fall into
             grace and then into suspension.
           </p>
-          <Button size="sm" variant="secondary" className="mt-4">
-            <CalendarClock size={15} strokeWidth={1.5} />
+          <Button size="sm" variant="secondary" className="mt-6">
+            <CalendarCheck size={18} weight="regular" />
             Advance 30 days
           </Button>
         </GlassCard>
 
-        <GlassCard elevation={1} hoverable eyebrow="Miss payment" title="Force arrears">
-          <p className="text-sm leading-relaxed text-ink-soft">
+        <GlassCard elevation={1} hoverable padding="lg" title="Force arrears">
+          <p className="leading-relaxed text-ink-soft">
             Marks the demo loan delinquent and steps the asset one stage down the enforcement path.
           </p>
-          <Button size="sm" variant="secondary" className="mt-4">
-            <TriangleAlert size={15} strokeWidth={1.5} />
+          <Button size="sm" variant="secondary" className="mt-6">
+            <Warning size={18} weight="regular" />
             Miss a payment
           </Button>
         </GlassCard>
       </div>
 
-      <GlassPanel elevation={1} className="mt-4 rounded-lg p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-          Demo clock
-        </p>
-        <p className="font-display tabular mt-1 text-3xl text-ink">
-          {daysAdvanced} days advanced
-        </p>
-        <p className="mt-2 text-sm text-ink-mute">{lastAction ?? 'No demo action yet.'}</p>
-      </GlassPanel>
+      <section className="mt-16">
+        <GlassPanel elevation={1} className="rounded-lg p-7">
+          <p className="text-sm text-ink-mute">Demo clock</p>
+          <p className="font-display tabular mt-3 text-4xl leading-none text-ink">
+            {daysAdvanced} days advanced
+          </p>
+          <p className="mt-5 text-ink-soft">{lastAction ?? 'No demo action yet.'}</p>
+        </GlassPanel>
+      </section>
 
-      <GlassCard elevation={1} className="mt-4" eyebrow="Route shell" title="Demo control">
-        <p className="text-sm leading-relaxed text-ink-soft">
-          The three buttons above map to the unauthenticated demo endpoints in the contract. They
-          are wired to the API client in the next pass. The demo loan is{' '}
-          <span className="tabular text-ink">{DEMO_IDS.loanId}</span>.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <StatusPill status="ACTIVE" size="sm" />
-          <StatusPill status="GRACE" size="sm" />
-          <StatusPill status="SUSPENDED" size="sm" />
-        </div>
-      </GlassCard>
+      <section className="mt-16">
+        <GlassCard elevation={1} padding="lg" title="Asset states">
+          <div className="flex flex-wrap gap-3">
+            <StatusPill status="ACTIVE" size="sm" />
+            <StatusPill status="GRACE" size="sm" />
+            <StatusPill status="SUSPENDED" size="sm" />
+          </div>
+          <p className="mt-6 max-w-lg leading-relaxed text-ink-soft">
+            The three buttons above map to the unauthenticated demo endpoints in the contract. They
+            are wired to the API client in the next pass.
+          </p>
+          <p className="mt-4 text-sm text-ink-mute">Demo loan {DEMO_IDS.loanId}.</p>
+        </GlassCard>
+      </section>
     </AppShell>
   );
 }

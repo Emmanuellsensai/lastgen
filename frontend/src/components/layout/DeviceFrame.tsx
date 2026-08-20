@@ -50,24 +50,26 @@ export function DeviceFrame({
       >
         {/* Inner bezel */}
         <div
-          className="relative h-full w-full overflow-hidden bg-ink"
+          className="relative h-full w-full overflow-hidden bg-black"
           style={{ borderRadius: 52 * scale, padding: 2 * scale }}
         >
           {/* Screen */}
           <div
-            className="relative h-full w-full overflow-hidden bg-cream"
+            className="relative h-full w-full overflow-hidden bg-paper"
             style={{ borderRadius: 50 * scale }}
           >
             {screenshot ? (
               <img src={screenshot} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="h-full w-full overflow-y-auto">{children}</div>
+              <div className="relative isolate z-10 h-full w-full overflow-y-auto">{children}</div>
             )}
 
             {/* Dynamic Island */}
             <div
-              className="absolute left-1/2 z-20 -translate-x-1/2 bg-ink"
+              className="absolute left-1/2 z-20 -translate-x-1/2"
               style={{
+                // A hardware cutout, so true black rather than the ink token.
+                background: '#000000',
                 top: 11 * scale,
                 width: 125 * scale,
                 height: 36 * scale,

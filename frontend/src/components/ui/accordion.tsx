@@ -1,5 +1,5 @@
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
-import { ChevronDown } from 'lucide-react';
+import { CaretDown } from '@phosphor-icons/react';
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
 import { cn } from '@/lib/cn';
 
@@ -28,15 +28,15 @@ export const AccordionTrigger = forwardRef<
         ref={ref}
         className={cn(
           'group flex flex-1 items-center justify-between gap-3 py-4 text-left text-sm font-medium text-ink',
-          'transition-colors duration-200 ease-lg hover:text-green',
+          'transition-colors duration-200 ease-lg hover:text-navy',
           className,
         )}
         {...props}
       >
         {children}
-        <ChevronDown
+        <CaretDown
           size={16}
-          strokeWidth={1.5}
+          weight="regular"
           className="shrink-0 text-ink-mute transition-transform duration-200 ease-lg group-data-[state=open]:rotate-180"
         />
       </AccordionPrimitive.Trigger>

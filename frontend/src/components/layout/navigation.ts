@@ -1,21 +1,23 @@
 import {
-  Building2,
+  Bank,
+  DotsThreeCircle,
   Flame,
-  LayoutGrid,
   Receipt,
   SlidersHorizontal,
+  SquaresFour,
   Sun,
   Trophy,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+  House,
+} from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
 import { DEMO_BUSINESS_ID } from '@/mocks/seed';
 
 export interface NavItem {
   to: string;
   label: string;
-  icon: LucideIcon;
-  /** Shown in the mobile tab bar. The rest live in the desktop rail only. */
-  primary?: boolean;
+  icon: Icon;
+  /** Treat sub paths as active too, so /bank/file/:id keeps Bank lit. */
+  matchPrefix?: string;
 }
 
 export interface NavGroup {
@@ -32,29 +34,47 @@ export const DEMO_IDS = {
   creditFileId: `cf_${DEMO_BUSINESS_ID}`,
 };
 
+/**
+ * The five mobile tabs. Every authenticated route lights exactly one of them,
+ * which is what keeps a user oriented on an inner screen.
+ */
+export const PRIMARY_NAV: NavItem[] = [
+  { to: '/', label: 'Home', icon: House },
+  { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
+  { to: `/asset/${DEMO_IDS.assetId}`, label: 'Systems', icon: Sun, matchPrefix: '/asset' },
+  { to: '/bank', label: 'Bank', icon: Bank, matchPrefix: '/bank' },
+  { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
+];
+
 export const NAV_GROUPS: NavGroup[] = [
   {
-    heading: 'Business',
+    heading: 'Your business',
     items: [
-      { to: '/burn', label: 'Burn', icon: Flame, primary: true },
-      { to: `/quote/${DEMO_IDS.quoteId}`, label: 'Quote', icon: Receipt, primary: true },
-      { to: `/asset/${DEMO_IDS.assetId}`, label: 'Asset', icon: Sun, primary: true },
-      { to: `/wrapped/${DEMO_IDS.businessId}`, label: 'Wrapped', icon: Trophy },
+      { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
+      { to: `/quote/${DEMO_IDS.quoteId}`, label: 'Quote', icon: Receipt, matchPrefix: '/quote' },
+      {
+        to: `/asset/${DEMO_IDS.assetId}`,
+        label: 'Your systems',
+        icon: Sun,
+        matchPrefix: '/asset',
+      },
+      {
+        to: `/wrapped/${DEMO_IDS.businessId}`,
+        label: 'Wrapped',
+        icon: Trophy,
+        matchPrefix: '/wrapped',
+      },
     ],
   },
   {
     heading: 'Bank',
     items: [
-      { to: '/bank', label: 'Applications', icon: Building2, primary: true },
-      { to: '/bank/portfolio', label: 'Portfolio', icon: LayoutGrid },
+      { to: '/bank', label: 'Applications', icon: Bank },
+      { to: '/bank/portfolio', label: 'Portfolio', icon: SquaresFour },
     ],
   },
   {
     heading: 'Demo',
-    items: [{ to: '/demo', label: 'Control', icon: SlidersHorizontal }],
+    items: [{ to: '/demo', label: 'Control', icon: SlidersHorizontal, matchPrefix: '/demo' }],
   },
 ];
-
-export const PRIMARY_NAV: NavItem[] = NAV_GROUPS.flatMap((group) =>
-  group.items.filter((item) => item.primary),
-);

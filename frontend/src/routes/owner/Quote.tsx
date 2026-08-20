@@ -1,12 +1,32 @@
 import { useParams } from 'react-router-dom';
-import { AppShell, PageIntro } from '@/components/layout';
-import { GlassCard, GlassNav } from '@/components/ui/glass';
+import { AppShell } from '@/components/layout';
+import { GlassCard, GlassPanel } from '@/components/ui/glass';
 import { Money } from '@/components/lastgen';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-const PREVIEW_ROWS = [
+const SPEC = [
+  { label: 'System', value: 'Harmattan Cold Chain 7.5' },
+  { label: 'Panels', value: '9,000 W' },
+  { label: 'Battery', value: '20.48 kWh' },
+  { label: 'Inverter', value: '8 kVA' },
+];
+
+const TERMS = [
+  { label: 'Term', value: '24 months' },
+  { label: 'Deposit', kobo: 74_200_000 },
+  { label: 'Total over the term', kobo: 953_908_936 },
+];
+
+const SCHEDULE = [
   { n: 1, due: 'Sep 2026', principalKobo: 15_100_000, interestKobo: 15_520_000 },
   { n: 2, due: 'Oct 2026', principalKobo: 15_450_000, interestKobo: 15_170_000 },
   { n: 3, due: 'Nov 2026', principalKobo: 15_810_000, interestKobo: 14_810_000 },
@@ -16,98 +36,107 @@ export default function Quote() {
   const { id } = useParams<{ id: string }>();
 
   return (
-    <AppShell nav={<GlassNav left={<span className="font-display text-base text-ink">Quote</span>} />}>
-      <PageIntro
-        eyebrow="Owner"
-        title="Quote"
-        description="A priced solar lease, only offered when the instalment lands below the current fuel bill."
-        actions={
-          <Button size="sm">Send to the bank</Button>
-        }
-      />
+    <AppShell
+      subNav={{
+        title: 'Your quote',
+        backTo: '/burn',
+        action: (
+          <Button size="sm" variant="blue">
+            Send it in
+          </Button>
+        ),
+      }}
+    >
+      {/* The one number that matters, alone. */}
+      <GlassPanel elevation={2} className="rounded-lg p-7 md:p-10">
+        <p className="text-sm text-ink-mute">You would pay, every month</p>
+        <Money kobo={36_654_539} size="xl" className="mt-3 block text-ink" />
+        <p className="mt-6 text-lg leading-relaxed text-ink-soft">
+          Against a fuel bill of <Money kobo={48_449_820} size="md" /> a month.
+        </p>
+      </GlassPanel>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <GlassCard
-          elevation={2}
-          padding="lg"
-          eyebrow="Harmattan Cold Chain 7.5"
-          title="7.5 kW, 20.48 kWh battery, 8 kVA inverter"
-          header={<Badge variant="green">Viable</Badge>}
-        >
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Monthly instalment
-              </dt>
-              <dd className="mt-1">
-                <Money kobo={36_654_539} size="lg" className="text-green" />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Monthly saving
-              </dt>
-              <dd className="mt-1">
-                <Money kobo={11_795_281} size="lg" signed className="text-green" />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Deposit
-              </dt>
-              <dd className="mt-1">
-                <Money kobo={74_200_000} size="md" />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-mute">
-                Total payable over 24 months
-              </dt>
-              <dd className="mt-1">
-                <Money kobo={953_908_936} size="md" />
-              </dd>
-            </div>
+      {/* Savings, its own section rather than another cell in a dense card. */}
+      <section className="mt-16">
+        <h2 className="font-display text-2xl text-ink">What you keep</h2>
+
+        <GlassCard elevation={1} padding="lg" className="mt-6" header={<Badge variant="success">Worth doing</Badge>}>
+          <p className="text-sm text-ink-mute">Left in your pocket each month</p>
+          <Money kobo={11_795_281} size="xl" signed className="mt-3 block text-success" />
+          <p className="mt-6 max-w-md leading-relaxed text-ink-soft">
+            That is 24 percent of what you currently burn. The deposit pays itself back by month
+            seven.
+          </p>
+        </GlassCard>
+      </section>
+
+      {/* Lease terms, separated from the savings story. */}
+      <section className="mt-16">
+        <h2 className="font-display text-2xl text-ink">The terms</h2>
+
+        <div className="mt-6 grid gap-5 sm:grid-cols-3">
+          {TERMS.map((term) => (
+            <GlassCard key={term.label} elevation={1} padding="lg">
+              <p className="text-sm text-ink-mute">{term.label}</p>
+              {term.kobo !== undefined ? (
+                <Money kobo={term.kobo} size="lg" className="mt-2 block" />
+              ) : (
+                <p className="font-display tabular mt-2 text-3xl text-ink">{term.value}</p>
+              )}
+            </GlassCard>
+          ))}
+        </div>
+      </section>
+
+      {/* System spec */}
+      <section className="mt-16">
+        <h2 className="font-display text-2xl text-ink">What gets installed</h2>
+
+        <GlassCard elevation={1} padding="lg" className="mt-6">
+          <dl className="grid gap-6 sm:grid-cols-2">
+            {SPEC.map((row) => (
+              <div key={row.label}>
+                <dt className="text-sm text-ink-mute">{row.label}</dt>
+                <dd className="mt-1 font-medium text-ink">{row.value}</dd>
+              </div>
+            ))}
           </dl>
         </GlassCard>
+      </section>
 
-        <GlassCard elevation={1} eyebrow="Route shell" title={`Quote ${id ?? 'unknown'}`}>
-          <p className="text-sm leading-relaxed text-ink-soft">
-            This shell will load the quote by id through the API client, render the system spec, the
-            amortisation schedule and the savings proof, then hand off to the credit application.
-          </p>
-          <p className="mt-3 text-sm text-ink-mute">
-            The contract rejects any quote whose monthly saving is not positive, so this screen never
-            shows a lease that costs more than the fuel it replaces.
-          </p>
-        </GlassCard>
-      </div>
+      {/* Schedule */}
+      <section className="mt-16">
+        <h2 className="font-display text-2xl text-ink">Your first payments</h2>
 
-      <GlassCard elevation={1} className="mt-4" eyebrow="Preview" title="First three instalments">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nr</TableHead>
-              <TableHead>Due</TableHead>
-              <TableHead>Principal</TableHead>
-              <TableHead>Interest</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {PREVIEW_ROWS.map((row) => (
-              <TableRow key={row.n}>
-                <TableCell className="tabular">{row.n}</TableCell>
-                <TableCell>{row.due}</TableCell>
-                <TableCell>
-                  <Money kobo={row.principalKobo} size="sm" />
-                </TableCell>
-                <TableCell>
-                  <Money kobo={row.interestKobo} size="sm" />
-                </TableCell>
+        <GlassCard elevation={1} padding="sm" className="mt-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nr</TableHead>
+                <TableHead>Due</TableHead>
+                <TableHead>Goes to the system</TableHead>
+                <TableHead>Goes to the bank</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </GlassCard>
+            </TableHeader>
+            <TableBody>
+              {SCHEDULE.map((row) => (
+                <TableRow key={row.n}>
+                  <TableCell className="tabular">{row.n}</TableCell>
+                  <TableCell>{row.due}</TableCell>
+                  <TableCell>
+                    <Money kobo={row.principalKobo} size="sm" />
+                  </TableCell>
+                  <TableCell>
+                    <Money kobo={row.interestKobo} size="sm" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </GlassCard>
+
+        <p className="mt-6 text-sm text-ink-mute">Quote reference {id ?? 'unknown'}.</p>
+      </section>
     </AppShell>
   );
 }

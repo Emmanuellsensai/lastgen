@@ -1,5 +1,5 @@
 import * as ToastPrimitive from '@radix-ui/react-toast';
-import { X } from 'lucide-react';
+import { X } from '@phosphor-icons/react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
 import { cn } from '@/lib/cn';
@@ -32,8 +32,8 @@ const toastVariants = cva(
     variants: {
       tone: {
         neutral: '',
-        success: 'lg-tint-green',
-        warning: 'lg-tint-gold',
+        success: 'lg-tint-navy',
+        warning: 'lg-tint-blue',
         danger: 'lg-tint-burn',
       },
     },
@@ -86,8 +86,8 @@ export const ToastAction = forwardRef<
     <ToastPrimitive.Action
       ref={ref}
       className={cn(
-        'shrink-0 rounded-sm px-2.5 py-1 text-[13px] font-medium text-green',
-        'transition-colors duration-200 ease-lg hover:bg-green-soft',
+        'shrink-0 rounded-sm px-2.5 py-1 text-[13px] font-medium text-navy',
+        'transition-colors duration-200 ease-lg hover:bg-blue-soft',
         className,
       )}
       {...props}
@@ -105,12 +105,12 @@ export const ToastClose = forwardRef<
       aria-label="Close"
       className={cn(
         'ml-auto shrink-0 rounded-full p-1 text-ink-mute',
-        'transition-colors duration-200 ease-lg hover:bg-cream-2 hover:text-ink',
+        'transition-colors duration-200 ease-lg hover:bg-paper-2 hover:text-ink',
         className,
       )}
       {...props}
     >
-      <X size={15} strokeWidth={1.5} />
+      <X size={15} weight="regular" />
     </ToastPrimitive.Close>
   );
 });
