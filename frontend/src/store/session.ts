@@ -12,16 +12,18 @@ export interface SessionState {
   demoAssetId: string | null;
   demoLoanId: string | null;
   demoQuoteId: string | null;
+  isAdmin: boolean;
   signIn: (role: 'owner' | 'bank') => void;
   setRole: (role: SessionRole) => void;
   setAccessToken: (token: string | null) => void;
   setBusinessId: (id: string | null) => void;
+  register: (body: { email: string; password: string; fullName: string; phone: string }) => Promise<void>;
   signOut: () => void;
 }
 
 export const useSession = create<SessionState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       role: 'guest',
       accessToken: null,
       businessId: null,
@@ -29,10 +31,12 @@ export const useSession = create<SessionState>()(
       demoAssetId: null,
       demoLoanId: null,
       demoQuoteId: null,
+      isAdmin: false,
 
       signIn: (role) =>
         set({
           role,
+          isAdmin: role === 'bank',
           demoBusinessId: DEMO_IDS.businessId,
           demoAssetId: DEMO_IDS.assetId,
           demoLoanId: DEMO_IDS.loanId,
@@ -43,6 +47,18 @@ export const useSession = create<SessionState>()(
       setAccessToken: (accessToken) => set({ accessToken }),
       setBusinessId: (businessId) => set({ businessId }),
 
+      register: async (_body) => {
+        // In mock/demo mode, registration just signs in as owner
+        set({
+          role: 'owner',
+          isAdmin: false,
+          demoBusinessId: DEMO_IDS.businessId,
+          demoAssetId: DEMO_IDS.assetId,
+          demoLoanId: DEMO_IDS.loanId,
+          demoQuoteId: DEMO_IDS.quoteId,
+        });
+      },
+
       signOut: () =>
         set({
           role: 'guest',
@@ -52,6 +68,7 @@ export const useSession = create<SessionState>()(
           demoAssetId: null,
           demoLoanId: null,
           demoQuoteId: null,
+          isAdmin: false,
         }),
     }),
     { name: 'lastgen.session' },
