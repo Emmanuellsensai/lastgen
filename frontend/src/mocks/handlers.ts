@@ -21,6 +21,7 @@ import {
   type Payment,
   type Quote,
   type SolarSystem,
+  type Wallet,
 } from '@/types/api';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo, monthsToOwnership } from '@/lib/lease';
 import { buildDb, DEMO_BUSINESS_ID, PETROL_PRICE_PER_LITRE_KOBO, type Db } from './seed';
@@ -256,6 +257,20 @@ const businessHandlers: HttpHandler[] = [
     db.fuelLogs.sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
     recomputeBurn(businessId);
     return ok(log, 201);
+  }),
+
+  http.get(`${BASE}/businesses/:id/fuel-logs`, async ({ params, request }) => {
+    await lag();
+    const businessId = String(params.id);
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get('limit')) || 30;
+    const offset = Number(url.searchParams.get('offset')) || 0;
+    const logs = db.fuelLogs
+      .filter((fl) => fl.businessId === businessId)
+      .sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime())
+      .slice(offset, offset + limit);
+    const total = db.fuelLogs.filter((fl) => fl.businessId === businessId).length;
+    return ok({ items: logs, total });
   }),
 
   http.get(`${BASE}/businesses/:id/burn`, async ({ params }) => {
@@ -501,18 +516,43 @@ const loanHandlers: HttpHandler[] = [
     if (loan.status === 'CLOSED') {
       return fail('INVALID_TRANSITION', 'This loan is already closed', 409);
     }
-    const body = (await request.json()) as { amountKobo: number };
-    if (!body?.amountKobo || body.amountKobo <= 0) {
+    const body = (await request.json()) as { source: 'wallet' | 'bank_account'; amountKobo?: number };
+    const amount = body.amountKobo ?? loan.balanceKobo;
+    if (amount <= 0) {
       return fail('VALIDATION', 'amountKobo must be greater than zero');
     }
-    const { payment, asset } = settlePayment(
-      loan,
-      body.amountKobo,
-      'SIMULATED',
-      `SIM-${Date.now()}`,
-    );
-    if (!asset) return notFound('Asset');
-    return ok({ payment, loan, asset });
+
+    if (body.source === 'wallet') {
+      const asset = db.assets.find((a) => a.id === loan.assetId);
+      const wallet = asset ? db.wallets.find((w) => w.businessId === asset.businessId) : undefined;
+      if (!wallet || wallet.balanceKobo < amount) {
+        return fail('PAYMENT_REQUIRED', 'Insufficient wallet balance', 402);
+      }
+      wallet.balanceKobo -= amount;
+      const { payment } = settlePayment(loan, amount, 'WALLET', `SIM-${Date.now()}`);
+      return ok<{ paymentId: string; platformTransactionReference: null; status: 'SUCCESS' | 'pending_authorisation' }>({ paymentId: payment.id, platformTransactionReference: null, status: 'SUCCESS' });
+    }
+
+    // Bank account path: pending, auto-settle after 3 seconds
+    const ref = `SIM-${Date.now()}`;
+    const paymentId = `pay_${Date.now()}`;
+    db.pendingPayments.push({
+      id: paymentId,
+      loanId: loan.id,
+      amountKobo: amount,
+      reference: ref,
+      status: 'pending_authorisation',
+    });
+
+    setTimeout(() => {
+      const p = db.pendingPayments.find((x) => x.reference === ref);
+      if (p && p.status === 'pending_authorisation') {
+        p.status = 'SUCCESS';
+        settlePayment(loan, amount, 'ALAT', ref);
+      }
+    }, 3000);
+
+    return ok<{ paymentId: string; platformTransactionReference: null; status: 'SUCCESS' | 'pending_authorisation' }>({ paymentId, platformTransactionReference: null, status: 'pending_authorisation' });
   }),
 
   http.get(`${BASE}/loans/:id/schedule`, async ({ params }) => {
@@ -687,33 +727,79 @@ const webhookHandlers: HttpHandler[] = [
   }),
 ];
 
-const authHandlers: HttpHandler[] = [
-  http.post(`${BASE}/auth/login`, async ({ request }) => {
-    await delay(500);
-    const body = (await request.json()) as { email: string; password: string };
-    if (!body.email || !body.password) {
-      return fail('VALIDATION', 'Email and password are required');
+const walletHandlers: HttpHandler[] = [
+  http.get(`${BASE}/wallets/balance`, async () => {
+    await lag();
+    const wallet = db.wallets[0];
+    if (!wallet) return notFound('Wallet');
+    return ok(wallet);
+  }),
+
+  http.get(`${BASE}/wallets/statement`, async ({ request }) => {
+    await lag();
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get('limit')) || 20;
+    const txs = db.walletTransactions.slice(0, limit);
+    return ok({ items: txs });
+  }),
+
+  http.post(`${BASE}/wallets/create`, async ({ request }) => {
+    await new Promise((r) => setTimeout(r, 2500));
+    const body = (await request.json()) as Record<string, string>;
+    const wallet: Wallet = {
+      id: `wlt_${Date.now()}`,
+      businessId: body.businessId,
+      accountNumber: `${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+      bankCode: '035',
+      balanceKobo: 5_000_000,
+      currency: 'NGN',
+      createdAt: new Date().toISOString(),
+    };
+    db.wallets.push(wallet);
+    db.walletTransactions.push({
+      id: `wtx_${Date.now()}`,
+      walletId: wallet.id,
+      ts: new Date().toISOString(),
+      direction: 'IN',
+      amountKobo: 5_000_000,
+      description: 'Demo account pre-funding',
+      reference: 'DEMO-PREFUND',
+      category: 'credit',
+    });
+    return ok(wallet);
+  }),
+
+  http.get(`${BASE}/payments/:ref/status`, async ({ params }) => {
+    await lag();
+    const ref = String(params.ref);
+    const payment = db.pendingPayments.find((p) => p.reference === ref || p.id === ref);
+    if (!payment) return notFound('Payment');
+    return ok({ paymentId: payment.id, status: payment.status });
+  }),
+
+  http.post(`${BASE}/auth/verify-nin`, async ({ request }) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    const body = (await request.json()) as { nin: string };
+    if (!body.nin || body.nin.length !== 11) {
+      return fail('VALIDATION', 'NIN must be 11 digits');
     }
-    // Demo: any email/password combo works, return owner role
     return ok({
-      user: { id: 'demo-user', email: body.email, fullName: 'Adaeze Okafor' },
-      role: 'owner',
-      businessId: DEMO_BUSINESS_ID,
-      accessToken: 'demo-token-xxx',
+      verified: true,
+      owner: {
+        firstName: 'Adaeze',
+        lastName: 'Okafor',
+        dateOfBirth: '1988-04-12',
+        phone: '+2348012345678',
+      },
     });
   }),
 
-  http.post(`${BASE}/auth/register`, async ({ request }) => {
-    await delay(800);
-    const body = (await request.json()) as { email: string; password: string; fullName: string; phone: string };
-    if (!body.email || !body.password || !body.fullName) {
-      return fail('VALIDATION', 'All fields are required');
-    }
+  http.get(`${BASE}/me/session`, async () => {
+    await lag();
     return ok({
-      user: { id: 'demo-user-new', email: body.email, fullName: body.fullName },
       role: 'owner',
       businessId: DEMO_BUSINESS_ID,
-      accessToken: 'demo-token-xxx',
+      name: 'Adaeze Okafor',
     });
   }),
 ];
@@ -728,7 +814,7 @@ export const handlers: HttpHandler[] = [
   ...impactHandlers,
   ...demoHandlers,
   ...webhookHandlers,
-  ...authHandlers,
+  ...walletHandlers,
 ];
 
 export { DEMO_BUSINESS_ID };

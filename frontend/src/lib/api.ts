@@ -14,6 +14,7 @@ import type {
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
+  CreateWalletBody,
   CreditFile,
   CreditFileDetail,
   DeclineBody,
@@ -31,12 +32,15 @@ import type {
   PagedEnvelope,
   PayBody,
   PayResult,
+  PaymentStatus,
   PortfolioAssetsQuery,
   PortfolioStats,
   Quote,
   SolarSystem,
   SuspendBody,
   SystemsQuery,
+  Wallet,
+  WalletTransaction,
   WrappedPayload,
 } from '@/types/api';
 
@@ -184,13 +188,23 @@ export const api = {
       post<{ loan: Loan; asset: Asset }>('/demo/miss-payment', body),
   },
 
-  auth: {
-    login: (body: { email: string; password: string }) =>
-      post<{ user: { id: string; email: string; fullName: string }; role: 'owner' | 'bank'; businessId: string; accessToken: string }>('/auth/login', body),
-    register: (body: { email: string; password: string; fullName: string; phone: string }) =>
-      post<{ user: { id: string; email: string; fullName: string }; role: 'owner' | 'bank'; businessId: string; accessToken: string }>('/auth/register', body),
-    verifyNin: (nin: string) =>
-      post<{ verified: boolean; owner: { firstName: string; lastName: string; dateOfBirth: string; phone: string } }>('/auth/verify-nin', { nin }),
+  wallets: {
+    create: (body: CreateWalletBody) => post<Wallet>('/wallets/create', body),
+    balance: () => request<Wallet>('/wallets/balance'),
+    statement: (query: { limit?: number } = {}) =>
+      request<ListEnvelope<WalletTransaction>>('/wallets/statement', { query: { ...query } }),
+  },
+
+  payments: {
+    status: (ref: string) =>
+      request<{ paymentId: string; status: PaymentStatus }>(`/payments/${ref}/status`),
+  },
+
+  fuelLogs: {
+    list: (businessId: string, limit = 30, offset = 0) =>
+      request<PagedEnvelope<FuelLog>>(`/businesses/${businessId}/fuel-logs`, {
+        query: { limit, offset },
+      }),
   },
 };
 

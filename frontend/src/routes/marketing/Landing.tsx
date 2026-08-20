@@ -182,9 +182,14 @@ export default function Landing() {
             </Link>
           }
           right={
-            <Button asChild size="sm">
-              <Link to="/login">Open the demo</Link>
-            </Button>
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/bank">For banks</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/login">Open the demo</Link>
+              </Button>
+            </>
           }
         />
       }
