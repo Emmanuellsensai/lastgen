@@ -259,6 +259,20 @@ const businessHandlers: HttpHandler[] = [
     return ok(log, 201);
   }),
 
+  http.get(`${BASE}/businesses/:id/fuel-logs`, async ({ params, request }) => {
+    await lag();
+    const businessId = String(params.id);
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get('limit')) || 30;
+    const offset = Number(url.searchParams.get('offset')) || 0;
+    const logs = db.fuelLogs
+      .filter((fl) => fl.businessId === businessId)
+      .sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime())
+      .slice(offset, offset + limit);
+    const total = db.fuelLogs.filter((fl) => fl.businessId === businessId).length;
+    return ok({ items: logs, total });
+  }),
+
   http.get(`${BASE}/businesses/:id/burn`, async ({ params }) => {
     await lag();
     const profile = db.burnProfiles.find((p) => p.businessId === String(params.id));

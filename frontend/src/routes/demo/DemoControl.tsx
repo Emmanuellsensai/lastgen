@@ -1,13 +1,63 @@
+import { useState } from 'react';
 import { ArrowCounterClockwise, CalendarCheck, Warning } from '@phosphor-icons/react';
 import { AppShell, DEMO_IDS, PageIntro } from '@/components/layout';
 import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
 import { StatusPill } from '@/components/lastgen';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Toast, ToastTitle } from '@/components/ui/toast';
 import { useDemo } from '@/store/demo';
+import { api } from '@/lib/api';
 
 export default function DemoControl() {
-  const { daysAdvanced, lastAction } = useDemo();
+  const { daysAdvanced, lastAction, busy, setBusy, recordAdvance, recordAction, reset } = useDemo();
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+
+  async function handleReset() {
+    setBusy(true);
+    try {
+      await api.demo.reset();
+      reset();
+      setToastMsg('Demo data reset.');
+      setToastOpen(true);
+    } catch {
+      setToastMsg('Reset failed.');
+      setToastOpen(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAdvance() {
+    setBusy(true);
+    try {
+      await api.demo.advanceTime({ days: 30 });
+      recordAdvance(30);
+      setToastMsg('Advanced 30 days.');
+      setToastOpen(true);
+    } catch {
+      setToastMsg('Advance failed.');
+      setToastOpen(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMissPayment() {
+    setBusy(true);
+    try {
+      await api.demo.missPayment({ loanId: DEMO_IDS.loanId });
+      recordAction('Marked payment as missed');
+      setToastMsg('Payment marked as missed.');
+      setToastOpen(true);
+    } catch {
+      setToastMsg('Failed to mark payment.');
+      setToastOpen(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <AppShell
@@ -29,9 +79,9 @@ export default function DemoControl() {
             Rebuilds every business, asset and loan from the fixed seed, so a run always starts the
             same way.
           </p>
-          <Button size="sm" variant="secondary" className="mt-6">
+          <Button size="sm" variant="secondary" className="mt-6" onClick={handleReset} disabled={busy}>
             <ArrowCounterClockwise size={18} weight="regular" />
-            Reset
+            {busy ? 'Working...' : 'Reset'}
           </Button>
         </GlassCard>
 
@@ -40,9 +90,9 @@ export default function DemoControl() {
             Moves the demo clock forward and rolls the state machine, so overdue loans fall into
             grace and then into suspension.
           </p>
-          <Button size="sm" variant="secondary" className="mt-6">
+          <Button size="sm" variant="secondary" className="mt-6" onClick={handleAdvance} disabled={busy}>
             <CalendarCheck size={18} weight="regular" />
-            Advance 30 days
+            {busy ? 'Working...' : 'Advance 30 days'}
           </Button>
         </GlassCard>
 
@@ -50,9 +100,9 @@ export default function DemoControl() {
           <p className="leading-relaxed text-ink-soft">
             Marks the demo loan delinquent and steps the asset one stage down the enforcement path.
           </p>
-          <Button size="sm" variant="secondary" className="mt-6">
+          <Button size="sm" variant="secondary" className="mt-6" onClick={handleMissPayment} disabled={busy}>
             <Warning size={18} weight="regular" />
-            Miss a payment
+            {busy ? 'Working...' : 'Miss a payment'}
           </Button>
         </GlassCard>
       </div>
@@ -75,12 +125,16 @@ export default function DemoControl() {
             <StatusPill status="SUSPENDED" size="sm" />
           </div>
           <p className="mt-6 max-w-lg leading-relaxed text-ink-soft">
-            The three buttons above map to the unauthenticated demo endpoints in the contract. They
-            are wired to the API client in the next pass.
+            The three buttons above drive the actual demo data. Advance the clock, then check the
+            owner phone to see the system go dark.
           </p>
           <p className="mt-4 text-sm text-ink-mute">Demo loan {DEMO_IDS.loanId}.</p>
         </GlassCard>
       </section>
+
+      <Toast open={toastOpen} onOpenChange={setToastOpen} tone="success">
+        <ToastTitle>{toastMsg}</ToastTitle>
+      </Toast>
     </AppShell>
   );
 }
