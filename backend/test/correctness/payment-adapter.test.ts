@@ -50,7 +50,7 @@ describe('payment adapter seam', () => {
   });
 
   it('factory selects the simulated adapter by default', () => {
-    const adapter = paymentAdapterFor({ paymentAdapter: 'simulated' });
+    const adapter = paymentAdapterFor({ paymentAdapter: 'simulated', settleAfterMs: 0 });
     expect(adapter.name).toBe('simulated');
   });
 
@@ -60,7 +60,36 @@ describe('payment adapter seam', () => {
       alatBaseUrl: 'https://alat.example.com',
       alatChannelId: 'chan',
       alatApiKey: API_KEY,
+      settleAfterMs: 0,
     });
     expect(adapter.name).toBe('alat');
+  });
+
+  it('simulated collect settles synchronously when the consent window is 0', async () => {
+    let settled: string | undefined;
+    const adapter = createSimulatedAdapter({
+      settleAfterMs: 0,
+      notify: (reference) => {
+        settled = reference;
+      },
+    });
+
+    const result = await adapter.collect({ amountKobo: 1000, reference: 'SIM-X', narration: '' });
+    expect(result).toMatchObject({ reference: 'SIM-X', status: 'SUCCESS' });
+    expect(result.platformTransactionReference).toMatch(/^SIM-PLT-/);
+    expect(settled).toBe('SIM-X');
+  });
+
+  it('simulated collect stays pending when the consent window is open', async () => {
+    const adapter = createSimulatedAdapter({ settleAfterMs: 60_000 });
+    const result = await adapter.collect({ amountKobo: 1000, reference: 'SIM-Y', narration: '' });
+    expect(result.status).toBe('pending_authorisation');
+  });
+
+  it('alat collect books pending_authorisation without a network call yet', async () => {
+    const adapter = createAlatAdapter({ baseUrl: 'https://alat.example.com', channelId: 'chan' });
+    const result = await adapter.collect({ amountKobo: 1000, reference: 'ALAT-Z', narration: '' });
+    expect(result).toMatchObject({ reference: 'ALAT-Z', status: 'pending_authorisation' });
+    expect(result.platformTransactionReference).toMatch(/^ALAT-PLT-/);
   });
 });

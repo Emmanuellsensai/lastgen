@@ -21,7 +21,13 @@ import { createWebhookRouter } from './webhookRoutes.js';
 
 export function apiRouter(repo: Repository, env: Env): Router {
   const router = Router();
-  const adapter = paymentAdapterFor(env);
+  const adapter = paymentAdapterFor(env, {
+    // The simulated adapter's in-process consent completes through the same
+    // repository settle path the ALAT webhook uses.
+    settle: (reference) => {
+      repo.settlePayment(reference);
+    },
+  });
 
   // Provider callbacks run BEFORE the auth boundary: ALAT signs its own
   // notifications and is never asked for a Lastgen bearer token.

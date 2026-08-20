@@ -28,6 +28,8 @@ export function createTestApp(options: TestAppOptions = {}): TestApp {
     DEMO_MODE: options.demoMode === false ? 'false' : 'true',
     LOG_LEVEL: 'silent',
     PAYMENT_ADAPTER: options.paymentAdapter ?? 'simulated',
+    // Deterministic settlement unless a test opts into the authorisation wait.
+    SETTLE_AFTER_MS: '0',
     ...options.env,
   });
   const logger = pino({ level: 'silent' });

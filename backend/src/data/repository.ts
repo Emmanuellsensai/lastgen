@@ -30,8 +30,8 @@ import type {
   Loan,
   MeterReading,
   PagedEnvelope,
+  Payment,
   PaymentSource,
-  PayResult,
   PortfolioAssetsQuery,
   PortfolioStats,
   Quote,
@@ -44,6 +44,13 @@ export interface ReceiptExtraction {
   litres: number;
   pricePerLitreKobo: number;
   confidence?: number;
+}
+
+/** Internal full settlement result; the HTTP layer maps it to the slim PayResult. */
+export interface PaySettlement {
+  payment: Payment;
+  loan: Loan;
+  asset: Asset;
 }
 
 export interface Repository {
@@ -89,7 +96,35 @@ export interface Repository {
   getLoan(id: string): Loan | undefined;
   loanByAsset(assetId: string): Loan | undefined;
   scheduleFor(loanId: string): Installment[];
-  payLoan(loanId: string, amountKobo: number, source: PaymentSource, reference: string): PayResult;
+  /**
+   * Settlement primitive shared by every entry path (simulated consent, ALAT
+   * webhook, wallet debit): applies the PAY transition to loan + asset + next
+   * unpaid installment + audit atomically and records the settled payment.
+   */
+  payLoan(
+    loanId: string,
+    amountKobo: number,
+    source: PaymentSource,
+    reference: string,
+  ): PaySettlement;
+
+  /* Payments lifecycle --------------------------------------------- */
+  /** Book a payment as pending_authorisation without touching loan or asset. */
+  startPayment(
+    loanId: string,
+    amountKobo: number,
+    source: PaymentSource,
+    reference: string,
+    platformTransactionReference?: string,
+  ): Payment;
+  /** Settle a pending payment by reference. Idempotent; returns the current state. */
+  settlePayment(reference: string): PaySettlement;
+  /** Mark a pending payment FAILED. Idempotent; no loan or asset changes. */
+  failPayment(reference: string): Payment | undefined;
+  /** Record the provider's platform reference once the consent request is issued. */
+  setPaymentPlatformReference(reference: string, platformTransactionReference: string): void;
+  /** Look a payment up by its transaction reference or its id. */
+  paymentByRefOrId(key: string): Payment | undefined;
 
   /* Portfolio ------------------------------------------------------ */
   portfolioStats(): PortfolioStats;

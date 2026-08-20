@@ -2,22 +2,89 @@ import { Router } from 'express';
 import type { PaymentAdapter } from '../adapters/paymentAdapter.js';
 import type { Repository } from '../data/repository.js';
 import { ok } from '../lib/envelope.js';
-import type { PayBody } from '../types/api.js';
+import { ApiError } from '../middleware/errorHandler.js';
+import type { PayBody, PayResult } from '../types/api.js';
 
-// Payments: settle a loan instalment through the active payment adapter. The
-// repository applies the pure state machine atomically (loan + asset + next
-// unpaid installment + payment ledger + audit) and throws the contract errors.
+// Payments: settle a loan instalment through the active payment adapter.
+//
+// source='bank_account' books a PENDING payment and asks the provider to
+// collect; the frontend shows the "waiting for you to approve in the ALAT
+// Authenticator" state and polls GET /payments/:reference/status until the
+// webhook (or simulated consent) settles it. source='wallet' debits the
+// business wallet directly and settles in one shot (wired in the wallet
+// milestone).
+//
+// The response is deliberately slim — { paymentId, platformTransactionReference,
+// status } — so the frontend can render the sheet and subscribe to the
+// payment.status_changed realtime channel without receiving loan internals.
+
+function suggestedAmount(repo: Repository, loanId: string): number {
+  const schedule = repo.scheduleFor(loanId);
+  const nextUnpaid = schedule.find((i) => !i.paidAt);
+  if (nextUnpaid) return nextUnpaid.principalKobo + nextUnpaid.interestKobo;
+  const loan = repo.getLoan(loanId);
+  return loan?.monthlyPaymentKobo ?? 0;
+}
 
 export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): Router {
   const router = Router();
 
-  router.post('/loans/:id/pay', (req, res) => {
-    const body = (req.body ?? {}) as PayBody;
-    // The ledger records the provider that actually executed the payment, so
-    // an ALAT settlement is never labelled SIMULATED.
-    const source = adapter.name === 'alat' ? 'ALAT' : 'SIMULATED';
-    const result = repo.payLoan(req.params.id, body.amountKobo, source, adapter.makeReference());
-    res.json(ok(result));
+  router.post('/loans/:id/pay', (req, res, next) => {
+    // Express 4 does not forward rejected promises from async handlers, so the
+    // async adapter call is wrapped and its rejection routed to the error
+    // handler instead of crashing the process.
+    void (async () => {
+      const body = (req.body ?? {}) as PayBody;
+      if (body.source !== 'wallet' && body.source !== 'bank_account') {
+        throw new ApiError('VALIDATION', "source must be 'wallet' or 'bank_account'", 400);
+      }
+      const amountKobo = body.amountKobo ?? suggestedAmount(repo, req.params.id);
+
+      if (body.source === 'wallet') {
+        // Wallet direct debit lands with the wallet milestone; keep the route
+        // honest until then instead of silently settling without a debit.
+        throw new ApiError('NOT_IMPLEMENTED', 'Wallet payments are not available yet', 501);
+      }
+
+      const reference = adapter.makeReference();
+      const payment = repo.startPayment(
+        req.params.id,
+        amountKobo,
+        adapter.name === 'alat' ? 'ALAT' : 'SIMULATED',
+        reference,
+      );
+
+      // The provider's consent flow. For the simulated adapter with
+      // settleAfterMs 0 the callback settles before collect() resolves.
+      const collected = await adapter.collect({ amountKobo, reference, narration: req.params.id });
+      if (collected.platformTransactionReference) {
+        repo.setPaymentPlatformReference(reference, collected.platformTransactionReference);
+      }
+      if (
+        payment.status === 'pending_authorisation' &&
+        (collected.status === 'SUCCESS' || collected.status === 'authorised')
+      ) {
+        repo.settlePayment(reference);
+      }
+
+      const settled = repo.paymentByRefOrId(payment.id)!;
+      const result: PayResult = {
+        paymentId: settled.id,
+        platformTransactionReference: settled.platformTransactionReference ?? null,
+        status: settled.status,
+      };
+      res.json(ok(result));
+    })().catch(next);
+  });
+
+  router.get('/payments/:reference/status', (req, res) => {
+    // Accepts the transaction reference or the payment id so the frontend can
+    // poll with whatever key the pay response gave it.
+    const payment = repo.paymentByRefOrId(req.params.reference);
+    if (!payment) {
+      throw new ApiError('NOT_FOUND', 'Payment not found', 404);
+    }
+    res.json(ok({ status: payment.status, payment }));
   });
 
   return router;

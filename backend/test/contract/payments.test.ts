@@ -4,8 +4,10 @@ import type { TestApp } from '../helpers.js';
 import { createTestApp } from '../helpers.js';
 
 // Contract suite: payments
-// POST /loans/:id/pay settles an instalment through the simulated adapter and
-// returns { payment, loan, asset }. Paying the balance transfers ownership.
+// POST /loans/:id/pay books a payment through the active adapter and returns
+// the slim { paymentId, platformTransactionReference, status } envelope. With
+// the simulated adapter (settleAfterMs 0) the consent settles synchronously and
+// status is SUCCESS; the ledger and loan/asset are updated in one transaction.
 
 describe('payments contract', () => {
   let app: TestApp['app'];
@@ -15,28 +17,30 @@ describe('payments contract', () => {
     ({ app, repo } = createTestApp());
   });
 
-  it('settles an instalment and returns payment, loan and asset', async () => {
+  it('settles an instalment and returns the slim pay envelope', async () => {
     const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
     const asset = repo.getAsset(loan.assetId)!;
     const amountKobo = 36_654_539;
     const before = loan.balanceKobo;
     const unpaidBefore = repo.scheduleFor(loan.id).filter((i) => !i.paidAt).length;
 
-    const res = await request(app).post(`/api/loans/${loan.id}/pay`).send({ amountKobo });
+    const res = await request(app)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ source: 'bank_account', amountKobo });
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.data.payment).toMatchObject({
-      loanId: loan.id,
-      amountKobo,
-      source: 'SIMULATED',
+    expect(res.body.data).toMatchObject({
+      status: 'SUCCESS',
     });
-    expect(res.body.data.payment.reference).toMatch(/^SIM-/);
-    expect(res.body.data.loan.id).toBe(loan.id);
-    expect(res.body.data.loan.balanceKobo).toBe(before - amountKobo);
-    expect(res.body.data.asset.id).toBe(asset.id);
+    expect(res.body.data.paymentId).toMatch(/^pay_/);
+    expect(res.body.data.platformTransactionReference).toMatch(/^SIM-PLT-/);
 
+    const payment = repo.paymentByRefOrId(res.body.data.paymentId)!;
+    expect(payment).toMatchObject({ loanId: loan.id, amountKobo, source: 'SIMULATED' });
+    expect(payment.reference).toMatch(/^SIM-/);
     expect(loan.balanceKobo).toBe(before - amountKobo);
+    expect(asset.id).toBe(asset.id);
     expect(repo.scheduleFor(loan.id).filter((i) => !i.paidAt)).toHaveLength(unpaidBefore - 1);
   });
 
@@ -47,34 +51,66 @@ describe('payments contract', () => {
 
     const res = await request(app)
       .post(`/api/loans/${loan.id}/pay`)
-      .send({ amountKobo: balanceKobo });
+      .send({ source: 'bank_account', amountKobo: balanceKobo });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.loan.status).toBe('CLOSED');
-    expect(res.body.data.loan.balanceKobo).toBe(0);
-    expect(res.body.data.asset.status).toBe('OWNED');
-    expect(asset.status).toBe('OWNED');
+    expect(res.body.data.status).toBe('SUCCESS');
     expect(loan.status).toBe('CLOSED');
+    expect(loan.balanceKobo).toBe(0);
+    expect(asset.status).toBe('OWNED');
   });
 
-  it('records the ALAT source when the alat adapter is active', async () => {
+  it('defaults the amount to the next unpaid installment', async () => {
+    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const nextUnpaid = repo.scheduleFor(loan.id).find((i) => !i.paidAt)!;
+    const expected = nextUnpaid.principalKobo + nextUnpaid.interestKobo;
+
+    const res = await request(app)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ source: 'bank_account' });
+
+    expect(res.status).toBe(200);
+    const payment = repo.paymentByRefOrId(res.body.data.paymentId)!;
+    expect(payment.amountKobo).toBe(expected);
+  });
+
+  it('books a pending payment when the alat adapter is active', async () => {
     const { app: alatApp, repo: alatRepo } = createTestApp({
       paymentAdapter: 'alat',
       env: { ALAT_BASE_URL: 'https://alat.example.com' },
     });
     const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const before = loan.balanceKobo;
 
     const res = await request(alatApp)
       .post(`/api/loans/${loan.id}/pay`)
-      .send({ amountKobo: 36_654_539 });
+      .send({ source: 'bank_account', amountKobo: 36_654_539 });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.payment.source).toBe('ALAT');
-    expect(res.body.data.payment.reference).toMatch(/^ALAT-/);
+    expect(res.body.data.status).toBe('pending_authorisation');
+    expect(res.body.data.platformTransactionReference).toMatch(/^ALAT-PLT-/);
+
+    const payment = alatRepo.paymentByRefOrId(res.body.data.paymentId)!;
+    expect(payment.source).toBe('ALAT');
+    expect(payment.reference).toMatch(/^ALAT-/);
+    expect(payment.status).toBe('pending_authorisation');
+    expect(loan.balanceKobo).toBe(before);
+  });
+
+  it('requires a valid source', async () => {
+    const res = await request(app)
+      .post('/api/loans/loan_biz_adaeze_frozen/pay')
+      .send({ amountKobo: 100 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION');
+    expect(res.body.error.message).toBe("source must be 'wallet' or 'bank_account'");
   });
 
   it('returns the contract 404 for an unknown loan', async () => {
-    const res = await request(app).post('/api/loans/nope/pay').send({ amountKobo: 100 });
+    const res = await request(app)
+      .post('/api/loans/nope/pay')
+      .send({ source: 'bank_account', amountKobo: 100 });
     expect(res.status).toBe(404);
     expect(res.body.error).toEqual({ code: 'NOT_FOUND', message: 'Loan not found' });
   });
@@ -82,7 +118,7 @@ describe('payments contract', () => {
   it('rejects a non-positive amount', async () => {
     const res = await request(app)
       .post('/api/loans/loan_biz_adaeze_frozen/pay')
-      .send({ amountKobo: 0 });
+      .send({ source: 'bank_account', amountKobo: 0 });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION');
@@ -90,11 +126,22 @@ describe('payments contract', () => {
   });
 
   it('rejects paying a closed loan', async () => {
-    const res = await request(app).post('/api/loans/loan_p000/pay').send({ amountKobo: 1000 });
+    const res = await request(app)
+      .post('/api/loans/loan_p000/pay')
+      .send({ source: 'bank_account', amountKobo: 1000 });
     expect(res.status).toBe(409);
     expect(res.body.error).toEqual({
       code: 'INVALID_TRANSITION',
       message: 'This loan is already closed',
     });
+  });
+
+  it('keeps wallet payments honest until the wallet milestone', async () => {
+    const res = await request(app)
+      .post('/api/loans/loan_biz_adaeze_frozen/pay')
+      .send({ source: 'wallet', amountKobo: 1000 });
+
+    expect(res.status).toBe(501);
+    expect(res.body.error.code).toBe('NOT_IMPLEMENTED');
   });
 });

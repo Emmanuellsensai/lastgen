@@ -43,7 +43,6 @@ import type {
   PagedEnvelope,
   Payment,
   PaymentSource,
-  PayResult,
   PortfolioAssetsQuery,
   PortfolioStats,
   Quote,
@@ -51,7 +50,7 @@ import type {
   SystemsQuery,
 } from '../types/api.js';
 import { buildSeed, type AssetStatusHistoryEntry, type DemoDb } from './seed.js';
-import type { ReceiptExtraction, Repository } from './repository.js';
+import type { PaySettlement, ReceiptExtraction, Repository } from './repository.js';
 
 const PAGE_SIZE = 25;
 const DAY_MS = 86_400_000;
@@ -422,17 +421,15 @@ export class InMemoryRepository implements Repository {
     return this.state.installments[loanId] ?? [];
   }
 
-  payLoan(loanId: string, amountKobo: number, source: PaymentSource, reference: string): PayResult {
+  payLoan(
+    loanId: string,
+    amountKobo: number,
+    source: PaymentSource,
+    reference: string,
+  ): PaySettlement {
     const loan = this.findLoanOrThrow(loanId);
     const asset = this.findAssetOrThrow(loan.assetId);
-    const result = transition(asset, loan, this.businessFor(asset), 'PAY', {
-      now: this.state.now,
-      amountKobo,
-    });
-
-    // Commit the loan and asset state, then the payment ledger and the next
-    // unpaid installment. All of it happens together, or not at all.
-    this.commit(result, asset, loan, source === 'ALAT' ? 'alat' : 'bank');
+    const applied = this.applySettlement(loan, asset, amountKobo, source);
     const payment: Payment = {
       id: this.nextId('pay'),
       loanId,
@@ -440,14 +437,93 @@ export class InMemoryRepository implements Repository {
       paidAt: this.state.now.toISOString(),
       source,
       reference,
+      status: 'SUCCESS',
     };
     this.state.payments.push(payment);
+    return { payment, loan: applied.loan, asset: applied.asset };
+  }
 
-    const schedule = this.state.installments[loanId];
-    const nextUnpaid = schedule?.find((i) => !i.paidAt);
-    if (nextUnpaid) nextUnpaid.paidAt = this.state.now.toISOString();
+  /* ------------------------------------------------------------------ */
+  /* Payments lifecycle                                                  */
+  /* ------------------------------------------------------------------ */
 
-    return { payment, loan: result.loan, asset: result.asset };
+  startPayment(
+    loanId: string,
+    amountKobo: number,
+    source: PaymentSource,
+    reference: string,
+    platformTransactionReference?: string,
+  ): Payment {
+    const loan = this.findLoanOrThrow(loanId);
+    if (!Number.isInteger(amountKobo) || amountKobo <= 0) {
+      throw new ApiError('VALIDATION', 'amountKobo must be a positive integer', 400);
+    }
+    if (loan.status === 'CLOSED') {
+      throw new ApiError('INVALID_TRANSITION', 'This loan is already closed', 409);
+    }
+
+    const payment: Payment = {
+      id: this.nextId('pay'),
+      loanId,
+      amountKobo,
+      paidAt: this.state.now.toISOString(),
+      source,
+      reference,
+      status: 'pending_authorisation',
+      platformTransactionReference,
+    };
+    this.state.payments.push(payment);
+    return payment;
+  }
+
+  settlePayment(reference: string): PaySettlement {
+    const payment = this.state.payments.find(
+      (p) => p.reference === reference && p.status === 'pending_authorisation',
+    );
+    // Idempotent: a replay (webhook retry, poll race, simulated consent) sees
+    // the terminal state and returns it unchanged.
+    if (!payment) {
+      const terminal = this.state.payments.find((p) => p.reference === reference);
+      if (terminal && terminal.status !== 'pending_authorisation') {
+        const loan = this.findLoanOrThrow(terminal.loanId);
+        return {
+          payment: terminal,
+          loan,
+          asset: this.findAssetOrThrow(loan.assetId),
+        };
+      }
+      throw new ApiError('NOT_FOUND', 'Payment not found', 404);
+    }
+
+    // Apply the PAY transition exactly like the direct path, then mark the
+    // booked payment settled — one ledger row, one state change.
+    const loan = this.findLoanOrThrow(payment.loanId);
+    const applied = this.applySettlement(
+      loan,
+      this.findAssetOrThrow(loan.assetId),
+      payment.amountKobo,
+      payment.source,
+    );
+    payment.status = 'SUCCESS';
+    return { payment, loan: applied.loan, asset: applied.asset };
+  }
+
+  failPayment(reference: string): Payment | undefined {
+    const payment = this.state.payments.find(
+      (p) => p.reference === reference && p.status === 'pending_authorisation',
+    );
+    if (!payment) return this.paymentByRefOrId(reference);
+    payment.status = 'FAILED';
+    return payment;
+  }
+
+  setPaymentPlatformReference(reference: string, platformTransactionReference: string): void {
+    const payment = this.state.payments.find((p) => p.reference === reference);
+    if (payment) payment.platformTransactionReference = platformTransactionReference;
+  }
+
+  paymentByRefOrId(key: string): Payment | undefined {
+    return this.state.payments.find((p) => p.reference === key || p.id === key);
   }
 
   /* ------------------------------------------------------------------ */
@@ -508,6 +584,18 @@ export class InMemoryRepository implements Repository {
     if (this.state.seenReferences.has(reference)) return;
     this.state.seenReferences.add(reference);
 
+    // Preferred path: settle the payment the API booked for this reference.
+    // The narration no longer drives the loan lookup.
+    const pending = this.state.payments.find(
+      (p) => p.reference === reference && p.status === 'pending_authorisation',
+    );
+    if (pending) {
+      this.settlePayment(reference);
+      return;
+    }
+
+    // Legacy fallback for notifications that arrive without a booked payment:
+    // settle the loan named in the narration, exactly as before the lifecycle.
     const loan = this.state.loans.find((l) => narration.includes(l.id)) ?? this.state.loans[0];
     if (loan && loan.status !== 'CLOSED' && amountKobo > 0) {
       this.payLoan(loan.id, amountKobo, 'ALAT', reference);
@@ -621,6 +709,30 @@ export class InMemoryRepository implements Repository {
       nextDueAt: '',
       status: 'ACTIVE',
     };
+  }
+
+  /**
+   * Runs the PAY state machine for a settlement and commits the loan, asset and
+   * next unpaid installment together. Shared by the direct pay path and the
+   * lifecycle settle path so both entry points apply the identical rule.
+   */
+  private applySettlement(
+    loan: Loan,
+    asset: Asset,
+    amountKobo: number,
+    source: PaymentSource,
+  ): { loan: Loan; asset: Asset } {
+    const result = transition(asset, loan, this.businessFor(asset), 'PAY', {
+      now: this.state.now,
+      amountKobo,
+    });
+    this.commit(result, asset, loan, source === 'ALAT' ? 'alat' : 'bank');
+
+    const schedule = this.state.installments[loan.id];
+    const nextUnpaid = schedule?.find((i) => !i.paidAt);
+    if (nextUnpaid) nextUnpaid.paidAt = this.state.now.toISOString();
+
+    return { loan: result.loan, asset: result.asset };
   }
 
   /**

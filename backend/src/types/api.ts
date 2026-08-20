@@ -25,7 +25,15 @@ export type FuelLogSource = 'receipt' | 'manual';
 export type CreditFileStatus = 'PENDING' | 'APPROVED' | 'DECLINED';
 export type AssetStatus = 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'OWNED';
 export type LoanStatus = 'ACTIVE' | 'DELINQUENT' | 'CLOSED';
-export type PaymentSource = 'ALAT' | 'SIMULATED';
+export type PaymentSource = 'ALAT' | 'SIMULATED' | 'WALLET';
+
+/**
+ * ALAT's own status vocabulary, surfaced verbatim so the frontend can render
+ * the payment sheet without mapping provider codes. WALLET payments skip the
+ * provider dance and jump straight to SUCCESS.
+ */
+export type PaymentStatus =
+  'pending_authorisation' | 'authorised' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
 export type ImpactPeriod = 'month' | 'year' | 'all';
 
 /* Entities */
@@ -141,6 +149,10 @@ export interface Payment {
   paidAt: string;
   source: PaymentSource;
   reference: string;
+  /** Lifecycle state: pending_authorisation while the provider awaits consent. */
+  status: PaymentStatus;
+  /** ALAT's platform reference for the transfer; null for wallet payments. */
+  platformTransactionReference?: string;
 }
 
 export interface MeterReading {
@@ -224,7 +236,10 @@ export interface SuspendBody {
 }
 
 export interface PayBody {
-  amountKobo: number;
+  /** 'wallet' debits the business wallet directly; 'bank_account' runs the ALAT dance. */
+  source: 'wallet' | 'bank_account';
+  /** Optional: defaults to the next unpaid installment amount. */
+  amountKobo?: number;
 }
 
 export interface AdvanceTimeBody {
@@ -251,9 +266,9 @@ export interface ApproveResult {
 }
 
 export interface PayResult {
-  payment: Payment;
-  loan: Loan;
-  asset: Asset;
+  paymentId: string;
+  platformTransactionReference: string | null;
+  status: PaymentStatus;
 }
 
 export interface ExportResult {

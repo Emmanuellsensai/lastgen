@@ -673,6 +673,7 @@ export function buildSeed(): DemoDb {
         paidAt: schedule[i].dueAt,
         source: i % 4 === 0 ? 'SIMULATED' : 'ALAT',
         reference: `ALT-${spec.id.slice(4, 10).toUpperCase()}-${pad(i, 3)}`,
+        status: 'SUCCESS',
       });
     }
     installments[loanId] = schedule;
