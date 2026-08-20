@@ -84,14 +84,31 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
     })().catch(next);
   });
 
-  router.get('/payments/:reference/status', (req, res) => {
+  router.get('/payments/:reference/status', (req, res, next) => {
     // Accepts the transaction reference or the payment id so the frontend can
-    // poll with whatever key the pay response gave it.
-    const payment = repo.paymentByRefOrId(req.params.reference);
-    if (!payment) {
-      throw new ApiError('NOT_FOUND', 'Payment not found', 404);
-    }
-    res.json(ok({ status: payment.status, payment }));
+    // poll with whatever key the pay response gave it. A still-pending payment
+    // is reconciled against the provider first: a missed webhook (or a poll
+    // that beat the callback) is caught by asking ALAT what happened.
+    void (async () => {
+      let payment = repo.paymentByRefOrId(req.params.reference);
+      if (!payment) {
+        throw new ApiError('NOT_FOUND', 'Payment not found', 404);
+      }
+
+      if (payment.status === 'pending_authorisation' && adapter.pollStatus) {
+        const polled = await adapter.pollStatus({ reference: payment.reference });
+        if (polled.status === 'SUCCESS' || polled.status === 'authorised') {
+          repo.settlePayment(payment.reference);
+        } else if (polled.status === 'FAILED') {
+          repo.failPayment(payment.reference);
+        } else if (polled.status === 'EXPIRED') {
+          repo.expirePayment(payment.reference);
+        }
+        payment = repo.paymentByRefOrId(payment.id)!;
+      }
+
+      res.json(ok({ status: payment.status, payment }));
+    })().catch(next);
   });
 
   return router;

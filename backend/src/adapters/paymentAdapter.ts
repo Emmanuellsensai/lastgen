@@ -28,6 +28,11 @@ export interface CollectResult {
   platformTransactionReference?: string;
 }
 
+/** Status reconciliation: check on a provider-issued reference. */
+export interface PollInput {
+  reference: string;
+}
+
 export interface PaymentAdapter {
   readonly name: 'simulated' | 'alat';
 
@@ -40,6 +45,15 @@ export interface PaymentAdapter {
    * simulated adapter settles in-process after its configured window.
    */
   collect(input: CollectInput): Promise<CollectResult>;
+
+  /**
+   * Ask the provider for the current state of a collected payment. Adapters
+   * that settle out-of-band (ALAT webhook) implement it so GET
+   * /payments/:reference/status can reconcile a stale pending payment; the
+   * simulated adapter keeps reporting pending because its settlement happens
+   * through the in-process notify path, never through the provider.
+   */
+  pollStatus?(input: PollInput): Promise<CollectResult>;
 
   /**
    * Validate an inbound provider notification. The simulated adapter accepts

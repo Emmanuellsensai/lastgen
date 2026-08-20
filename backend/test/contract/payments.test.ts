@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TestApp } from '../helpers.js';
 import { createTestApp } from '../helpers.js';
 
@@ -8,6 +8,10 @@ import { createTestApp } from '../helpers.js';
 // the slim { paymentId, platformTransactionReference, status } envelope. With
 // the simulated adapter (settleAfterMs 0) the consent settles synchronously and
 // status is SUCCESS; the ledger and loan/asset are updated in one transaction.
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('payments contract', () => {
   let app: TestApp['app'];
@@ -75,9 +79,32 @@ describe('payments contract', () => {
   });
 
   it('books a pending payment when the alat adapter is active', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request) => {
+        const target = String(url);
+        if (target.includes('transfer-fund-request')) {
+          return new Response(JSON.stringify({ platformTransactionReference: 'PLT-BOOKED' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (target.includes('CheckTransactionStatus')) {
+          return new Response(JSON.stringify({ status: 'pending_authorisation' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        throw new Error(`unexpected fetch: ${target}`);
+      }),
+    );
     const { app: alatApp, repo: alatRepo } = createTestApp({
       paymentAdapter: 'alat',
-      env: { ALAT_BASE_URL: 'https://alat.example.com' },
+      env: {
+        ALAT_BASE_URL: 'https://alat.example.com',
+        ALAT_CHANNEL_ID: 'chan',
+        ALAT_API_KEY: 'key',
+      },
     });
     const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
     const before = loan.balanceKobo;
@@ -88,7 +115,7 @@ describe('payments contract', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('pending_authorisation');
-    expect(res.body.data.platformTransactionReference).toMatch(/^ALAT-PLT-/);
+    expect(res.body.data.platformTransactionReference).toBe('PLT-BOOKED');
 
     const payment = alatRepo.paymentByRefOrId(res.body.data.paymentId)!;
     expect(payment.source).toBe('ALAT');

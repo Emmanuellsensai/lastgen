@@ -41,5 +41,11 @@ export function createSimulatedAdapter(options: SimulatedAdapterOptions = {}): P
       if (notify) notify(reference);
       return { reference, status: 'SUCCESS', platformTransactionReference };
     },
+
+    // The simulated consent completes in-process via the notify path, never
+    // through the provider, so a status poll never changes anything here.
+    async pollStatus({ reference }) {
+      return { reference, status: 'pending_authorisation' };
+    },
   };
 }

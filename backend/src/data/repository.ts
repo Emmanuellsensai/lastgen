@@ -130,6 +130,8 @@ export interface Repository {
   settlePayment(reference: string): PaySettlement;
   /** Mark a pending payment FAILED. Idempotent; no loan or asset changes. */
   failPayment(reference: string): Payment | undefined;
+  /** Mark a pending payment EXPIRED (consent window elapsed). Idempotent. */
+  expirePayment(reference: string): Payment | undefined;
   /** Record the provider's platform reference once the consent request is issued. */
   setPaymentPlatformReference(reference: string, platformTransactionReference: string): void;
   /** Look a payment up by its transaction reference or its id. */

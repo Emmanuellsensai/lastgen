@@ -529,6 +529,15 @@ export class InMemoryRepository implements Repository {
     return payment;
   }
 
+  expirePayment(reference: string): Payment | undefined {
+    const payment = this.state.payments.find(
+      (p) => p.reference === reference && p.status === 'pending_authorisation',
+    );
+    if (!payment) return this.paymentByRefOrId(reference);
+    payment.status = 'EXPIRED';
+    return payment;
+  }
+
   setPaymentPlatformReference(reference: string, platformTransactionReference: string): void {
     const payment = this.state.payments.find((p) => p.reference === reference);
     if (payment) payment.platformTransactionReference = platformTransactionReference;

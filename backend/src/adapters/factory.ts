@@ -19,7 +19,12 @@ export interface AdapterDeps {
 export function paymentAdapterFor(
   env: Pick<
     Env,
-    'paymentAdapter' | 'alatBaseUrl' | 'alatChannelId' | 'alatApiKey' | 'settleAfterMs'
+    | 'paymentAdapter'
+    | 'alatBaseUrl'
+    | 'alatChannelId'
+    | 'alatApiKey'
+    | 'alatSourceAccount'
+    | 'settleAfterMs'
   >,
   deps: AdapterDeps = {},
 ): PaymentAdapter {
@@ -28,6 +33,7 @@ export function paymentAdapterFor(
       baseUrl: env.alatBaseUrl,
       channelId: env.alatChannelId,
       apiKey: env.alatApiKey,
+      sourceAccountNumber: env.alatSourceAccount,
     });
   }
   return createSimulatedAdapter({

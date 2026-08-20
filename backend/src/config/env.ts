@@ -15,6 +15,8 @@ export interface Env {
   alatBaseUrl?: string;
   alatChannelId?: string;
   alatApiKey?: string;
+  /** Merchant Wema/ALAT account debited by transfer-fund-request. */
+  alatSourceAccount?: string;
   /** Simulated adapter auto-settle delay (ms). 0 settles synchronously; the demo sets 3000 to show the authorisation wait. */
   settleAfterMs: number;
   demoMode: boolean;
@@ -46,6 +48,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     alatBaseUrl: source.ALAT_BASE_URL || undefined,
     alatChannelId: source.ALAT_CHANNEL_ID || undefined,
     alatApiKey: source.ALAT_API_KEY || undefined,
+    alatSourceAccount: source.ALAT_SOURCE_ACCOUNT || undefined,
     settleAfterMs: Number(source.SETTLE_AFTER_MS ?? 0),
     demoMode: bool(source.DEMO_MODE),
   };

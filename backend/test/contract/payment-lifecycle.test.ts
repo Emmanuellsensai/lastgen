@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TestApp } from '../helpers.js';
 import { createTestApp } from '../helpers.js';
 
@@ -8,6 +8,17 @@ import { createTestApp } from '../helpers.js';
 // pending_authorisation payment, the provider consents (simulated in-process
 // or via the ALAT webhook), and settlement updates loan + asset in one
 // transaction. GET /payments/:reference/status is the frontend's 2s poll.
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('payment lifecycle contract', () => {
   let app: TestApp['app'];
@@ -114,6 +125,82 @@ describe('payment lifecycle contract', () => {
 
     const res = await request(slowApp).get(`/api/payments/${reference}/status`);
     expect(res.body.data.status).toBe('FAILED');
+    expect(loan.balanceKobo).toBe(before);
+  });
+
+  it('reconciles a stale pending payment against the real ALAT provider', async () => {
+    // The alat adapter is active; the first pay POST books pending (no settle
+    // callback for ALAT). The status poll then asks ALAT CheckTransactionStatus
+    // and settles when the provider reports the consent went through.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request) => {
+        const target = String(url);
+        if (target.includes('transfer-fund-request')) {
+          return jsonResponse({ platformTransactionReference: 'PLT-STALE' });
+        }
+        if (target.includes('CheckTransactionStatus')) {
+          return jsonResponse({ status: 'SUCCESS' });
+        }
+        throw new Error(`unexpected fetch: ${target}`);
+      }),
+    );
+
+    const { app: alatApp, repo: alatRepo } = createTestApp({
+      paymentAdapter: 'alat',
+      env: {
+        ALAT_BASE_URL: 'https://alat.test',
+        ALAT_CHANNEL_ID: 'chan',
+        ALAT_API_KEY: 'key',
+      },
+    });
+    const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const amountKobo = 12_000_000;
+    const before = loan.balanceKobo;
+
+    const pay = await request(alatApp)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ source: 'bank_account', amountKobo });
+    expect(pay.body.data.status).toBe('pending_authorisation');
+
+    const res = await request(alatApp).get(`/api/payments/${pay.body.data.paymentId}/status`);
+    expect(res.body.data.status).toBe('SUCCESS');
+    expect(res.body.data.payment.platformTransactionReference).toBe('PLT-STALE');
+    expect(loan.balanceKobo).toBe(before - amountKobo);
+  });
+
+  it('marks a pending payment EXPIRED when the provider reports the window elapsed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request) => {
+        const target = String(url);
+        if (target.includes('transfer-fund-request')) {
+          return jsonResponse({ platformTransactionReference: 'PLT-EXPIRED' });
+        }
+        if (target.includes('CheckTransactionStatus')) {
+          return jsonResponse({ status: 'EXPIRED' });
+        }
+        throw new Error(`unexpected fetch: ${target}`);
+      }),
+    );
+
+    const { app: alatApp, repo: alatRepo } = createTestApp({
+      paymentAdapter: 'alat',
+      env: {
+        ALAT_BASE_URL: 'https://alat.test',
+        ALAT_CHANNEL_ID: 'chan',
+        ALAT_API_KEY: 'key',
+      },
+    });
+    const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const before = loan.balanceKobo;
+
+    const pay = await request(alatApp)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ source: 'bank_account', amountKobo: 3_000_000 });
+
+    const res = await request(alatApp).get(`/api/payments/${pay.body.data.paymentId}/status`);
+    expect(res.body.data.status).toBe('EXPIRED');
     expect(loan.balanceKobo).toBe(before);
   });
 });
