@@ -15,7 +15,6 @@ export const KOBO_PER_NAIRA = 100;
 /* Burn profile projection. */
 export const DAYS_PER_MONTH = 30;
 export const DAYS_PER_YEAR = 365;
-export const VERIFIED_BURN_DAYS = 14; // backend assignment threshold
 
 /* Quote defaults (match the MSW reference). */
 export const DEFAULT_APR_BPS = 2800;
