@@ -23,6 +23,12 @@ export function createAssetRouter(repo: Repository): Router {
     void (async () => {
       const from = req.query.from === undefined ? undefined : String(req.query.from);
       const to = req.query.to === undefined ? undefined : String(req.query.to);
+      if (from !== undefined && Number.isNaN(Date.parse(from))) {
+        throw new ApiError('VALIDATION', 'from must be a valid ISO date string', 400);
+      }
+      if (to !== undefined && Number.isNaN(Date.parse(to))) {
+        throw new ApiError('VALIDATION', 'to must be a valid ISO date string', 400);
+      }
       res.json(ok({ items: await repo.meterReadingsFor(req.params.id, from, to) }));
     })().catch(next);
   });

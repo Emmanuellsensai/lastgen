@@ -71,9 +71,18 @@ describe('payment adapter seam', () => {
     expect(adapter.verifyWebhookSignature({ rawBody, signature: undefined })).toBe(false);
   });
 
-  it('alat adapter accepts unsigned notifications when no key is configured', () => {
+  it('alat adapter rejects unsigned notifications when no key is configured', () => {
+    // Fail-closed: without a key there is nothing to verify against.
     const adapter = createAlatAdapter({});
-    expect(adapter.verifyWebhookSignature({ rawBody, signature: undefined })).toBe(true);
+    expect(adapter.verifyWebhookSignature({ rawBody, signature: undefined })).toBe(false);
+  });
+
+  it('alat adapter generates collision-free references', () => {
+    const adapter = createAlatAdapter({ apiKey: API_KEY });
+    const a = adapter.makeReference();
+    const b = adapter.makeReference();
+    expect(a).toMatch(/^ALAT-\d+-[0-9a-f]{8}$/);
+    expect(a).not.toBe(b);
   });
 
   it('factory selects the simulated adapter by default', () => {
@@ -174,14 +183,40 @@ describe('alat HTTPS client', () => {
     });
   });
 
-  it('falls back to a generated platform reference when the response omits one', async () => {
+  it('omits the platform reference when the provider response omits one', async () => {
     const adapter = createAlatAdapter({
       baseUrl,
       channelId,
       fetchFn: (() => Promise.resolve(jsonResponse({}))) as typeof globalThis.fetch,
     });
     const result = await adapter.collect({ amountKobo: 1, reference: 'ALAT-2', narration: '' });
-    expect(result.platformTransactionReference).toMatch(/^ALAT-PLT-/);
+    expect(result.platformTransactionReference).toBeUndefined();
+    expect(result.status).toBe('pending_authorisation');
+  });
+
+  it('collect maps the provider status instead of assuming pending', async () => {
+    const adapter = createAlatAdapter({
+      baseUrl,
+      channelId,
+      fetchFn: (() =>
+        Promise.resolve(jsonResponse({ status: 'FAILED' }))) as typeof globalThis.fetch,
+    });
+    const result = await adapter.collect({ amountKobo: 1, reference: 'ALAT-2', narration: '' });
+    expect(result.status).toBe('FAILED');
+  });
+
+  it('sends the amount in naira when ALAT_AMOUNT_UNIT=naira', async () => {
+    const fetch = stubFetch((url, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({ amount: '2500' });
+      return jsonResponse({});
+    });
+    const adapter = createAlatAdapter({
+      baseUrl,
+      channelId,
+      amountUnit: 'naira',
+      fetchFn: fetch as unknown as typeof globalThis.fetch,
+    });
+    await adapter.collect({ amountKobo: 250000, reference: 'ALAT-N', narration: '' });
   });
 
   it('maps a 4xx provider rejection to VALIDATION', async () => {
@@ -258,5 +293,16 @@ describe('alat HTTPS client', () => {
       settleAfterMs: 0,
     });
     expect(adapter.name).toBe('simulated');
+  });
+
+  it('factory fails fast when ALAT is configured without an API key', () => {
+    expect(() =>
+      paymentAdapterFor({
+        paymentAdapter: 'alat',
+        alatBaseUrl: baseUrl,
+        alatChannelId: 'chan',
+        settleAfterMs: 0,
+      }),
+    ).toThrow(/ALAT_API_KEY/);
   });
 });

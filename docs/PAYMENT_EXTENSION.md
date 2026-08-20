@@ -140,3 +140,40 @@ SETTLE_AFTER_MS=3000
 | `INVALID_TRANSITION` | 409  | paying a closed loan                                              |
 | `UNAUTHORIZED`       | 401  | live mode without a bearer token                                  |
 | `UNAVAILABLE`        | 503  | ALAT gateway unreachable / 5xx (only with `PAYMENT_ADAPTER=alat`) |
+
+## 8. Frontend wiring contract (BE-frozen)
+
+This section summarizes all frozen backend behaviors and exact API payloads required for frontend implementation:
+
+1. **`POST /loans/:id/pay` Payload**:
+   - Request body: `{ source: 'wallet' | 'bank_account', amountKobo?: number }`
+   - Response envelope: `{ ok: true, data: { paymentId: string, platformTransactionReference: string | null, status: PaymentStatus } }`
+   - Note: The response intentionally omits `{ payment, loan, asset }`. The frontend MUST re-fetch `GET /loans/:id` or `GET /assets/:id` after receiving `SUCCESS` to obtain updated balances and statuses.
+
+2. **Payment Type & Source Deltas**:
+   - `Payment.status`: `'pending_authorisation' | 'authorised' | 'SUCCESS' | 'FAILED' | 'EXPIRED'`
+   - `Payment.source`: `'ALAT' | 'SIMULATED' | 'WALLET'`
+   - New types: `Wallet`, `WalletTransaction`, `CreateWalletBody`, `PaymentStatus`
+
+3. **New API Endpoints**:
+   - `GET /payments/:reference/status`: Accepts `paymentId` OR `reference`. Returns `{ status, payment? }`.
+   - `POST /wallets/create`: Body `{ businessId, nin, firstName, lastName, phone }`. Returns `{ wallet }`.
+   - `GET /wallets/balance`: Returns `Wallet`. Scoped to signed-in owner's business.
+   - `GET /wallets/statement`: Query `?limit&before`. Returns `{ items: WalletTransaction[] }`.
+
+4. **Realtime & Polling Behavior**:
+   - On Supabase deployment: Listen to channel `payments` for broadcast event `status_changed` (`{ paymentId, from, to, reference }`).
+   - In Demo mode: Poll `GET /payments/:reference/status` every ~2s until `status === 'SUCCESS' | 'FAILED' | 'EXPIRED'`, then re-fetch loan/asset.
+
+5. **Authentication & Authorization**:
+   - Send `Authorization: Bearer <Supabase session token>` on all requests.
+   - In demo mode, the backend injects a demo user (`demo-user`) automatically if no token is present.
+   - All `/wallets/*` endpoints resolve business ID from `req.user` server-side (never trust request body).
+
+6. **Error Codes & Handling**:
+   - `402 PAYMENT_REQUIRED`: Wallet balance insufficient for `source: 'wallet'`.
+   - `400 VALIDATION`: Bad parameters or invalid request format.
+   - `404 NOT_FOUND`: Resource not found.
+   - `409 INVALID_TRANSITION`: Operation not permitted on current resource state.
+   - `503 UNAVAILABLE`: ALAT provider endpoint unavailable.
+

@@ -128,6 +128,39 @@ describe('payment lifecycle contract', () => {
     expect(loan.balanceKobo).toBe(before);
   });
 
+  it('marks a payment FAILED when the provider rejects synchronously on collect', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request) => {
+        const target = String(url);
+        if (target.includes('transfer-fund-request')) {
+          return jsonResponse({ status: 'FAILED', message: 'Insufficient funds' }, 200);
+        }
+        throw new Error(`unexpected fetch: ${target}`);
+      }),
+    );
+
+    const { app: alatApp, repo: alatRepo } = createTestApp({
+      paymentAdapter: 'alat',
+      env: {
+        ALAT_BASE_URL: 'https://alat.test',
+        ALAT_CHANNEL_ID: 'chan',
+        ALAT_API_KEY: 'key',
+      },
+    });
+    const loan = (await alatRepo.getLoan('loan_biz_adaeze_frozen'))!;
+    const before = loan.balanceKobo;
+
+    const pay = await request(alatApp)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ source: 'bank_account', amountKobo: 2_000_000 });
+
+    expect(pay.body.data.status).toBe('FAILED');
+    const payment = (await alatRepo.paymentByRefOrId(pay.body.data.paymentId))!;
+    expect(payment.status).toBe('FAILED');
+    expect(loan.balanceKobo).toBe(before);
+  });
+
   it('reconciles a stale pending payment against the real ALAT provider', async () => {
     // The alat adapter is active; the first pay POST books pending (no settle
     // callback for ALAT). The status poll then asks ALAT CheckTransactionStatus

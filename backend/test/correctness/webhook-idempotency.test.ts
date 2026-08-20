@@ -54,14 +54,12 @@ describe('webhook idempotency', () => {
     expect(other.balanceKobo).toBe(otherBefore);
   });
 
-  it('falls back to the first loan when no narration matches', async () => {
+  it('rejects an unmatched notification when no pending payment or narration matches', async () => {
     const repo = new InMemoryRepository();
-    const fallback = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
-    const before = fallback.balanceKobo;
 
-    await repo.settleAlatWebhook('ref-narration-2', 1_000_000, 'no loan mentioned');
-
-    expect(fallback.balanceKobo).toBe(before - 1_000_000);
+    await expect(
+      repo.settleAlatWebhook('ref-unmatched-1', 1_000_000, 'no loan mentioned'),
+    ).rejects.toThrow(/No pending payment or matching loan found/);
   });
 
   it('pays off a loan and transfers ownership atomically', async () => {

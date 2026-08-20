@@ -268,11 +268,8 @@ export class SupabaseRepository implements Repository {
     return new Date();
   }
 
-  async advanceTime(days: number): Promise<void> {
-    if (!Number.isFinite(days) || days === 0) {
-      throw new ApiError('VALIDATION', 'days must be a non zero number', 400);
-    }
-    await this.rollOverdue();
+  async advanceTime(_days: number): Promise<void> {
+    throw new ApiError('NOT_IMPLEMENTED', 'advanceTime is a demo-only operation', 501);
   }
 
   async reset(): Promise<void> {
@@ -283,8 +280,8 @@ export class SupabaseRepository implements Repository {
   /* Businesses                                                          */
   /* ------------------------------------------------------------------ */
 
-  createBusiness(input: CreateBusinessBody): Promise<Business> {
-    return this.runCreateBusiness(input);
+  createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business> {
+    return this.runCreateBusiness(input, ownerId);
   }
 
   getBusiness(id: string): Promise<Business | undefined> {
@@ -1010,7 +1007,7 @@ export class SupabaseRepository implements Repository {
   /* Async implementations                                               */
   /* ------------------------------------------------------------------ */
 
-  private async runCreateBusiness(input: CreateBusinessBody): Promise<Business> {
+  private async runCreateBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business> {
     if (!input?.name || !input?.type || !input?.city) {
       throw new ApiError('VALIDATION', 'name, type and city are required', 400);
     }
@@ -1028,7 +1025,7 @@ export class SupabaseRepository implements Repository {
     await this.run(
       this.db.from('businesses').insert({
         id: business.id,
-        owner_id: null,
+        owner_id: ownerId ?? null,
         name: business.name,
         type: business.type,
         city: business.city,
@@ -1489,6 +1486,12 @@ export class SupabaseRepository implements Repository {
     await this.commit(result, asset, loan, pending.source === 'ALAT' ? 'alat' : 'bank');
     await this.markNextInstallmentPaid(loan.id, now);
     await this.run(this.db.from('payments').update({ status: 'SUCCESS' }).eq('id', pending.id));
+    this.broadcastPaymentStatus({
+      paymentId: pending.id,
+      from: 'pending_authorisation',
+      to: 'SUCCESS',
+      reference: pending.reference,
+    });
     return {
       payment: { ...this.mapPayment(pending), status: 'SUCCESS' },
       loan: result.loan,
@@ -1507,6 +1510,12 @@ export class SupabaseRepository implements Repository {
     );
     if (!pending) return this.loadPaymentByRefOrId(reference);
     await this.run(this.db.from('payments').update({ status: 'FAILED' }).eq('id', pending.id));
+    this.broadcastPaymentStatus({
+      paymentId: pending.id,
+      from: 'pending_authorisation',
+      to: 'FAILED',
+      reference: pending.reference,
+    });
     return { ...this.mapPayment(pending), status: 'FAILED' };
   }
 
@@ -1521,7 +1530,31 @@ export class SupabaseRepository implements Repository {
     );
     if (!pending) return this.loadPaymentByRefOrId(reference);
     await this.run(this.db.from('payments').update({ status: 'EXPIRED' }).eq('id', pending.id));
+    this.broadcastPaymentStatus({
+      paymentId: pending.id,
+      from: 'pending_authorisation',
+      to: 'EXPIRED',
+      reference: pending.reference,
+    });
     return { ...this.mapPayment(pending), status: 'EXPIRED' };
+  }
+
+  private broadcastPaymentStatus(payload: {
+    paymentId: string;
+    from: string;
+    to: string;
+    reference: string;
+  }): void {
+    try {
+      const channel = this.db.channel('payments');
+      void channel.send({
+        type: 'broadcast',
+        event: 'status_changed',
+        payload,
+      });
+    } catch {
+      // Best-effort: realtime broadcast failure does not abort the settlement.
+    }
   }
 
   private async setPlatformReference(
@@ -1610,12 +1643,15 @@ export class SupabaseRepository implements Repository {
       }
       return;
     }
-    // Legacy fallback for notifications that arrive without a booked payment:
-    // settle the loan named in the narration, exactly as before the lifecycle.
+    // Fallback for notifications that arrive without a booked payment:
+    // settle the loan named explicitly in the narration.
     const loan = await this.loanFromNarration(narration);
     if (loan && loan.status !== 'CLOSED' && amountKobo > 0) {
       await this.payLoanAsync(loan.id, amountKobo, 'ALAT', reference);
+      return;
     }
+
+    throw new ApiError('NOT_FOUND', 'No pending payment or matching loan found for reference', 404);
   }
 
   private async loanFromNarration(narration: string): Promise<Loan | undefined> {
@@ -1624,10 +1660,7 @@ export class SupabaseRepository implements Repository {
     const ids = (await this.run(this.db.from('loans').select('id'))) ?? [];
     const matched = ids.find((r: { id: string }) => r.id && narration.includes(r.id));
     if (matched) return this.loadLoan(matched.id);
-    const first = await this.run(
-      this.db.from('loans').select('*').order('id', { ascending: true }).limit(1).maybeSingle(),
-    );
-    return first ? this.mapLoan(first) : undefined;
+    return undefined;
   }
 
   private async runCreateWallet(businessId: string, input: CreateWalletBody): Promise<Wallet> {
@@ -1848,28 +1881,5 @@ export class SupabaseRepository implements Repository {
       changedAt: row.changed_at,
       changedBy: row.changed_by ?? undefined,
     }));
-  }
-
-  private async rollOverdue(): Promise<void> {
-    const now = new Date();
-    const rows =
-      (await this.run(
-        this.db
-          .from('loans')
-          .select('*')
-          .not('status', 'eq', 'CLOSED')
-          .lt('next_due_at', now.toISOString()),
-      )) ?? [];
-    for (const row of rows) {
-      const loan = this.mapLoan(row);
-      const assetRow = await this.run(
-        this.db.from('assets').select('*').eq('id', loan.assetId).maybeSingle(),
-      );
-      if (!assetRow || assetRow.status === 'OWNED') continue;
-      const asset = this.mapAsset(assetRow);
-      const business = await this.businessFor(asset, assetRow);
-      const result = transition(asset, loan, business, 'OVERDUE', { now });
-      await this.commit(result, asset, loan, 'demo');
-    }
   }
 }

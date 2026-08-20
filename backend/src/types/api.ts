@@ -120,6 +120,7 @@ export interface Asset {
   installedAt: string;
   suspendedAt?: string;
   suspendReason?: string;
+  city?: string;
 }
 
 export interface Loan {

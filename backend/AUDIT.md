@@ -1076,3 +1076,20 @@ wallet pay → SUCCESS + debit; statement ordering; status by id). `/supabase/
 schema.sql` and `docs/CONTRACT.md` untouched (payments-v2 is a separate additive
 migration). Not yet applied to a live project (no credentials) — the Supabase
 paths are stub-tested only.
+
+## 21. Remediation Pass — Backend Hardening & Final Gate (T1–T11)
+
+Comprehensive remediation pass completed on `feat/backend`:
+
+- **T1 — Hardened ALAT Adapter & Webhook**: Fail-closed signature verification (`!apiKey` rejects notifications with 401); collision-free references (`ALAT-<ts>-<random>`); stop fabricating platform references; provider status mapping; `ALAT_AMOUNT_UNIT` env option (`kobo` | `naira`); factory boot check throwing error on `PAYMENT_ADAPTER=alat` without `ALAT_API_KEY`; nested callback payload parsing (`data.transactionReference`).
+- **T2 — Money Safety (No Wrong-Loan Fallback)**: Unmatched webhook reference and narration returns `ApiError NOT_FOUND` (404), forcing provider retry instead of settling `loans[0]`.
+- **T3 — Live Identity Alignment**: Threaded `req.user.id` as `owner_id` on business creation (`createBusiness`), fixing live RLS 404 chain on `owns_business` queries.
+- **T4 — Realtime Status Broadcast**: Added `payment.status_changed` event broadcast on channel `payments` in `SupabaseRepository` upon payment settlement, failure, or expiration.
+- **T5 — Supabase Atomic Settlement Migration**: Added `backend/migrations/payments-v3-atomic.sql` containing `SECURITY DEFINER` PostgreSQL functions `fn_pay_from_wallet` and `fn_settle_payment` for single-transaction CAS debit, loan/asset/installment updates, and audit log generation.
+- **T6 — Query Parameter Validation**: Added strict query parameter validation for `impactRoutes` (`period`, `year`), `creditRoutes` (`status`), and `assetRoutes` (`from`, `to` dates), returning `400 VALIDATION` on invalid input.
+- **T7 — Portfolio Export CSV Route**: Mounted `GET /api/exports/:filename` to stream dynamically generated CSV data.
+- **T8 — Demo & Live Honesty**: Auto-expiring simulated pending payments older than `2 × SETTLE_AFTER_MS`; `advanceTime` throws `501 NOT_IMPLEMENTED` in `SupabaseRepository`; `repositoryFor` issues startup warning when `DEMO_MODE=true` is used with DB credentials.
+- **T9 — Frontend Handoff Documentation**: Updated `docs/PAYMENT_EXTENSION.md` with complete "Frontend wiring contract (BE-frozen)".
+- **T10 — Test Suite Hygiene**: Deleted obsolete root `it.todo` stub files (`tests/contract/*`), re-pointed root `vitest.config.ts` to `backend/test/`, and updated `QA_REPORT.md`.
+- **T11 — Verification Gate**: `pnpm typecheck` ✅ (0 errors), `pnpm lint` ✅ (0 errors), `pnpm test` ✅ (20/20 files passed, 161 tests passed).
+

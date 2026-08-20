@@ -71,7 +71,7 @@ export interface Repository {
   reset(): Promise<void>;
 
   /* Businesses ----------------------------------------------------- */
-  createBusiness(input: CreateBusinessBody): Promise<Business>;
+  createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business>;
   getBusiness(id: string): Promise<Business | undefined>;
 
   /* Fuel logs and burn --------------------------------------------- */

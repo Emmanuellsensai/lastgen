@@ -621,5 +621,6 @@ Read-only audit (two explorer sweeps + manual verification) → 11 fixes:
 - [x] `payments-v2.sql` migration (status, wallets, wallet_transactions, realtime) (Phase 6)
 - [x] Full `SupabaseRepository` + async repository seam + `repositoryFor(env)` + `.env` loading (Phase 6)
 - [x] `docs/PAYMENT_EXTENSION.md` handoff + README/env/audit/progress refresh (Phase 6)
+- [x] Remediation Pass (T1–T11): ALAT fail-closed, money safety (no wrong-loan fallback), live identity owner_id, realtime status broadcast, atomic settlement SQL migration, query param validation, CSV export route, demo/live honesty checks, test hygiene cleanup.
 - [ ] Render deployment with live Supabase + ALAT credentials (Phase 6/7)
 - [ ] Integration suite + final PR (Phase 7)

@@ -32,5 +32,28 @@ export function createPortfolioRouter(repo: Repository): Router {
     })().catch(next);
   });
 
+  router.get('/exports/:filename', (req, res, next) => {
+    void (async () => {
+      const filename = req.params.filename;
+      if (!filename.startsWith('lastgen-portfolio-') || !filename.endsWith('.csv')) {
+        res.status(404).send('Export file not found');
+        return;
+      }
+      const pageResult = await repo.listPortfolioAssets({ page: 1 });
+      const assets = pageResult.items;
+      const header = 'id,serial,controllerId,status,city,installedAt\n';
+      const rows = assets
+        .map(
+          (a) =>
+            `${a.id},${a.serial},${a.controllerId},${a.status},${a.city ?? ''},${a.installedAt}`,
+        )
+        .join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.status(200).send(header + rows);
+    })().catch(next);
+  });
+
   return router;
 }

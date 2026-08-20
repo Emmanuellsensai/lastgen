@@ -17,6 +17,8 @@ export interface Env {
   alatApiKey?: string;
   /** Merchant Wema/ALAT account debited by transfer-fund-request. */
   alatSourceAccount?: string;
+  /** Outbound ALAT amount unit: 'kobo' (default) or 'naira' (divides by 100). */
+  alatAmountUnit: 'kobo' | 'naira';
   /** Simulated adapter auto-settle delay (ms). 0 settles synchronously; the demo sets 3000 to show the authorisation wait. */
   settleAfterMs: number;
   demoMode: boolean;
@@ -49,6 +51,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     alatChannelId: source.ALAT_CHANNEL_ID || undefined,
     alatApiKey: source.ALAT_API_KEY || undefined,
     alatSourceAccount: source.ALAT_SOURCE_ACCOUNT || undefined,
+    alatAmountUnit: source.ALAT_AMOUNT_UNIT === 'naira' ? 'naira' : 'kobo',
     settleAfterMs: Number(source.SETTLE_AFTER_MS ?? 0),
     demoMode: bool(source.DEMO_MODE),
   };

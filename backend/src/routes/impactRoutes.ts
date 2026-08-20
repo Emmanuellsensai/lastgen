@@ -17,7 +17,11 @@ export function createImpactRouter(repo: Repository): Router {
       if (!(await repo.getBusiness(req.params.id))) {
         throw new ApiError('NOT_FOUND', 'Business not found', 404);
       }
-      const period = (String(req.query.period ?? 'month') || 'month') as ImpactPeriod;
+      const rawPeriod = req.query.period;
+      if (rawPeriod !== undefined && !['month', 'year', 'all'].includes(String(rawPeriod))) {
+        throw new ApiError('VALIDATION', 'period must be month, year, or all', 400);
+      }
+      const period = (String(rawPeriod ?? 'month') || 'month') as ImpactPeriod;
       res.json(ok(await repo.impactFor(req.params.id, period)));
     })().catch(next);
   });
@@ -27,7 +31,13 @@ export function createImpactRouter(repo: Repository): Router {
       if (!(await repo.getBusiness(req.params.id))) {
         throw new ApiError('NOT_FOUND', 'Business not found', 404);
       }
-      const year = req.query.year === undefined ? undefined : Number(req.query.year);
+      let year: number | undefined;
+      if (req.query.year !== undefined) {
+        year = Number(req.query.year);
+        if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+          throw new ApiError('VALIDATION', 'year must be a 4-digit integer year', 400);
+        }
+      }
       res.json(
         ok(
           computeWrapped({

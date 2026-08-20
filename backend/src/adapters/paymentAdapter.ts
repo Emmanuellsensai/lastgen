@@ -57,8 +57,8 @@ export interface PaymentAdapter {
 
   /**
    * Validate an inbound provider notification. The simulated adapter accepts
-   * everything; the ALAT adapter verifies the HMAC-SHA512 signature when an
-   * API key is configured and rejects unsigned notifications otherwise.
+   * everything; the ALAT adapter is fail-closed — it verifies the HMAC-SHA512
+   * signature and rejects every notification when no API key is configured.
    */
   verifyWebhookSignature(input: WebhookSignatureInput): boolean;
 }

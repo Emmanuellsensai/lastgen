@@ -120,7 +120,7 @@ export class InMemoryRepository implements Repository {
   /* Businesses                                                          */
   /* ------------------------------------------------------------------ */
 
-  async createBusiness(input: CreateBusinessBody): Promise<Business> {
+  async createBusiness(input: CreateBusinessBody, _ownerId?: string | null): Promise<Business> {
     if (!input?.name || !input?.type || !input?.city) {
       throw new ApiError('VALIDATION', 'name, type and city are required', 400);
     }
@@ -616,7 +616,6 @@ export class InMemoryRepository implements Repository {
   async settleAlatWebhook(reference: string, amountKobo: number, narration: string): Promise<void> {
     // Idempotent on transactionReference: a replay is accepted and ignored.
     if (this.state.seenReferences.has(reference)) return;
-    this.state.seenReferences.add(reference);
 
     // Preferred path: settle the payment the API booked for this reference.
     // The narration no longer drives the loan lookup.
@@ -624,16 +623,21 @@ export class InMemoryRepository implements Repository {
       (p) => p.reference === reference && p.status === 'pending_authorisation',
     );
     if (pending) {
+      this.state.seenReferences.add(reference);
       await this.settlePayment(reference);
       return;
     }
 
-    // Legacy fallback for notifications that arrive without a booked payment:
-    // settle the loan named in the narration, exactly as before the lifecycle.
-    const loan = this.state.loans.find((l) => narration.includes(l.id)) ?? this.state.loans[0];
+    // Fallback for notifications that arrive without a booked payment:
+    // settle the loan named explicitly in the narration.
+    const loan = this.state.loans.find((l) => narration.includes(l.id));
     if (loan && loan.status !== 'CLOSED' && amountKobo > 0) {
+      this.state.seenReferences.add(reference);
       await this.payLoan(loan.id, amountKobo, 'ALAT', reference);
+      return;
     }
+
+    throw new ApiError('NOT_FOUND', 'No pending payment or matching loan found for reference', 404);
   }
 
   /* ------------------------------------------------------------------ */

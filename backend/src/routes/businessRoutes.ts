@@ -17,7 +17,8 @@ export function createBusinessRouter(repo: Repository, env: Env): Router {
 
   router.post('/businesses', (req, res, next) => {
     void (async () => {
-      const business = await repo.createBusiness(req.body as CreateBusinessBody);
+      const ownerId = req.user?.id ?? null;
+      const business = await repo.createBusiness(req.body as CreateBusinessBody, ownerId);
       res.status(201).json(ok(business));
     })().catch(next);
   });

@@ -47,7 +47,7 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(createCreditRouter(repo));
   router.use(createAssetRouter(repo));
   router.use(createLoanRouter(repo));
-  router.use(createPaymentRouter(repo, adapter));
+  router.use(createPaymentRouter(repo, adapter, env));
   router.use(createWalletRouter(repo, env));
   router.use(createPortfolioRouter(repo));
   router.use(createImpactRouter(repo));

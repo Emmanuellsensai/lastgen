@@ -12,7 +12,11 @@ export function createCreditRouter(repo: Repository): Router {
 
   router.get('/credit/applications', (req, res, next) => {
     void (async () => {
-      const status = req.query.status as CreditFileStatus | undefined;
+      const rawStatus = req.query.status;
+      if (rawStatus !== undefined && !['PENDING', 'APPROVED', 'DECLINED'].includes(String(rawStatus))) {
+        throw new ApiError('VALIDATION', 'status must be PENDING, APPROVED, or DECLINED', 400);
+      }
+      const status = rawStatus as CreditFileStatus | undefined;
       res.json(ok({ items: await repo.listCreditFiles(status) }));
     })().catch(next);
   });

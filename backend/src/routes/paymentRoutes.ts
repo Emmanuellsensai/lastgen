@@ -26,7 +26,11 @@ async function suggestedAmount(repo: Repository, loanId: string): Promise<number
   return loan?.monthlyPaymentKobo ?? 0;
 }
 
-export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): Router {
+export function createPaymentRouter(
+  repo: Repository,
+  adapter: PaymentAdapter,
+  env?: { settleAfterMs?: number },
+): Router {
   const router = Router();
 
   router.post('/loans/:id/pay', (req, res, next) => {
@@ -67,11 +71,14 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
       if (collected.platformTransactionReference) {
         await repo.setPaymentPlatformReference(reference, collected.platformTransactionReference);
       }
-      if (
-        payment.status === 'pending_authorisation' &&
-        (collected.status === 'SUCCESS' || collected.status === 'authorised')
-      ) {
-        await repo.settlePayment(reference);
+      if (payment.status === 'pending_authorisation') {
+        if (collected.status === 'SUCCESS' || collected.status === 'authorised') {
+          await repo.settlePayment(reference);
+        } else if (collected.status === 'FAILED') {
+          await repo.failPayment(reference);
+        } else if (collected.status === 'EXPIRED') {
+          await repo.expirePayment(reference);
+        }
       }
 
       const settled = (await repo.paymentByRefOrId(payment.id))!;
@@ -95,16 +102,25 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
         throw new ApiError('NOT_FOUND', 'Payment not found', 404);
       }
 
-      if (payment.status === 'pending_authorisation' && adapter.pollStatus) {
-        const polled = await adapter.pollStatus({ reference: payment.reference });
-        if (polled.status === 'SUCCESS' || polled.status === 'authorised') {
-          await repo.settlePayment(payment.reference);
-        } else if (polled.status === 'FAILED') {
-          await repo.failPayment(payment.reference);
-        } else if (polled.status === 'EXPIRED') {
-          await repo.expirePayment(payment.reference);
+      if (payment.status === 'pending_authorisation') {
+        if (adapter.pollStatus) {
+          const polled = await adapter.pollStatus({ reference: payment.reference });
+          if (polled.status === 'SUCCESS' || polled.status === 'authorised') {
+            await repo.settlePayment(payment.reference);
+          } else if (polled.status === 'FAILED') {
+            await repo.failPayment(payment.reference);
+          } else if (polled.status === 'EXPIRED') {
+            await repo.expirePayment(payment.reference);
+          }
+          payment = (await repo.paymentByRefOrId(payment.id))!;
+        } else if (adapter.name === 'simulated') {
+          const settleAfterMs = env?.settleAfterMs ?? 3000;
+          const ageMs = (await repo.now()).getTime() - new Date(payment.paidAt).getTime();
+          if (ageMs > settleAfterMs * 2) {
+            await repo.expirePayment(payment.reference);
+            payment = (await repo.paymentByRefOrId(payment.id))!;
+          }
         }
-        payment = (await repo.paymentByRefOrId(payment.id))!;
       }
 
       res.json(ok({ status: payment.status, payment }));
