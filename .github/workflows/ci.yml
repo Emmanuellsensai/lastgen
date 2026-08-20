@@ -34,7 +34,7 @@ jobs:
         run: pnpm lint
 
       - name: Shared correctness suites
-        run: pnpm exec vitest run tests/correctness
+        run: pnpm exec vitest run backend/test/correctness
 
       - name: Backend suites
         run: pnpm --filter @lastgen/backend test
