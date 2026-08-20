@@ -7,6 +7,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { createAssetRouter } from './assetRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
 import { createCreditRouter } from './creditRoutes.js';
+import { createDemoRouter } from './demoRoutes.js';
 import { createImpactRouter } from './impactRoutes.js';
 import { createLoanRouter } from './loanRoutes.js';
 import { createPaymentRouter } from './paymentRoutes.js';
@@ -25,6 +26,12 @@ export function apiRouter(repo: Repository, env: Env): Router {
   // Provider callbacks run BEFORE the auth boundary: ALAT signs its own
   // notifications and is never asked for a Lastgen bearer token.
   router.use(createWebhookRouter(repo, adapter));
+
+  // Demo controls are unauthenticated (per the contract) but only exist in
+  // demo mode; live deployments simply never mount this router.
+  if (env.demoMode) {
+    router.use(createDemoRouter(repo));
+  }
 
   router.use(makeRequireAuth(env));
   router.use(createBusinessRouter(repo, env));

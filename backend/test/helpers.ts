@@ -14,8 +14,22 @@ export interface TestApp {
   repo: Repository;
 }
 
-export function createTestApp(): TestApp {
-  const env = loadEnv({ DEMO_MODE: 'true', LOG_LEVEL: 'silent' });
+export interface TestAppOptions {
+  /** Default true. When false the app enforces bearer tokens and hides the demo routes. */
+  demoMode?: boolean;
+  /** Default 'simulated'. 'alat' exercises the real ALAT adapter seam. */
+  paymentAdapter?: 'simulated' | 'alat';
+  /** Raw env overrides, applied on top of the test defaults. */
+  env?: NodeJS.ProcessEnv;
+}
+
+export function createTestApp(options: TestAppOptions = {}): TestApp {
+  const env = loadEnv({
+    DEMO_MODE: options.demoMode === false ? 'false' : 'true',
+    LOG_LEVEL: 'silent',
+    PAYMENT_ADAPTER: options.paymentAdapter ?? 'simulated',
+    ...options.env,
+  });
   const logger = pino({ level: 'silent' });
   const repo = new InMemoryRepository();
   return { app: createApp(env, logger, repo), repo };
