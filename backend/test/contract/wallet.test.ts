@@ -127,7 +127,7 @@ describe('wallets contract', () => {
       lastName: 'Okonkwo',
       phone: '+2348012345678',
     });
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
     const before = loan.balanceKobo;
     const amountKobo = 3_000_000;
 
@@ -141,7 +141,7 @@ describe('wallets contract', () => {
       platformTransactionReference: null,
     });
 
-    const payment = repo.paymentByRefOrId(pay.body.data.paymentId)!;
+    const payment = (await repo.paymentByRefOrId(pay.body.data.paymentId))!;
     expect(payment).toMatchObject({ source: 'WALLET', amountKobo });
     expect(payment.reference).toMatch(/^WLT-/);
     expect(loan.balanceKobo).toBe(before - amountKobo);
@@ -166,7 +166,7 @@ describe('wallets contract', () => {
       lastName: 'Okonkwo',
       phone: '+2348012345678',
     });
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
     const before = loan.balanceKobo;
 
     const res = await request(app)

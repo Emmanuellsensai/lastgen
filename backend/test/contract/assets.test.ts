@@ -64,7 +64,7 @@ describe('assets contract', () => {
     expect(suspend.body.data).toMatchObject({
       status: 'SUSPENDED',
       suspendReason: 'Repeated missed payments',
-      suspendedAt: repo.now().toISOString(),
+      suspendedAt: (await repo.now()).toISOString(),
     });
 
     const restore = await request(app).post('/api/assets/ast_biz_adaeze_frozen/restore');
@@ -81,9 +81,9 @@ describe('assets contract', () => {
     const pending = seed.creditFiles.find((f) => f.status === 'PENDING')!;
     await request(app).post(`/api/credit/applications/${pending.id}/approve`).expect(201);
 
-    const business = repo.getBusiness(pending.businessId)!;
+    const business = (await repo.getBusiness(pending.businessId))!;
     business.medicalFlag = true;
-    const asset = repo.assetByBusiness(pending.businessId)!;
+    const asset = (await repo.assetByBusiness(pending.businessId))!;
 
     const res = await request(app)
       .post(`/api/assets/${asset.id}/suspend`)

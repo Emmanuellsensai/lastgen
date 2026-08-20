@@ -12,28 +12,32 @@ import type { ImpactPeriod } from '../types/api.js';
 export function createImpactRouter(repo: Repository): Router {
   const router = Router();
 
-  router.get('/businesses/:id/impact', (req, res) => {
-    if (!repo.getBusiness(req.params.id)) {
-      throw new ApiError('NOT_FOUND', 'Business not found', 404);
-    }
-    const period = (String(req.query.period ?? 'month') || 'month') as ImpactPeriod;
-    res.json(ok(repo.impactFor(req.params.id, period)));
+  router.get('/businesses/:id/impact', (req, res, next) => {
+    void (async () => {
+      if (!(await repo.getBusiness(req.params.id))) {
+        throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      }
+      const period = (String(req.query.period ?? 'month') || 'month') as ImpactPeriod;
+      res.json(ok(await repo.impactFor(req.params.id, period)));
+    })().catch(next);
   });
 
-  router.get('/businesses/:id/wrapped', (req, res) => {
-    if (!repo.getBusiness(req.params.id)) {
-      throw new ApiError('NOT_FOUND', 'Business not found', 404);
-    }
-    const year = req.query.year === undefined ? undefined : Number(req.query.year);
-    res.json(
-      ok(
-        computeWrapped({
-          year,
-          impact: repo.impactFor(req.params.id, 'year'),
-          now: repo.now(),
-        }),
-      ),
-    );
+  router.get('/businesses/:id/wrapped', (req, res, next) => {
+    void (async () => {
+      if (!(await repo.getBusiness(req.params.id))) {
+        throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      }
+      const year = req.query.year === undefined ? undefined : Number(req.query.year);
+      res.json(
+        ok(
+          computeWrapped({
+            year,
+            impact: await repo.impactFor(req.params.id, 'year'),
+            now: await repo.now(),
+          }),
+        ),
+      );
+    })().catch(next);
   });
 
   return router;

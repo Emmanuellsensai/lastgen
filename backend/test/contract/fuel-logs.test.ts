@@ -28,7 +28,7 @@ describe('fuel logs contract', () => {
       litres: 10,
       amountKobo: 1_150_000,
       pricePerLitreKobo: 115_000,
-      loggedAt: repo.now().toISOString(),
+      loggedAt: (await repo.now()).toISOString(),
     });
     expect(res.body.data.id).toMatch(/^fl_/);
 
@@ -36,7 +36,7 @@ describe('fuel logs contract', () => {
     expect(burn.status).toBe(200);
     expect(burn.body.data.litresPerDay).toBeGreaterThan(0);
     expect(burn.body.data.daysObserved).toBeGreaterThanOrEqual(1);
-    expect(burn.body.data.computedAt).toBe(repo.now().toISOString());
+    expect(burn.body.data.computedAt).toBe((await repo.now()).toISOString());
   });
 
   it('rejects non-positive litres or amount', async () => {

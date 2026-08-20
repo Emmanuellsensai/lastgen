@@ -196,22 +196,22 @@ describe('deterministic rebuild', () => {
     expect(second.quotes).toEqual(seed.quotes);
   });
 
-  it('a repository reset restores the pristine seed', () => {
+  it('a repository reset restores the pristine seed', async () => {
     const repo = new InMemoryRepository();
-    repo.advanceTime(90);
-    repo.reset();
-    expect(repo.now().toISOString()).toBe('2026-08-19T09:00:00.000Z');
-    expect(repo.getAsset('ast_biz_adaeze_frozen')?.status).toBe('ACTIVE');
-    expect(repo.getLoan('loan_biz_wuse_press')?.status).toBe('DELINQUENT');
-    expect(repo.getBusiness('biz_gwarinpa_mart')?.medicalFlag).toBe(true);
-    expect(repo.statusHistory()).toHaveLength(0);
+    await repo.advanceTime(90);
+    await repo.reset();
+    expect((await repo.now()).toISOString()).toBe('2026-08-19T09:00:00.000Z');
+    expect((await repo.getAsset('ast_biz_adaeze_frozen'))?.status).toBe('ACTIVE');
+    expect((await repo.getLoan('loan_biz_wuse_press'))?.status).toBe('DELINQUENT');
+    expect((await repo.getBusiness('biz_gwarinpa_mart'))?.medicalFlag).toBe(true);
+    expect(await repo.statusHistory()).toHaveLength(0);
   });
 });
 
 describe('repository portfolio stats parity', () => {
-  it('matches the reference projection to the kobo', () => {
+  it('matches the reference projection to the kobo', async () => {
     const repo = new InMemoryRepository();
-    expect(repo.portfolioStats()).toEqual({
+    expect(await repo.portfolioStats()).toEqual({
       assetsFinanced: 523,
       portfolioValueKobo: 256_396_630_000,
       repaymentRatePct: 87.8,

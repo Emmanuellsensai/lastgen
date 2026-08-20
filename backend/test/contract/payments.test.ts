@@ -22,11 +22,11 @@ describe('payments contract', () => {
   });
 
   it('settles an instalment and returns the slim pay envelope', async () => {
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
-    const asset = repo.getAsset(loan.assetId)!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
+    const asset = (await repo.getAsset(loan.assetId))!;
     const amountKobo = 36_654_539;
     const before = loan.balanceKobo;
-    const unpaidBefore = repo.scheduleFor(loan.id).filter((i) => !i.paidAt).length;
+    const unpaidBefore = (await repo.scheduleFor(loan.id)).filter((i) => !i.paidAt).length;
 
     const res = await request(app)
       .post(`/api/loans/${loan.id}/pay`)
@@ -40,17 +40,19 @@ describe('payments contract', () => {
     expect(res.body.data.paymentId).toMatch(/^pay_/);
     expect(res.body.data.platformTransactionReference).toMatch(/^SIM-PLT-/);
 
-    const payment = repo.paymentByRefOrId(res.body.data.paymentId)!;
+    const payment = (await repo.paymentByRefOrId(res.body.data.paymentId))!;
     expect(payment).toMatchObject({ loanId: loan.id, amountKobo, source: 'SIMULATED' });
     expect(payment.reference).toMatch(/^SIM-/);
     expect(loan.balanceKobo).toBe(before - amountKobo);
     expect(asset.id).toBe(asset.id);
-    expect(repo.scheduleFor(loan.id).filter((i) => !i.paidAt)).toHaveLength(unpaidBefore - 1);
+    expect((await repo.scheduleFor(loan.id)).filter((i) => !i.paidAt)).toHaveLength(
+      unpaidBefore - 1,
+    );
   });
 
   it('transfers ownership when the balance is cleared', async () => {
-    const loan = repo.getLoan('loan_biz_wuse_press')!;
-    const asset = repo.getAsset(loan.assetId)!;
+    const loan = (await repo.getLoan('loan_biz_wuse_press'))!;
+    const asset = (await repo.getAsset(loan.assetId))!;
     const balanceKobo = loan.balanceKobo;
 
     const res = await request(app)
@@ -65,8 +67,8 @@ describe('payments contract', () => {
   });
 
   it('defaults the amount to the next unpaid installment', async () => {
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
-    const nextUnpaid = repo.scheduleFor(loan.id).find((i) => !i.paidAt)!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
+    const nextUnpaid = (await repo.scheduleFor(loan.id)).find((i) => !i.paidAt)!;
     const expected = nextUnpaid.principalKobo + nextUnpaid.interestKobo;
 
     const res = await request(app)
@@ -74,7 +76,7 @@ describe('payments contract', () => {
       .send({ source: 'bank_account' });
 
     expect(res.status).toBe(200);
-    const payment = repo.paymentByRefOrId(res.body.data.paymentId)!;
+    const payment = (await repo.paymentByRefOrId(res.body.data.paymentId))!;
     expect(payment.amountKobo).toBe(expected);
   });
 
@@ -106,7 +108,7 @@ describe('payments contract', () => {
         ALAT_API_KEY: 'key',
       },
     });
-    const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await alatRepo.getLoan('loan_biz_adaeze_frozen'))!;
     const before = loan.balanceKobo;
 
     const res = await request(alatApp)
@@ -117,7 +119,7 @@ describe('payments contract', () => {
     expect(res.body.data.status).toBe('pending_authorisation');
     expect(res.body.data.platformTransactionReference).toBe('PLT-BOOKED');
 
-    const payment = alatRepo.paymentByRefOrId(res.body.data.paymentId)!;
+    const payment = (await alatRepo.paymentByRefOrId(res.body.data.paymentId))!;
     expect(payment.source).toBe('ALAT');
     expect(payment.reference).toMatch(/^ALAT-/);
     expect(payment.status).toBe('pending_authorisation');

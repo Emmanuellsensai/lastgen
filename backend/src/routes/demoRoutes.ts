@@ -11,20 +11,26 @@ import type { AdvanceTimeBody, MissPaymentBody } from '../types/api.js';
 export function createDemoRouter(repo: Repository): Router {
   const router = Router();
 
-  router.post('/demo/reset', (_req, res) => {
-    repo.reset();
-    res.json(ok({ ok: true }));
+  router.post('/demo/reset', (_req, res, next) => {
+    void (async () => {
+      await repo.reset();
+      res.json(ok({ ok: true }));
+    })().catch(next);
   });
 
-  router.post('/demo/advance-time', (req, res) => {
-    const body = (req.body ?? {}) as AdvanceTimeBody;
-    repo.advanceTime(body.days);
-    res.json(ok({ ok: true }));
+  router.post('/demo/advance-time', (req, res, next) => {
+    void (async () => {
+      const body = (req.body ?? {}) as AdvanceTimeBody;
+      await repo.advanceTime(body.days);
+      res.json(ok({ ok: true }));
+    })().catch(next);
   });
 
-  router.post('/demo/miss-payment', (req, res) => {
-    const body = (req.body ?? {}) as MissPaymentBody;
-    res.json(ok(repo.missPayment(body.loanId)));
+  router.post('/demo/miss-payment', (req, res, next) => {
+    void (async () => {
+      const body = (req.body ?? {}) as MissPaymentBody;
+      res.json(ok(await repo.missPayment(body.loanId)));
+    })().catch(next);
   });
 
   return router;

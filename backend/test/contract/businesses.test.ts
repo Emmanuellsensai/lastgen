@@ -29,7 +29,7 @@ describe('businesses contract', () => {
       generatorKva: 2.5,
       hoursPerDay: 8,
       medicalFlag: false,
-      createdAt: repo.now().toISOString(),
+      createdAt: (await repo.now()).toISOString(),
     });
     expect(res.body.data.id).toMatch(/^biz_/);
   });

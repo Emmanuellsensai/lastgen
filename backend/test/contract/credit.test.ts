@@ -67,7 +67,7 @@ describe('credit contract', () => {
       businessId: file.businessId,
       systemId: file.quote.system.id,
       status: 'ACTIVE',
-      installedAt: repo.now().toISOString(),
+      installedAt: (await repo.now()).toISOString(),
     });
     expect(asset.serial).toMatch(/^LG-\d{5}$/);
     expect(asset.controllerId).toMatch(/^CTL-\d{5}$/);
@@ -80,7 +80,9 @@ describe('credit contract', () => {
       balanceKobo: file.quote.system.priceKobo - file.quote.depositKobo,
       status: 'ACTIVE',
     });
-    expect(loan.nextDueAt).toBe(new Date(repo.now().getTime() + 30 * 86_400_000).toISOString());
+    expect(loan.nextDueAt).toBe(
+      new Date((await repo.now()).getTime() + 30 * 86_400_000).toISOString(),
+    );
 
     const assetRes = await request(app).get(`/api/assets/${asset.id}`);
     expect(assetRes.status).toBe(200);

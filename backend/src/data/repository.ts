@@ -66,45 +66,49 @@ export interface Repository {
   readonly kind: 'memory' | 'supabase';
 
   /* Demo clock ----------------------------------------------------- */
-  now(): Date;
-  advanceTime(days: number): void;
-  reset(): void;
+  now(): Promise<Date>;
+  advanceTime(days: number): Promise<void>;
+  reset(): Promise<void>;
 
   /* Businesses ----------------------------------------------------- */
-  createBusiness(input: CreateBusinessBody): Business;
-  getBusiness(id: string): Business | undefined;
+  createBusiness(input: CreateBusinessBody): Promise<Business>;
+  getBusiness(id: string): Promise<Business | undefined>;
 
   /* Fuel logs and burn --------------------------------------------- */
-  addFuelLog(businessId: string, input: CreateFuelLogBody): FuelLog;
-  addReceiptLog(businessId: string, extraction: ReceiptExtraction, receiptUrl: string): FuelLog;
-  fuelLogsFor(businessId: string, limit?: number): FuelLog[];
-  burnProfileFor(businessId: string): BurnProfile | undefined;
-  recomputeBurn(businessId: string): BurnProfile | undefined;
+  addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog>;
+  addReceiptLog(
+    businessId: string,
+    extraction: ReceiptExtraction,
+    receiptUrl: string,
+  ): Promise<FuelLog>;
+  fuelLogsFor(businessId: string, limit?: number): Promise<FuelLog[]>;
+  burnProfileFor(businessId: string): Promise<BurnProfile | undefined>;
+  recomputeBurn(businessId: string): Promise<BurnProfile | undefined>;
 
   /* Systems -------------------------------------------------------- */
-  listSystems(query: SystemsQuery): SolarSystem[];
+  listSystems(query: SystemsQuery): Promise<SolarSystem[]>;
 
   /* Quotes --------------------------------------------------------- */
-  createQuote(businessId: string, input: CreateQuoteBody): Quote;
-  getQuote(id: string): Quote | undefined;
+  createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote>;
+  getQuote(id: string): Promise<Quote | undefined>;
 
   /* Credit --------------------------------------------------------- */
-  listCreditFiles(status?: CreditFileStatus): CreditFile[];
-  getCreditFile(id: string): CreditFileDetail | undefined;
-  approveCreditFile(id: string): { loan: Loan; asset: Asset };
-  declineCreditFile(id: string, reason: string): CreditFile;
+  listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]>;
+  getCreditFile(id: string): Promise<CreditFileDetail | undefined>;
+  approveCreditFile(id: string): Promise<{ loan: Loan; asset: Asset }>;
+  declineCreditFile(id: string, reason: string): Promise<CreditFile>;
 
   /* Assets --------------------------------------------------------- */
-  getAsset(id: string): Asset | undefined;
-  assetByBusiness(businessId: string): Asset | undefined;
-  meterReadingsFor(assetId: string, from?: string, to?: string): MeterReading[];
-  suspendAsset(id: string, reason: string): Asset;
-  restoreAsset(id: string): Asset;
+  getAsset(id: string): Promise<Asset | undefined>;
+  assetByBusiness(businessId: string): Promise<Asset | undefined>;
+  meterReadingsFor(assetId: string, from?: string, to?: string): Promise<MeterReading[]>;
+  suspendAsset(id: string, reason: string): Promise<Asset>;
+  restoreAsset(id: string): Promise<Asset>;
 
   /* Loans ---------------------------------------------------------- */
-  getLoan(id: string): Loan | undefined;
-  loanByAsset(assetId: string): Loan | undefined;
-  scheduleFor(loanId: string): Installment[];
+  getLoan(id: string): Promise<Loan | undefined>;
+  loanByAsset(assetId: string): Promise<Loan | undefined>;
+  scheduleFor(loanId: string): Promise<Installment[]>;
   /**
    * Settlement primitive shared by every entry path (simulated consent, ALAT
    * webhook, wallet debit): applies the PAY transition to loan + asset + next
@@ -115,7 +119,7 @@ export interface Repository {
     amountKobo: number,
     source: PaymentSource,
     reference: string,
-  ): PaySettlement;
+  ): Promise<PaySettlement>;
 
   /* Payments lifecycle --------------------------------------------- */
   /** Book a payment as pending_authorisation without touching loan or asset. */
@@ -125,31 +129,34 @@ export interface Repository {
     source: PaymentSource,
     reference: string,
     platformTransactionReference?: string,
-  ): Payment;
+  ): Promise<Payment>;
   /** Settle a pending payment by reference. Idempotent; returns the current state. */
-  settlePayment(reference: string): PaySettlement;
+  settlePayment(reference: string): Promise<PaySettlement>;
   /** Mark a pending payment FAILED. Idempotent; no loan or asset changes. */
-  failPayment(reference: string): Payment | undefined;
+  failPayment(reference: string): Promise<Payment | undefined>;
   /** Mark a pending payment EXPIRED (consent window elapsed). Idempotent. */
-  expirePayment(reference: string): Payment | undefined;
+  expirePayment(reference: string): Promise<Payment | undefined>;
   /** Record the provider's platform reference once the consent request is issued. */
-  setPaymentPlatformReference(reference: string, platformTransactionReference: string): void;
+  setPaymentPlatformReference(
+    reference: string,
+    platformTransactionReference: string,
+  ): Promise<void>;
   /** Look a payment up by its transaction reference or its id. */
-  paymentByRefOrId(key: string): Payment | undefined;
+  paymentByRefOrId(key: string): Promise<Payment | undefined>;
 
   /* Portfolio ------------------------------------------------------ */
-  portfolioStats(): PortfolioStats;
-  listPortfolioAssets(query: PortfolioAssetsQuery): PagedEnvelope<Asset>;
-  exportCsv(): ExportResult;
+  portfolioStats(): Promise<PortfolioStats>;
+  listPortfolioAssets(query: PortfolioAssetsQuery): Promise<PagedEnvelope<Asset>>;
+  exportCsv(): Promise<ExportResult>;
 
   /* Webhook -------------------------------------------------------- */
-  settleAlatWebhook(reference: string, amountKobo: number, narration: string): void;
+  settleAlatWebhook(reference: string, amountKobo: number, narration: string): Promise<void>;
 
   /* Wallets -------------------------------------------------------- */
   /** Create the business wallet (KYC'd virtual account). Idempotent per business. */
-  createWallet(businessId: string, input: CreateWalletBody): Wallet;
-  walletForBusiness(businessId: string): Wallet | undefined;
-  walletStatement(walletId: string, query: WalletStatementQuery): WalletTransaction[];
+  createWallet(businessId: string, input: CreateWalletBody): Promise<Wallet>;
+  walletForBusiness(businessId: string): Promise<Wallet | undefined>;
+  walletStatement(walletId: string, query: WalletStatementQuery): Promise<WalletTransaction[]>;
   /** Credit a wallet and record an IN transaction. Returns the updated wallet. */
   creditWallet(
     walletId: string,
@@ -157,20 +164,20 @@ export interface Repository {
     description: string,
     reference: string,
     category: string,
-  ): Wallet;
+  ): Promise<Wallet>;
   /** Direct wallet debit: 402 if insufficient, then settle loan + asset atomically. */
-  payFromWallet(loanId: string, amountKobo: number): PaySettlement;
+  payFromWallet(loanId: string, amountKobo: number): Promise<PaySettlement>;
   /** Resolve the business owned by a user (Supabase owner_id; demo maps demo-user). */
-  businessForOwner(ownerId: string): Business | undefined;
+  businessForOwner(ownerId: string): Promise<Business | undefined>;
 
   /* Impact --------------------------------------------------------- */
-  impactFor(businessId: string, period: ImpactPeriod): ImpactSummary;
+  impactFor(businessId: string, period: ImpactPeriod): Promise<ImpactSummary>;
 
   /* Demo ----------------------------------------------------------- */
-  missPayment(loanId: string): { loan: Loan; asset: Asset };
+  missPayment(loanId: string): Promise<{ loan: Loan; asset: Asset }>;
 
   /* Audit ---------------------------------------------------------- */
-  statusHistory(assetId?: string): readonly AssetStatusHistoryEntry[];
+  statusHistory(assetId?: string): Promise<readonly AssetStatusHistoryEntry[]>;
 }
 
 export type { AssetStatus, AssetStatusHistoryEntry };

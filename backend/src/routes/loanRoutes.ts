@@ -9,16 +9,20 @@ import { ApiError } from '../middleware/errorHandler.js';
 export function createLoanRouter(repo: Repository): Router {
   const router = Router();
 
-  router.get('/loans/:id', (req, res) => {
-    const loan = repo.getLoan(req.params.id);
-    if (!loan) throw new ApiError('NOT_FOUND', 'Loan not found', 404);
-    res.json(ok(loan));
+  router.get('/loans/:id', (req, res, next) => {
+    void (async () => {
+      const loan = await repo.getLoan(req.params.id);
+      if (!loan) throw new ApiError('NOT_FOUND', 'Loan not found', 404);
+      res.json(ok(loan));
+    })().catch(next);
   });
 
-  router.get('/loans/:id/schedule', (req, res) => {
-    const items = repo.scheduleFor(req.params.id);
-    if (items.length === 0) throw new ApiError('NOT_FOUND', 'Schedule not found', 404);
-    res.json(ok({ items }));
+  router.get('/loans/:id/schedule', (req, res, next) => {
+    void (async () => {
+      const items = await repo.scheduleFor(req.params.id);
+      if (items.length === 0) throw new ApiError('NOT_FOUND', 'Schedule not found', 404);
+      res.json(ok({ items }));
+    })().catch(next);
   });
 
   return router;

@@ -81,11 +81,11 @@ export class InMemoryRepository implements Repository {
   /* Demo clock                                                          */
   /* ------------------------------------------------------------------ */
 
-  now(): Date {
+  async now(): Promise<Date> {
     return new Date(this.state.now);
   }
 
-  advanceTime(days: number): void {
+  async advanceTime(days: number): Promise<void> {
     if (!Number.isFinite(days) || days === 0) {
       throw new ApiError('VALIDATION', 'days must be a non zero number', 400);
     }
@@ -109,7 +109,7 @@ export class InMemoryRepository implements Repository {
     }
   }
 
-  reset(): void {
+  async reset(): Promise<void> {
     this.state = buildSeed();
     this.seq = 0;
     this.serialSeqValue = 10_000;
@@ -120,7 +120,7 @@ export class InMemoryRepository implements Repository {
   /* Businesses                                                          */
   /* ------------------------------------------------------------------ */
 
-  createBusiness(input: CreateBusinessBody): Business {
+  async createBusiness(input: CreateBusinessBody): Promise<Business> {
     if (!input?.name || !input?.type || !input?.city) {
       throw new ApiError('VALIDATION', 'name, type and city are required', 400);
     }
@@ -148,7 +148,7 @@ export class InMemoryRepository implements Repository {
     return business;
   }
 
-  getBusiness(id: string): Business | undefined {
+  async getBusiness(id: string): Promise<Business | undefined> {
     return this.state.businesses.find((b) => b.id === id);
   }
 
@@ -156,8 +156,8 @@ export class InMemoryRepository implements Repository {
   /* Fuel logs and burn                                                  */
   /* ------------------------------------------------------------------ */
 
-  addFuelLog(businessId: string, input: CreateFuelLogBody): FuelLog {
-    this.findBusinessOrThrow(businessId);
+  async addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog> {
+    await this.findBusinessOrThrow(businessId);
     if (!input || input.litres <= 0 || input.amountKobo <= 0) {
       throw new ApiError('VALIDATION', 'litres and amountKobo must be greater than zero', 400);
     }
@@ -170,12 +170,16 @@ export class InMemoryRepository implements Repository {
       pricePerLitreKobo: input.pricePerLitreKobo,
       loggedAt: input.loggedAt ?? this.state.now.toISOString(),
     };
-    this.pushFuelLog(log);
+    await this.pushFuelLog(log);
     return log;
   }
 
-  addReceiptLog(businessId: string, extraction: ReceiptExtraction, receiptUrl: string): FuelLog {
-    this.findBusinessOrThrow(businessId);
+  async addReceiptLog(
+    businessId: string,
+    extraction: ReceiptExtraction,
+    receiptUrl: string,
+  ): Promise<FuelLog> {
+    await this.findBusinessOrThrow(businessId);
     const log: FuelLog = {
       id: this.nextId('fl'),
       businessId,
@@ -187,22 +191,22 @@ export class InMemoryRepository implements Repository {
       receiptUrl,
       confidence: extraction.confidence,
     };
-    this.pushFuelLog(log);
+    await this.pushFuelLog(log);
     return log;
   }
 
-  fuelLogsFor(businessId: string, limit?: number): FuelLog[] {
+  async fuelLogsFor(businessId: string, limit?: number): Promise<FuelLog[]> {
     const logs = this.state.fuelLogs.filter((l) => l.businessId === businessId);
     return limit === undefined ? logs : logs.slice(-limit);
   }
 
-  burnProfileFor(businessId: string): BurnProfile | undefined {
+  async burnProfileFor(businessId: string): Promise<BurnProfile | undefined> {
     return this.state.burnProfiles.find((p) => p.businessId === businessId);
   }
 
-  recomputeBurn(businessId: string): BurnProfile | undefined {
+  async recomputeBurn(businessId: string): Promise<BurnProfile | undefined> {
     const logs = this.state.fuelLogs.filter((l) => l.businessId === businessId);
-    const profile = this.burnProfileFor(businessId);
+    const profile = await this.burnProfileFor(businessId);
     if (!profile || logs.length === 0) return profile;
 
     const totalLitres = logs.reduce((sum, l) => sum + l.litres, 0);
@@ -227,7 +231,7 @@ export class InMemoryRepository implements Repository {
   /* Systems                                                             */
   /* ------------------------------------------------------------------ */
 
-  listSystems(query: SystemsQuery): SolarSystem[] {
+  async listSystems(query: SystemsQuery): Promise<SolarSystem[]> {
     const minKw = query.minKw ?? 0;
     const maxPriceKobo = query.maxPriceKobo ?? Number.MAX_SAFE_INTEGER;
     return this.state.solarSystems.filter(
@@ -239,9 +243,9 @@ export class InMemoryRepository implements Repository {
   /* Quotes                                                              */
   /* ------------------------------------------------------------------ */
 
-  createQuote(businessId: string, input: CreateQuoteBody): Quote {
-    this.findBusinessOrThrow(businessId);
-    const burn = this.burnProfileFor(businessId);
+  async createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote> {
+    await this.findBusinessOrThrow(businessId);
+    const burn = await this.burnProfileFor(businessId);
     if (!burn) throw new ApiError('NOT_FOUND', 'Burn profile not found', 404);
 
     const system = this.state.solarSystems.find((s) => s.id === input.systemId);
@@ -281,7 +285,7 @@ export class InMemoryRepository implements Repository {
     return quote;
   }
 
-  getQuote(id: string): Quote | undefined {
+  async getQuote(id: string): Promise<Quote | undefined> {
     return this.state.quotes.find((q) => q.id === id);
   }
 
@@ -289,20 +293,20 @@ export class InMemoryRepository implements Repository {
   /* Credit                                                              */
   /* ------------------------------------------------------------------ */
 
-  listCreditFiles(status?: CreditFileStatus): CreditFile[] {
+  async listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]> {
     return status
       ? this.state.creditFiles.filter((f) => f.status === status)
       : this.state.creditFiles;
   }
 
-  getCreditFile(id: string): CreditFileDetail | undefined {
+  async getCreditFile(id: string): Promise<CreditFileDetail | undefined> {
     const file = this.state.creditFiles.find((f) => f.id === id);
     if (!file) return undefined;
 
     const principal = file.quote.system.priceKobo - file.quote.depositKobo;
     return {
       ...file,
-      fuelLogs: this.fuelLogsFor(file.businessId, 24),
+      fuelLogs: await this.fuelLogsFor(file.businessId, 24),
       schedulePreview: buildSchedule(
         principal,
         file.quote.aprBps,
@@ -312,7 +316,7 @@ export class InMemoryRepository implements Repository {
     };
   }
 
-  approveCreditFile(id: string): { loan: Loan; asset: Asset } {
+  async approveCreditFile(id: string): Promise<{ loan: Loan; asset: Asset }> {
     const file = this.state.creditFiles.find((f) => f.id === id);
     if (!file) throw new ApiError('NOT_FOUND', 'Credit file not found', 404);
     if (file.status !== 'PENDING') {
@@ -360,7 +364,7 @@ export class InMemoryRepository implements Repository {
     return { loan, asset };
   }
 
-  declineCreditFile(id: string, reason: string): CreditFile {
+  async declineCreditFile(id: string, reason: string): Promise<CreditFile> {
     const file = this.state.creditFiles.find((f) => f.id === id);
     if (!file) throw new ApiError('NOT_FOUND', 'Credit file not found', 404);
     if (file.status !== 'PENDING') {
@@ -375,24 +379,24 @@ export class InMemoryRepository implements Repository {
   /* Assets                                                              */
   /* ------------------------------------------------------------------ */
 
-  getAsset(id: string): Asset | undefined {
+  async getAsset(id: string): Promise<Asset | undefined> {
     return this.state.assets.find((a) => a.id === id);
   }
 
-  assetByBusiness(businessId: string): Asset | undefined {
+  async assetByBusiness(businessId: string): Promise<Asset | undefined> {
     return this.state.assets.find((a) => a.businessId === businessId);
   }
 
-  meterReadingsFor(assetId: string, from?: string, to?: string): MeterReading[] {
+  async meterReadingsFor(assetId: string, from?: string, to?: string): Promise<MeterReading[]> {
     let items = this.state.meterReadings.filter((r) => r.assetId === assetId);
     if (from) items = items.filter((r) => r.ts >= from);
     if (to) items = items.filter((r) => r.ts <= to);
     return items;
   }
 
-  suspendAsset(id: string, reason: string): Asset {
-    const asset = this.findAssetOrThrow(id);
-    const loan = this.loanByAsset(asset.id) ?? this.fallbackLoan(asset);
+  async suspendAsset(id: string, reason: string): Promise<Asset> {
+    const asset = await this.findAssetOrThrow(id);
+    const loan = (await this.loanByAsset(asset.id)) ?? this.fallbackLoan(asset);
     this.commit(
       transition(asset, loan, this.businessFor(asset), 'SUSPEND', {
         now: this.state.now,
@@ -405,9 +409,9 @@ export class InMemoryRepository implements Repository {
     return asset;
   }
 
-  restoreAsset(id: string): Asset {
-    const asset = this.findAssetOrThrow(id);
-    const loan = this.loanByAsset(asset.id) ?? this.fallbackLoan(asset);
+  async restoreAsset(id: string): Promise<Asset> {
+    const asset = await this.findAssetOrThrow(id);
+    const loan = (await this.loanByAsset(asset.id)) ?? this.fallbackLoan(asset);
     this.commit(
       transition(asset, loan, this.businessFor(asset), 'RESTORE', { now: this.state.now }),
       asset,
@@ -421,27 +425,27 @@ export class InMemoryRepository implements Repository {
   /* Loans                                                               */
   /* ------------------------------------------------------------------ */
 
-  getLoan(id: string): Loan | undefined {
+  async getLoan(id: string): Promise<Loan | undefined> {
     return this.state.loans.find((l) => l.id === id);
   }
 
-  loanByAsset(assetId: string): Loan | undefined {
+  async loanByAsset(assetId: string): Promise<Loan | undefined> {
     return this.state.loans.find((l) => l.assetId === assetId);
   }
 
-  scheduleFor(loanId: string): Installment[] {
+  async scheduleFor(loanId: string): Promise<Installment[]> {
     return this.state.installments[loanId] ?? [];
   }
 
-  payLoan(
+  async payLoan(
     loanId: string,
     amountKobo: number,
     source: PaymentSource,
     reference: string,
-  ): PaySettlement {
-    const loan = this.findLoanOrThrow(loanId);
-    const asset = this.findAssetOrThrow(loan.assetId);
-    const applied = this.applySettlement(loan, asset, amountKobo, source);
+  ): Promise<PaySettlement> {
+    const loan = await this.findLoanOrThrow(loanId);
+    const asset = await this.findAssetOrThrow(loan.assetId);
+    const applied = await this.applySettlement(loan, asset, amountKobo, source);
     const payment: Payment = {
       id: this.nextId('pay'),
       loanId,
@@ -459,14 +463,14 @@ export class InMemoryRepository implements Repository {
   /* Payments lifecycle                                                  */
   /* ------------------------------------------------------------------ */
 
-  startPayment(
+  async startPayment(
     loanId: string,
     amountKobo: number,
     source: PaymentSource,
     reference: string,
     platformTransactionReference?: string,
-  ): Payment {
-    const loan = this.findLoanOrThrow(loanId);
+  ): Promise<Payment> {
+    const loan = await this.findLoanOrThrow(loanId);
     if (!Number.isInteger(amountKobo) || amountKobo <= 0) {
       throw new ApiError('VALIDATION', 'amountKobo must be a positive integer', 400);
     }
@@ -488,7 +492,7 @@ export class InMemoryRepository implements Repository {
     return payment;
   }
 
-  settlePayment(reference: string): PaySettlement {
+  async settlePayment(reference: string): Promise<PaySettlement> {
     const payment = this.state.payments.find(
       (p) => p.reference === reference && p.status === 'pending_authorisation',
     );
@@ -497,11 +501,11 @@ export class InMemoryRepository implements Repository {
     if (!payment) {
       const terminal = this.state.payments.find((p) => p.reference === reference);
       if (terminal && terminal.status !== 'pending_authorisation') {
-        const loan = this.findLoanOrThrow(terminal.loanId);
+        const loan = await this.findLoanOrThrow(terminal.loanId);
         return {
           payment: terminal,
           loan,
-          asset: this.findAssetOrThrow(loan.assetId),
+          asset: await this.findAssetOrThrow(loan.assetId),
         };
       }
       throw new ApiError('NOT_FOUND', 'Payment not found', 404);
@@ -509,18 +513,24 @@ export class InMemoryRepository implements Repository {
 
     // Apply the PAY transition exactly like the direct path, then mark the
     // booked payment settled — one ledger row, one state change.
-    const loan = this.findLoanOrThrow(payment.loanId);
-    const applied = this.applySettlement(
-      loan,
-      this.findAssetOrThrow(loan.assetId),
-      payment.amountKobo,
-      payment.source,
-    );
+    const loan = await this.findLoanOrThrow(payment.loanId);
+    const asset = await this.findAssetOrThrow(loan.assetId);
+    // A concurrent settle (the route's awaited settle racing the simulated
+    // adapter's in-process consent callback, or a webhook replay racing a poll)
+    // can pass the pending lookup above before the first commit lands. The
+    // state machine applies the transition exactly once, so the loser observes
+    // the terminal status and returns it unchanged. applySettlement is
+    // synchronous and is called without await so the commit is atomic with the
+    // status check above — no microtask gap for a second caller to slip in.
+    if (payment.status !== 'pending_authorisation') {
+      return { payment, loan, asset };
+    }
+    const applied = this.applySettlement(loan, asset, payment.amountKobo, payment.source);
     payment.status = 'SUCCESS';
     return { payment, loan: applied.loan, asset: applied.asset };
   }
 
-  failPayment(reference: string): Payment | undefined {
+  async failPayment(reference: string): Promise<Payment | undefined> {
     const payment = this.state.payments.find(
       (p) => p.reference === reference && p.status === 'pending_authorisation',
     );
@@ -529,7 +539,7 @@ export class InMemoryRepository implements Repository {
     return payment;
   }
 
-  expirePayment(reference: string): Payment | undefined {
+  async expirePayment(reference: string): Promise<Payment | undefined> {
     const payment = this.state.payments.find(
       (p) => p.reference === reference && p.status === 'pending_authorisation',
     );
@@ -538,12 +548,15 @@ export class InMemoryRepository implements Repository {
     return payment;
   }
 
-  setPaymentPlatformReference(reference: string, platformTransactionReference: string): void {
+  async setPaymentPlatformReference(
+    reference: string,
+    platformTransactionReference: string,
+  ): Promise<void> {
     const payment = this.state.payments.find((p) => p.reference === reference);
     if (payment) payment.platformTransactionReference = platformTransactionReference;
   }
 
-  paymentByRefOrId(key: string): Payment | undefined {
+  async paymentByRefOrId(key: string): Promise<Payment | undefined> {
     return this.state.payments.find((p) => p.reference === key || p.id === key);
   }
 
@@ -551,7 +564,7 @@ export class InMemoryRepository implements Repository {
   /* Portfolio                                                            */
   /* ------------------------------------------------------------------ */
 
-  portfolioStats(): PortfolioStats {
+  async portfolioStats(): Promise<PortfolioStats> {
     const financed = this.state.assets.length;
     const portfolioValueKobo = this.state.loans.reduce((sum, l) => sum + l.principalKobo, 0);
     const suspendedCount = this.state.assets.filter((a) => a.status === 'SUSPENDED').length;
@@ -578,7 +591,7 @@ export class InMemoryRepository implements Repository {
     };
   }
 
-  listPortfolioAssets(query: PortfolioAssetsQuery): PagedEnvelope<Asset> {
+  async listPortfolioAssets(query: PortfolioAssetsQuery): Promise<PagedEnvelope<Asset>> {
     let items = this.state.assets;
     if (query.status) items = items.filter((a) => a.status === query.status);
     if (query.city) items = items.filter((a) => this.state.assetCity[a.id] === query.city);
@@ -589,7 +602,7 @@ export class InMemoryRepository implements Repository {
     return { items: items.slice(start, start + PAGE_SIZE), total };
   }
 
-  exportCsv(): ExportResult {
+  async exportCsv(): Promise<ExportResult> {
     return {
       url: `/exports/lastgen-portfolio-${this.state.now.toISOString().slice(0, 10)}.csv`,
       generatedAt: this.state.now.toISOString(),
@@ -600,7 +613,7 @@ export class InMemoryRepository implements Repository {
   /* Webhook                                                             */
   /* ------------------------------------------------------------------ */
 
-  settleAlatWebhook(reference: string, amountKobo: number, narration: string): void {
+  async settleAlatWebhook(reference: string, amountKobo: number, narration: string): Promise<void> {
     // Idempotent on transactionReference: a replay is accepted and ignored.
     if (this.state.seenReferences.has(reference)) return;
     this.state.seenReferences.add(reference);
@@ -611,7 +624,7 @@ export class InMemoryRepository implements Repository {
       (p) => p.reference === reference && p.status === 'pending_authorisation',
     );
     if (pending) {
-      this.settlePayment(reference);
+      await this.settlePayment(reference);
       return;
     }
 
@@ -619,7 +632,7 @@ export class InMemoryRepository implements Repository {
     // settle the loan named in the narration, exactly as before the lifecycle.
     const loan = this.state.loans.find((l) => narration.includes(l.id)) ?? this.state.loans[0];
     if (loan && loan.status !== 'CLOSED' && amountKobo > 0) {
-      this.payLoan(loan.id, amountKobo, 'ALAT', reference);
+      await this.payLoan(loan.id, amountKobo, 'ALAT', reference);
     }
   }
 
@@ -627,15 +640,15 @@ export class InMemoryRepository implements Repository {
   /* Wallets                                                             */
   /* ------------------------------------------------------------------ */
 
-  createWallet(businessId: string, input: CreateWalletBody): Wallet {
-    this.findBusinessOrThrow(businessId);
+  async createWallet(businessId: string, input: CreateWalletBody): Promise<Wallet> {
+    await this.findBusinessOrThrow(businessId);
     if (!input?.nin || !input?.firstName || !input?.lastName || !input?.phone) {
       throw new ApiError('VALIDATION', 'nin, firstName, lastName and phone are required', 400);
     }
 
     // Idempotent per business: onboarding may retry and should observe the
     // same virtual account rather than a conflict.
-    const existing = this.walletForBusiness(businessId);
+    const existing = await this.walletForBusiness(businessId);
     if (existing) return existing;
 
     const wallet: Wallet = {
@@ -657,11 +670,14 @@ export class InMemoryRepository implements Repository {
     return wallet;
   }
 
-  walletForBusiness(businessId: string): Wallet | undefined {
+  async walletForBusiness(businessId: string): Promise<Wallet | undefined> {
     return this.state.wallets.find((w) => w.businessId === businessId);
   }
 
-  walletStatement(walletId: string, query: WalletStatementQuery): WalletTransaction[] {
+  async walletStatement(
+    walletId: string,
+    query: WalletStatementQuery,
+  ): Promise<WalletTransaction[]> {
     const txs = this.state.walletTransactions
       .filter((t) => t.walletId === walletId && (!query.before || t.ts < query.before))
       // Newest first; the id tie-break keeps same-instant rows (demo clock)
@@ -671,13 +687,13 @@ export class InMemoryRepository implements Repository {
     return txs;
   }
 
-  creditWallet(
+  async creditWallet(
     walletId: string,
     amountKobo: number,
     description: string,
     reference: string,
     category: string,
-  ): Wallet {
+  ): Promise<Wallet> {
     if (!Number.isInteger(amountKobo) || amountKobo <= 0) {
       throw new ApiError('VALIDATION', 'amountKobo must be a positive integer', 400);
     }
@@ -687,16 +703,16 @@ export class InMemoryRepository implements Repository {
     return wallet;
   }
 
-  payFromWallet(loanId: string, amountKobo: number): PaySettlement {
+  async payFromWallet(loanId: string, amountKobo: number): Promise<PaySettlement> {
     if (!Number.isInteger(amountKobo) || amountKobo <= 0) {
       throw new ApiError('VALIDATION', 'amountKobo must be a positive integer', 400);
     }
-    const loan = this.findLoanOrThrow(loanId);
+    const loan = await this.findLoanOrThrow(loanId);
     if (loan.status === 'CLOSED') {
       throw new ApiError('INVALID_TRANSITION', 'This loan is already closed', 409);
     }
-    const asset = this.findAssetOrThrow(loan.assetId);
-    const wallet = this.walletForBusiness(asset.businessId);
+    const asset = await this.findAssetOrThrow(loan.assetId);
+    const wallet = await this.walletForBusiness(asset.businessId);
     if (!wallet) {
       throw new ApiError('NOT_FOUND', 'Wallet not found', 404);
     }
@@ -710,7 +726,7 @@ export class InMemoryRepository implements Repository {
 
     // Settlement applies the exact same PAY transition as every other path,
     // after the wallet debit — the invariant is one transaction per entry path.
-    const applied = this.applySettlement(loan, asset, amountKobo, 'WALLET');
+    const applied = await this.applySettlement(loan, asset, amountKobo, 'WALLET');
     const payment: Payment = {
       id: this.nextId('pay'),
       loanId,
@@ -724,7 +740,7 @@ export class InMemoryRepository implements Repository {
     return { payment, loan: applied.loan, asset: applied.asset };
   }
 
-  businessForOwner(ownerId: string): Business | undefined {
+  async businessForOwner(ownerId: string): Promise<Business | undefined> {
     // Demo auth attaches the fixed demo-user; it owns the seeded demo business.
     if (ownerId === 'demo-user') return this.getBusiness(DEMO_BUSINESS_ID);
     return undefined;
@@ -734,16 +750,16 @@ export class InMemoryRepository implements Repository {
   /* Impact                                                              */
   /* ------------------------------------------------------------------ */
 
-  impactFor(businessId: string, period: ImpactPeriod): ImpactSummary {
-    const burn = this.burnProfileFor(businessId);
-    const asset = this.assetByBusiness(businessId);
-    const loan = asset ? this.loanByAsset(asset.id) : undefined;
+  async impactFor(businessId: string, period: ImpactPeriod): Promise<ImpactSummary> {
+    const burn = await this.burnProfileFor(businessId);
+    const asset = await this.assetByBusiness(businessId);
+    const loan = asset ? await this.loanByAsset(asset.id) : undefined;
     return computeImpact({
       litresPerDay: burn?.litresPerDay ?? 0,
       balanceKobo: loan?.balanceKobo ?? 0,
       monthlyPaymentKobo: loan?.monthlyPaymentKobo ?? 0,
       petrolPricePerLitreKobo: PETROL_PRICE_PER_LITRE_KOBO,
-      readings: asset ? this.meterReadingsFor(asset.id) : [],
+      readings: asset ? await this.meterReadingsFor(asset.id) : [],
       period,
       now: this.state.now,
     });
@@ -753,9 +769,9 @@ export class InMemoryRepository implements Repository {
   /* Demo                                                                */
   /* ------------------------------------------------------------------ */
 
-  missPayment(loanId: string): { loan: Loan; asset: Asset } {
-    const loan = this.findLoanOrThrow(loanId);
-    const asset = this.findAssetOrThrow(loan.assetId);
+  async missPayment(loanId: string): Promise<{ loan: Loan; asset: Asset }> {
+    const loan = await this.findLoanOrThrow(loanId);
+    const asset = await this.findAssetOrThrow(loan.assetId);
     const result = transition(asset, loan, this.businessFor(asset), 'MISS_PAYMENT', {
       now: this.state.now,
     });
@@ -767,7 +783,7 @@ export class InMemoryRepository implements Repository {
   /* Audit                                                               */
   /* ------------------------------------------------------------------ */
 
-  statusHistory(assetId?: string): readonly AssetStatusHistoryEntry[] {
+  async statusHistory(assetId?: string): Promise<readonly AssetStatusHistoryEntry[]> {
     const history = this.state.assetStatusHistory;
     return assetId ? history.filter((h) => h.assetId === assetId) : history;
   }
@@ -787,26 +803,26 @@ export class InMemoryRepository implements Repository {
     return this.serialSeqValue;
   }
 
-  private pushFuelLog(log: FuelLog): void {
+  private async pushFuelLog(log: FuelLog): Promise<void> {
     this.state.fuelLogs.push(log);
     this.state.fuelLogs.sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
-    this.recomputeBurn(log.businessId);
+    await this.recomputeBurn(log.businessId);
   }
 
-  private findBusinessOrThrow(id: string): Business {
-    const business = this.getBusiness(id);
+  private async findBusinessOrThrow(id: string): Promise<Business> {
+    const business = await this.getBusiness(id);
     if (!business) throw new ApiError('NOT_FOUND', 'Business not found', 404);
     return business;
   }
 
-  private findAssetOrThrow(id: string): Asset {
-    const asset = this.getAsset(id);
+  private async findAssetOrThrow(id: string): Promise<Asset> {
+    const asset = await this.getAsset(id);
     if (!asset) throw new ApiError('NOT_FOUND', 'Asset not found', 404);
     return asset;
   }
 
-  private findLoanOrThrow(id: string): Loan {
-    const loan = this.getLoan(id);
+  private async findLoanOrThrow(id: string): Promise<Loan> {
+    const loan = await this.getLoan(id);
     if (!loan) throw new ApiError('NOT_FOUND', 'Loan not found', 404);
     return loan;
   }

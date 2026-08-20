@@ -11,27 +11,35 @@ import type { SuspendBody } from '../types/api.js';
 export function createAssetRouter(repo: Repository): Router {
   const router = Router();
 
-  router.get('/assets/:id', (req, res) => {
-    const asset = repo.getAsset(req.params.id);
-    if (!asset) throw new ApiError('NOT_FOUND', 'Asset not found', 404);
-    res.json(ok(asset));
+  router.get('/assets/:id', (req, res, next) => {
+    void (async () => {
+      const asset = await repo.getAsset(req.params.id);
+      if (!asset) throw new ApiError('NOT_FOUND', 'Asset not found', 404);
+      res.json(ok(asset));
+    })().catch(next);
   });
 
-  router.get('/assets/:id/meter', (req, res) => {
-    const from = req.query.from === undefined ? undefined : String(req.query.from);
-    const to = req.query.to === undefined ? undefined : String(req.query.to);
-    res.json(ok({ items: repo.meterReadingsFor(req.params.id, from, to) }));
+  router.get('/assets/:id/meter', (req, res, next) => {
+    void (async () => {
+      const from = req.query.from === undefined ? undefined : String(req.query.from);
+      const to = req.query.to === undefined ? undefined : String(req.query.to);
+      res.json(ok({ items: await repo.meterReadingsFor(req.params.id, from, to) }));
+    })().catch(next);
   });
 
-  router.post('/assets/:id/suspend', (req, res) => {
-    const body = req.body as SuspendBody;
-    const asset = repo.suspendAsset(req.params.id, body?.reason);
-    res.json(ok(asset));
+  router.post('/assets/:id/suspend', (req, res, next) => {
+    void (async () => {
+      const body = req.body as SuspendBody;
+      const asset = await repo.suspendAsset(req.params.id, body?.reason);
+      res.json(ok(asset));
+    })().catch(next);
   });
 
-  router.post('/assets/:id/restore', (req, res) => {
-    const asset = repo.restoreAsset(req.params.id);
-    res.json(ok(asset));
+  router.post('/assets/:id/restore', (req, res, next) => {
+    void (async () => {
+      const asset = await repo.restoreAsset(req.params.id);
+      res.json(ok(asset));
+    })().catch(next);
   });
 
   return router;

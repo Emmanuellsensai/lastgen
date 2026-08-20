@@ -10,20 +10,26 @@ import type { AssetStatus, PortfolioAssetsQuery } from '../types/api.js';
 export function createPortfolioRouter(repo: Repository): Router {
   const router = Router();
 
-  router.get('/portfolio/stats', (_req, res) => {
-    res.json(ok(repo.portfolioStats()));
+  router.get('/portfolio/stats', (_req, res, next) => {
+    void (async () => {
+      res.json(ok(await repo.portfolioStats()));
+    })().catch(next);
   });
 
-  router.get('/portfolio/assets', (req, res) => {
-    const query: PortfolioAssetsQuery = {};
-    if (req.query.status !== undefined) query.status = String(req.query.status) as AssetStatus;
-    if (req.query.city !== undefined) query.city = String(req.query.city);
-    if (req.query.page !== undefined) query.page = Number(req.query.page);
-    res.json(ok(repo.listPortfolioAssets(query)));
+  router.get('/portfolio/assets', (req, res, next) => {
+    void (async () => {
+      const query: PortfolioAssetsQuery = {};
+      if (req.query.status !== undefined) query.status = String(req.query.status) as AssetStatus;
+      if (req.query.city !== undefined) query.city = String(req.query.city);
+      if (req.query.page !== undefined) query.page = Number(req.query.page);
+      res.json(ok(await repo.listPortfolioAssets(query)));
+    })().catch(next);
   });
 
-  router.post('/portfolio/export', (_req, res) => {
-    res.json(ok(repo.exportCsv()));
+  router.post('/portfolio/export', (_req, res, next) => {
+    void (async () => {
+      res.json(ok(await repo.exportCsv()));
+    })().catch(next);
   });
 
   return router;

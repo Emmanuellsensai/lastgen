@@ -18,11 +18,11 @@ import type { PayBody, PayResult } from '../types/api.js';
 // status } — so the frontend can render the sheet and subscribe to the
 // payment.status_changed realtime channel without receiving loan internals.
 
-function suggestedAmount(repo: Repository, loanId: string): number {
-  const schedule = repo.scheduleFor(loanId);
+async function suggestedAmount(repo: Repository, loanId: string): Promise<number> {
+  const schedule = await repo.scheduleFor(loanId);
   const nextUnpaid = schedule.find((i) => !i.paidAt);
   if (nextUnpaid) return nextUnpaid.principalKobo + nextUnpaid.interestKobo;
-  const loan = repo.getLoan(loanId);
+  const loan = await repo.getLoan(loanId);
   return loan?.monthlyPaymentKobo ?? 0;
 }
 
@@ -38,12 +38,12 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
       if (body.source !== 'wallet' && body.source !== 'bank_account') {
         throw new ApiError('VALIDATION', "source must be 'wallet' or 'bank_account'", 400);
       }
-      const amountKobo = body.amountKobo ?? suggestedAmount(repo, req.params.id);
+      const amountKobo = body.amountKobo ?? (await suggestedAmount(repo, req.params.id));
 
       if (body.source === 'wallet') {
         // Direct debit: repo checks the 402 guard and settles loan + asset in
         // the same transaction as the wallet debit.
-        const result = repo.payFromWallet(req.params.id, amountKobo);
+        const result = await repo.payFromWallet(req.params.id, amountKobo);
         const walletResult: PayResult = {
           paymentId: result.payment.id,
           platformTransactionReference: null,
@@ -54,7 +54,7 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
       }
 
       const reference = adapter.makeReference();
-      const payment = repo.startPayment(
+      const payment = await repo.startPayment(
         req.params.id,
         amountKobo,
         adapter.name === 'alat' ? 'ALAT' : 'SIMULATED',
@@ -65,16 +65,16 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
       // settleAfterMs 0 the callback settles before collect() resolves.
       const collected = await adapter.collect({ amountKobo, reference, narration: req.params.id });
       if (collected.platformTransactionReference) {
-        repo.setPaymentPlatformReference(reference, collected.platformTransactionReference);
+        await repo.setPaymentPlatformReference(reference, collected.platformTransactionReference);
       }
       if (
         payment.status === 'pending_authorisation' &&
         (collected.status === 'SUCCESS' || collected.status === 'authorised')
       ) {
-        repo.settlePayment(reference);
+        await repo.settlePayment(reference);
       }
 
-      const settled = repo.paymentByRefOrId(payment.id)!;
+      const settled = (await repo.paymentByRefOrId(payment.id))!;
       const result: PayResult = {
         paymentId: settled.id,
         platformTransactionReference: settled.platformTransactionReference ?? null,
@@ -90,7 +90,7 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
     // is reconciled against the provider first: a missed webhook (or a poll
     // that beat the callback) is caught by asking ALAT what happened.
     void (async () => {
-      let payment = repo.paymentByRefOrId(req.params.reference);
+      let payment = await repo.paymentByRefOrId(req.params.reference);
       if (!payment) {
         throw new ApiError('NOT_FOUND', 'Payment not found', 404);
       }
@@ -98,13 +98,13 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
       if (payment.status === 'pending_authorisation' && adapter.pollStatus) {
         const polled = await adapter.pollStatus({ reference: payment.reference });
         if (polled.status === 'SUCCESS' || polled.status === 'authorised') {
-          repo.settlePayment(payment.reference);
+          await repo.settlePayment(payment.reference);
         } else if (polled.status === 'FAILED') {
-          repo.failPayment(payment.reference);
+          await repo.failPayment(payment.reference);
         } else if (polled.status === 'EXPIRED') {
-          repo.expirePayment(payment.reference);
+          await repo.expirePayment(payment.reference);
         }
-        payment = repo.paymentByRefOrId(payment.id)!;
+        payment = (await repo.paymentByRefOrId(payment.id))!;
       }
 
       res.json(ok({ status: payment.status, payment }));

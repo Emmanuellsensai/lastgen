@@ -32,7 +32,7 @@ describe('payment lifecycle contract', () => {
     const { app: slowApp, repo: slowRepo } = createTestApp({
       env: { SETTLE_AFTER_MS: '60000' },
     });
-    const loan = slowRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await slowRepo.getLoan('loan_biz_adaeze_frozen'))!;
     const amountKobo = 36_654_539;
     const before = loan.balanceKobo;
 
@@ -41,7 +41,7 @@ describe('payment lifecycle contract', () => {
       .send({ source: 'bank_account', amountKobo });
 
     expect(pay.body.data.status).toBe('pending_authorisation');
-    const payment = slowRepo.paymentByRefOrId(pay.body.data.paymentId)!;
+    const payment = (await slowRepo.paymentByRefOrId(pay.body.data.paymentId))!;
     expect(payment.status).toBe('pending_authorisation');
 
     const statusWhilePending = await request(slowApp).get(
@@ -70,13 +70,13 @@ describe('payment lifecycle contract', () => {
     const { app: slowApp, repo: slowRepo } = createTestApp({
       env: { SETTLE_AFTER_MS: '60000' },
     });
-    const loan = slowRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await slowRepo.getLoan('loan_biz_adaeze_frozen'))!;
     const amountKobo = 10_000_000;
 
     const pay = await request(slowApp)
       .post(`/api/loans/${loan.id}/pay`)
       .send({ source: 'bank_account', amountKobo });
-    const reference = slowRepo.paymentByRefOrId(pay.body.data.paymentId)!.reference;
+    const reference = (await slowRepo.paymentByRefOrId(pay.body.data.paymentId))!.reference;
 
     const payload = {
       transactionReference: reference,
@@ -92,7 +92,7 @@ describe('payment lifecycle contract', () => {
   });
 
   it('accepts paymentId as the status lookup key', async () => {
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
     const pay = await request(app)
       .post(`/api/loans/${loan.id}/pay`)
       .send({ source: 'bank_account', amountKobo: 100_000 });
@@ -113,15 +113,15 @@ describe('payment lifecycle contract', () => {
     const { app: slowApp, repo: slowRepo } = createTestApp({
       env: { SETTLE_AFTER_MS: '60000' },
     });
-    const loan = slowRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await slowRepo.getLoan('loan_biz_adaeze_frozen'))!;
     const before = loan.balanceKobo;
 
     const pay = await request(slowApp)
       .post(`/api/loans/${loan.id}/pay`)
       .send({ source: 'bank_account', amountKobo: 5_000_000 });
-    const reference = slowRepo.paymentByRefOrId(pay.body.data.paymentId)!.reference;
+    const reference = (await slowRepo.paymentByRefOrId(pay.body.data.paymentId))!.reference;
 
-    slowRepo.failPayment(reference);
+    await slowRepo.failPayment(reference);
 
     const res = await request(slowApp).get(`/api/payments/${reference}/status`);
     expect(res.body.data.status).toBe('FAILED');
@@ -154,7 +154,7 @@ describe('payment lifecycle contract', () => {
         ALAT_API_KEY: 'key',
       },
     });
-    const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await alatRepo.getLoan('loan_biz_adaeze_frozen'))!;
     const amountKobo = 12_000_000;
     const before = loan.balanceKobo;
 
@@ -192,7 +192,7 @@ describe('payment lifecycle contract', () => {
         ALAT_API_KEY: 'key',
       },
     });
-    const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await alatRepo.getLoan('loan_biz_adaeze_frozen'))!;
     const before = loan.balanceKobo;
 
     const pay = await request(alatApp)

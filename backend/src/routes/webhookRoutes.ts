@@ -19,22 +19,24 @@ interface AlatNotification {
 export function createWebhookRouter(repo: Repository, adapter: PaymentAdapter): Router {
   const router = Router();
 
-  router.post('/webhooks/alat', (req, res) => {
-    const body = (req.body ?? {}) as AlatNotification;
-    const reference = body.transactionReference;
-    if (!reference) {
-      throw new ApiError('VALIDATION', 'transactionReference is required', 400);
-    }
+  router.post('/webhooks/alat', (req, res, next) => {
+    void (async () => {
+      const body = (req.body ?? {}) as AlatNotification;
+      const reference = body.transactionReference;
+      if (!reference) {
+        throw new ApiError('VALIDATION', 'transactionReference is required', 400);
+      }
 
-    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
-    const signature = String(req.header('signature') ?? '');
-    if (!adapter.verifyWebhookSignature({ rawBody, signature })) {
-      throw new ApiError('UNAUTHORIZED', 'Invalid webhook signature', 401);
-    }
+      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
+      const signature = String(req.header('signature') ?? '');
+      if (!adapter.verifyWebhookSignature({ rawBody, signature })) {
+        throw new ApiError('UNAUTHORIZED', 'Invalid webhook signature', 401);
+      }
 
-    const amountKobo = Math.round((body.amount ?? 0) * 100);
-    repo.settleAlatWebhook(reference, amountKobo, body.narration ?? '');
-    res.json(ok({ ok: true as const }));
+      const amountKobo = Math.round((body.amount ?? 0) * 100);
+      await repo.settleAlatWebhook(reference, amountKobo, body.narration ?? '');
+      res.json(ok({ ok: true as const }));
+    })().catch(next);
   });
 
   return router;

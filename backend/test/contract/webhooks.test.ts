@@ -16,7 +16,7 @@ describe('webhooks contract', () => {
   });
 
   it('settles a notification and returns the contract payload', async () => {
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
     const before = loan.balanceKobo;
 
     const res = await request(app)
@@ -29,7 +29,7 @@ describe('webhooks contract', () => {
   });
 
   it('ignores a replayed transactionReference', async () => {
-    const loan = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const loan = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
     const payload = { transactionReference: 'ALAT-REF-002', amount: 500, narration: loan.id };
 
     const first = await request(app).post('/api/webhooks/alat').send(payload);
@@ -42,8 +42,8 @@ describe('webhooks contract', () => {
   });
 
   it('settles the loan named in the narration', async () => {
-    const target = repo.getLoan('loan_biz_wuse_press')!;
-    const other = repo.getLoan('loan_biz_adaeze_frozen')!;
+    const target = (await repo.getLoan('loan_biz_wuse_press'))!;
+    const other = (await repo.getLoan('loan_biz_adaeze_frozen'))!;
     const targetBefore = target.balanceKobo;
     const otherBefore = other.balanceKobo;
 

@@ -21,25 +21,25 @@ describe('demo contract', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true, data: { ok: true } });
 
-    const wuse = repo.getAsset('ast_biz_wuse_press')!;
+    const wuse = (await repo.getAsset('ast_biz_wuse_press'))!;
     expect(wuse.status).toBe('SUSPENDED');
-    expect(repo.getLoan('loan_biz_adaeze_frozen')!.status).toBe('ACTIVE');
+    expect((await repo.getLoan('loan_biz_adaeze_frozen'))!.status).toBe('ACTIVE');
   });
 
   it('keeps a medical-flagged business in GRACE instead of suspending it', async () => {
     await request(app).post('/api/demo/advance-time').send({ days: 90 });
-    const flagged = repo.getAsset('ast_biz_gwarinpa_mart')!;
+    const flagged = (await repo.getAsset('ast_biz_gwarinpa_mart'))!;
     expect(flagged.status).toBe('GRACE');
-    expect(repo.getBusiness('biz_gwarinpa_mart')!.medicalFlag).toBe(true);
+    expect((await repo.getBusiness('biz_gwarinpa_mart'))!.medicalFlag).toBe(true);
   });
 
   it('resets the clock and restores the pristine seed', async () => {
     await request(app).post('/api/demo/advance-time').send({ days: 90 });
     const res = await request(app).post('/api/demo/reset');
     expect(res.status).toBe(200);
-    expect(repo.now().toISOString()).toBe('2026-08-19T09:00:00.000Z');
-    expect(repo.getAsset('ast_biz_adaeze_frozen')!.status).toBe('ACTIVE');
-    expect(repo.getAsset('ast_biz_wuse_press')!.status).toBe('GRACE');
+    expect((await repo.now()).toISOString()).toBe('2026-08-19T09:00:00.000Z');
+    expect((await repo.getAsset('ast_biz_adaeze_frozen'))!.status).toBe('ACTIVE');
+    expect((await repo.getAsset('ast_biz_wuse_press'))!.status).toBe('GRACE');
   });
 
   it('rejects a non-positive days value', async () => {

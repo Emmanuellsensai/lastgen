@@ -8,12 +8,15 @@ import type { SystemsQuery } from '../types/api.js';
 export function createSystemRouter(repo: Repository): Router {
   const router = Router();
 
-  router.get('/systems', (req, res) => {
-    const query = req.query;
-    const minKw = query.minKw === undefined ? undefined : Number(query.minKw);
-    const maxPriceKobo = query.maxPriceKobo === undefined ? undefined : Number(query.maxPriceKobo);
-    const items = repo.listSystems({ minKw, maxPriceKobo } satisfies SystemsQuery);
-    res.json(ok({ items }));
+  router.get('/systems', (req, res, next) => {
+    void (async () => {
+      const query = req.query;
+      const minKw = query.minKw === undefined ? undefined : Number(query.minKw);
+      const maxPriceKobo =
+        query.maxPriceKobo === undefined ? undefined : Number(query.maxPriceKobo);
+      const items = await repo.listSystems({ minKw, maxPriceKobo } satisfies SystemsQuery);
+      res.json(ok({ items }));
+    })().catch(next);
   });
 
   return router;

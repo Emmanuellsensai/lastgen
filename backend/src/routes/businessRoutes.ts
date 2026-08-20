@@ -15,15 +15,19 @@ import { asyncHandler, singleFile } from './helpers.js';
 export function createBusinessRouter(repo: Repository, env: Env): Router {
   const router = Router();
 
-  router.post('/businesses', (req, res) => {
-    const business = repo.createBusiness(req.body as CreateBusinessBody);
-    res.status(201).json(ok(business));
+  router.post('/businesses', (req, res, next) => {
+    void (async () => {
+      const business = await repo.createBusiness(req.body as CreateBusinessBody);
+      res.status(201).json(ok(business));
+    })().catch(next);
   });
 
-  router.get('/businesses/:id', (req, res) => {
-    const business = repo.getBusiness(req.params.id);
-    if (!business) throw new ApiError('NOT_FOUND', 'Business not found', 404);
-    res.json(ok(business));
+  router.get('/businesses/:id', (req, res, next) => {
+    void (async () => {
+      const business = await repo.getBusiness(req.params.id);
+      if (!business) throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      res.json(ok(business));
+    })().catch(next);
   });
 
   router.post(
@@ -31,7 +35,7 @@ export function createBusinessRouter(repo: Repository, env: Env): Router {
     singleFile('file'),
     asyncHandler(async (req, res) => {
       const businessId = req.params.id;
-      if (!repo.getBusiness(businessId)) {
+      if (!(await repo.getBusiness(businessId))) {
         throw new ApiError('NOT_FOUND', 'Business not found', 404);
       }
       const extraction = await extractReceipt({
@@ -39,24 +43,28 @@ export function createBusinessRouter(repo: Repository, env: Env): Router {
         mimeType: req.file?.mimetype,
         geminiApiKey: env.geminiApiKey,
       });
-      const log = repo.addReceiptLog(businessId, extraction, '/img/receipts/uploaded.jpg');
+      const log = await repo.addReceiptLog(businessId, extraction, '/img/receipts/uploaded.jpg');
       res.status(201).json(ok(log));
     }),
   );
 
-  router.post('/businesses/:id/fuel-logs', (req, res) => {
-    const businessId = req.params.id;
-    if (!repo.getBusiness(businessId)) {
-      throw new ApiError('NOT_FOUND', 'Business not found', 404);
-    }
-    const log = repo.addFuelLog(businessId, req.body as CreateFuelLogBody);
-    res.status(201).json(ok(log));
+  router.post('/businesses/:id/fuel-logs', (req, res, next) => {
+    void (async () => {
+      const businessId = req.params.id;
+      if (!(await repo.getBusiness(businessId))) {
+        throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      }
+      const log = await repo.addFuelLog(businessId, req.body as CreateFuelLogBody);
+      res.status(201).json(ok(log));
+    })().catch(next);
   });
 
-  router.get('/businesses/:id/burn', (req, res) => {
-    const profile = repo.burnProfileFor(req.params.id);
-    if (!profile) throw new ApiError('NOT_FOUND', 'Burn profile not found', 404);
-    res.json(ok(profile));
+  router.get('/businesses/:id/burn', (req, res, next) => {
+    void (async () => {
+      const profile = await repo.burnProfileFor(req.params.id);
+      if (!profile) throw new ApiError('NOT_FOUND', 'Burn profile not found', 404);
+      res.json(ok(profile));
+    })().catch(next);
   });
 
   return router;

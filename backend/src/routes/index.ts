@@ -25,8 +25,8 @@ export function apiRouter(repo: Repository, env: Env): Router {
   const adapter = paymentAdapterFor(env, {
     // The simulated adapter's in-process consent completes through the same
     // repository settle path the ALAT webhook uses.
-    settle: (reference) => {
-      repo.settlePayment(reference);
+    settle: async (reference) => {
+      await repo.settlePayment(reference);
     },
   });
 

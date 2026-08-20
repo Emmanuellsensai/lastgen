@@ -9,15 +9,19 @@ import type { CreateQuoteBody } from '../types/api.js';
 export function createQuoteRouter(repo: Repository): Router {
   const router = Router();
 
-  router.post('/businesses/:id/quote', (req, res) => {
-    const quote = repo.createQuote(req.params.id, req.body as CreateQuoteBody);
-    res.status(201).json(ok(quote));
+  router.post('/businesses/:id/quote', (req, res, next) => {
+    void (async () => {
+      const quote = await repo.createQuote(req.params.id, req.body as CreateQuoteBody);
+      res.status(201).json(ok(quote));
+    })().catch(next);
   });
 
-  router.get('/quotes/:id', (req, res) => {
-    const quote = repo.getQuote(req.params.id);
-    if (!quote) throw new ApiError('NOT_FOUND', 'Quote not found', 404);
-    res.json(ok(quote));
+  router.get('/quotes/:id', (req, res, next) => {
+    void (async () => {
+      const quote = await repo.getQuote(req.params.id);
+      if (!quote) throw new ApiError('NOT_FOUND', 'Quote not found', 404);
+      res.json(ok(quote));
+    })().catch(next);
   });
 
   return router;
