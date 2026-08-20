@@ -21,7 +21,7 @@ export interface SessionState {
 
 export const useSession = create<SessionState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       role: 'guest',
       accessToken: null,
       businessId: null,

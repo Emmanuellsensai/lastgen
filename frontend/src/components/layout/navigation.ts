@@ -2,12 +2,12 @@ import {
   Bank,
   DotsThreeCircle,
   Flame,
+  House,
   Receipt,
   SlidersHorizontal,
   SquaresFour,
   Sun,
   Trophy,
-  House,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { DEMO_BUSINESS_ID } from '@/mocks/seed';
@@ -68,6 +68,60 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     heading: 'Bank',
+    items: [
+      { to: '/bank', label: 'Applications', icon: Bank },
+      { to: '/bank/portfolio', label: 'Portfolio', icon: SquaresFour },
+    ],
+  },
+  {
+    heading: 'Demo',
+    items: [{ to: '/demo', label: 'Control', icon: SlidersHorizontal, matchPrefix: '/demo' }],
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* Role-specific nav                                                   */
+/* ------------------------------------------------------------------ */
+
+export const OWNER_PRIMARY_NAV: NavItem[] = [
+  { to: '/app', label: 'Home', icon: House },
+  { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
+  { to: `/asset/${DEMO_IDS.assetId}`, label: 'Systems', icon: Sun, matchPrefix: '/asset' },
+  { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
+];
+
+export const BANK_PRIMARY_NAV: NavItem[] = [
+  { to: '/bank', label: 'Applications', icon: Bank, matchPrefix: '/bank' },
+  { to: '/bank/portfolio', label: 'Portfolio', icon: SquaresFour },
+  { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
+];
+
+export const OWNER_NAV_GROUPS: NavGroup[] = [
+  {
+    heading: 'Your business',
+    items: [
+      { to: '/app', label: 'Dashboard', icon: House },
+      { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
+      { to: `/quote/${DEMO_IDS.quoteId}`, label: 'Quote', icon: Receipt, matchPrefix: '/quote' },
+      {
+        to: `/asset/${DEMO_IDS.assetId}`,
+        label: 'Your systems',
+        icon: Sun,
+        matchPrefix: '/asset',
+      },
+      {
+        to: `/wrapped/${DEMO_IDS.businessId}`,
+        label: 'Wrapped',
+        icon: Trophy,
+        matchPrefix: '/wrapped',
+      },
+    ],
+  },
+];
+
+export const BANK_NAV_GROUPS: NavGroup[] = [
+  {
+    heading: 'Credit desk',
     items: [
       { to: '/bank', label: 'Applications', icon: Bank },
       { to: '/bank/portfolio', label: 'Portfolio', icon: SquaresFour },

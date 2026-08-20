@@ -1,7 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { GlassPanel } from '@/components/ui/glass';
-import { PRIMARY_NAV } from './navigation';
+import { useSession } from '@/store/session';
+import { OWNER_PRIMARY_NAV, BANK_PRIMARY_NAV } from './navigation';
 
 /**
  * Floating glass bar on mobile, clear of the home indicator via the safe area.
@@ -10,6 +11,8 @@ import { PRIMARY_NAV } from './navigation';
  */
 export function BottomTabs() {
   const { pathname } = useLocation();
+  const role = useSession((s) => s.role);
+  const nav = role === 'bank' ? BANK_PRIMARY_NAV : OWNER_PRIMARY_NAV;
 
   return (
     <div className="safe-bottom pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-3 lg:hidden">
@@ -20,7 +23,7 @@ export function BottomTabs() {
         blur="lg"
         className="pointer-events-auto flex w-full max-w-md items-stretch gap-1 rounded-full p-1.5"
       >
-        {PRIMARY_NAV.map((item) => {
+        {nav.map((item) => {
           const active = item.matchPrefix
             ? pathname.startsWith(item.matchPrefix)
             : pathname === item.to;
