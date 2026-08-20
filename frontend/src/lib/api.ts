@@ -14,6 +14,7 @@ import type {
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
+  CreateWalletBody,
   CreditFile,
   CreditFileDetail,
   DeclineBody,
@@ -31,12 +32,15 @@ import type {
   PagedEnvelope,
   PayBody,
   PayResult,
+  PaymentStatus,
   PortfolioAssetsQuery,
   PortfolioStats,
   Quote,
   SolarSystem,
   SuspendBody,
   SystemsQuery,
+  Wallet,
+  WalletTransaction,
   WrappedPayload,
 } from '@/types/api';
 
@@ -182,6 +186,25 @@ export const api = {
     advanceTime: (body: AdvanceTimeBody) => post<DemoResult>('/demo/advance-time', body),
     missPayment: (body: MissPaymentBody) =>
       post<{ loan: Loan; asset: Asset }>('/demo/miss-payment', body),
+  },
+
+  wallets: {
+    create: (body: CreateWalletBody) => post<Wallet>('/wallets/create', body),
+    balance: () => request<Wallet>('/wallets/balance'),
+    statement: (query: { limit?: number } = {}) =>
+      request<ListEnvelope<WalletTransaction>>('/wallets/statement', { query: { ...query } }),
+  },
+
+  payments: {
+    status: (ref: string) =>
+      request<{ paymentId: string; status: PaymentStatus }>(`/payments/${ref}/status`),
+  },
+
+  fuelLogs: {
+    list: (businessId: string, limit = 30, offset = 0) =>
+      request<PagedEnvelope<FuelLog>>(`/businesses/${businessId}/fuel-logs`, {
+        query: { limit, offset },
+      }),
   },
 };
 

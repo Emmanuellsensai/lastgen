@@ -187,7 +187,7 @@ export default function Landing() {
                 <Link to="/bank">For banks</Link>
               </Button>
               <Button asChild size="sm">
-                <Link to="/burn">Open the demo</Link>
+                <Link to="/login">Open the demo</Link>
               </Button>
             </>
           }
@@ -204,7 +204,7 @@ export default function Landing() {
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Button asChild size="lg">
-              <Link to="/burn">
+              <Link to="/login">
                 {HERO.ctaPrimary}
                 <ArrowRight size={20} weight="regular" />
               </Link>
@@ -376,7 +376,7 @@ export default function Landing() {
                 <p className="mb-4 font-medium text-ink">Product</p>
                 <ul className="flex flex-col gap-3 text-ink-mute">
                   <li>
-                    <Link to="/burn" className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Burn
                     </Link>
                   </li>

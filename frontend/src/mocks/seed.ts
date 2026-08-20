@@ -15,8 +15,11 @@ import {
   type Loan,
   type MeterReading,
   type Payment,
+  type PaymentStatus,
   type Quote,
   type SolarSystem,
+  type Wallet,
+  type WalletTransaction,
 } from '@/types/api';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '@/lib/lease';
 
@@ -592,6 +595,15 @@ export interface Db {
   assetBusinessName: Record<string, string>;
   /** Webhook idempotency ledger, keyed on transactionReference. */
   seenReferences: Set<string>;
+  wallets: Wallet[];
+  walletTransactions: WalletTransaction[];
+  pendingPayments: Array<{
+    id: string;
+    loanId: string;
+    amountKobo: number;
+    reference: string;
+    status: PaymentStatus;
+  }>;
 }
 
 export function buildDb(): Db {
@@ -673,6 +685,39 @@ export function buildDb(): Db {
     assetBusinessName[row.asset.id] = row.businessName;
   }
 
+  const demoWallet: Wallet = {
+    id: 'wlt_demo_001',
+    businessId: DEMO_BUSINESS_ID,
+    accountNumber: '0123456789',
+    bankCode: '035',
+    balanceKobo: 5_000_000,
+    currency: 'NGN',
+    createdAt: new Date().toISOString(),
+  };
+
+  const wallets: Wallet[] = [demoWallet];
+
+  const walletTransactions: WalletTransaction[] = [
+    {
+      id: 'wtx_demo_001',
+      walletId: demoWallet.id,
+      ts: new Date().toISOString(),
+      direction: 'IN',
+      amountKobo: 5_000_000,
+      description: 'Demo account pre-funding',
+      reference: 'DEMO-PREFUND',
+      category: 'credit',
+    },
+  ];
+
+  const pendingPayments: Array<{
+    id: string;
+    loanId: string;
+    amountKobo: number;
+    reference: string;
+    status: PaymentStatus;
+  }> = [];
+
   return {
     now: new Date(ANCHOR),
     businesses: [...BUSINESSES],
@@ -689,5 +734,8 @@ export function buildDb(): Db {
     assetCity,
     assetBusinessName,
     seenReferences: new Set<string>(),
+    wallets,
+    walletTransactions,
+    pendingPayments,
   };
 }
