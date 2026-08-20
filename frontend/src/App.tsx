@@ -1,7 +1,10 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ToastProvider, ToastViewport } from '@/components/ui/toast';
+import RequireRole from '@/components/layout/RequireRole';
 import Landing from '@/routes/marketing/Landing';
+import Login from '@/routes/auth/Login';
+import Dashboard from '@/routes/owner/Dashboard';
 import Burn from '@/routes/owner/Burn';
 import Quote from '@/routes/owner/Quote';
 import Asset from '@/routes/owner/Asset';
@@ -10,6 +13,7 @@ import Applications from '@/routes/bank/Applications';
 import CreditFile from '@/routes/bank/CreditFile';
 import Portfolio from '@/routes/bank/Portfolio';
 import DemoControl from '@/routes/demo/DemoControl';
+import Terms from '@/routes/legal/Terms';
 import NotFound from '@/routes/NotFound';
 
 export default function App() {
@@ -19,13 +23,16 @@ export default function App() {
         <ToastProvider swipeDirection="right">
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/burn" element={<Burn />} />
-            <Route path="/quote/:id" element={<Quote />} />
-            <Route path="/asset/:id" element={<Asset />} />
-            <Route path="/wrapped/:id" element={<Wrapped />} />
-            <Route path="/bank" element={<Applications />} />
-            <Route path="/bank/file/:id" element={<CreditFile />} />
-            <Route path="/bank/portfolio" element={<Portfolio />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/legal/terms" element={<Terms />} />
+            <Route path="/app" element={<RequireRole role="owner"><Dashboard /></RequireRole>} />
+            <Route path="/burn" element={<RequireRole role="owner"><Burn /></RequireRole>} />
+            <Route path="/quote/:id" element={<RequireRole role="owner"><Quote /></RequireRole>} />
+            <Route path="/asset/:id" element={<RequireRole role="owner"><Asset /></RequireRole>} />
+            <Route path="/wrapped/:id" element={<RequireRole role="owner"><Wrapped /></RequireRole>} />
+            <Route path="/bank" element={<RequireRole role="bank"><Applications /></RequireRole>} />
+            <Route path="/bank/file/:id" element={<RequireRole role="bank"><CreditFile /></RequireRole>} />
+            <Route path="/bank/portfolio" element={<RequireRole role="bank"><Portfolio /></RequireRole>} />
             <Route path="/demo" element={<DemoControl />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

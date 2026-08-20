@@ -26,7 +26,14 @@ export type FuelLogSource = 'receipt' | 'manual';
 export type CreditFileStatus = 'PENDING' | 'APPROVED' | 'DECLINED';
 export type AssetStatus = 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'OWNED';
 export type LoanStatus = 'ACTIVE' | 'DELINQUENT' | 'CLOSED';
-export type PaymentSource = 'ALAT' | 'SIMULATED';
+export type PaymentSource = 'ALAT' | 'SIMULATED' | 'WALLET';
+
+export type PaymentStatus =
+  | 'pending_authorisation'
+  | 'authorised'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'EXPIRED';
 export type ImpactPeriod = 'month' | 'year' | 'all';
 
 /* Entities */
@@ -144,6 +151,37 @@ export interface Payment {
   reference: string;
 }
 
+export interface Wallet {
+  id: string;
+  businessId: string;
+  accountNumber: string;
+  bankCode: string;
+  balanceKobo: number;
+  currency: string;
+  createdAt: string;
+}
+
+export type WalletDirection = 'IN' | 'OUT';
+
+export interface WalletTransaction {
+  id: string;
+  walletId: string;
+  ts: string;
+  direction: WalletDirection;
+  amountKobo: number;
+  description: string;
+  reference: string;
+  category: string;
+}
+
+export interface CreateWalletBody {
+  businessId: string;
+  nin: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
 export interface MeterReading {
   id: string;
   assetId: string;
@@ -227,7 +265,8 @@ export interface SuspendBody {
 }
 
 export interface PayBody {
-  amountKobo: number;
+  source: 'wallet' | 'bank_account';
+  amountKobo?: number;
 }
 
 export interface AdvanceTimeBody {
@@ -254,9 +293,9 @@ export interface ApproveResult {
 }
 
 export interface PayResult {
-  payment: Payment;
-  loan: Loan;
-  asset: Asset;
+  paymentId: string;
+  platformTransactionReference: string | null;
+  status: PaymentStatus;
 }
 
 export interface ExportResult {
