@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle, CircleDashed, Clock, Lightning, Pause } from '@phosphor-icons/react';
+import { CheckCircle, CircleDashed, Clock, Lightning, Pause, XCircle } from '@phosphor-icons/react';
 import { cn } from '@/lib/cn';
-import type { AssetStatus } from '@/types/api';
+import type { AssetStatus, CreditFileStatus } from '@/types/api';
 
-export type PillStatus = AssetStatus | 'PENDING';
+export type PillStatus = AssetStatus | CreditFileStatus;
 
 type PillStyle = {
   label: string;
@@ -38,6 +38,16 @@ const STYLES: Record<PillStatus, PillStyle> = {
     label: 'Pending',
     className: 'bg-transparent text-ink-soft border border-ink-soft',
     icon: CircleDashed,
+  },
+  APPROVED: {
+    label: 'Approved',
+    className: 'bg-success text-paper border border-success',
+    icon: CheckCircle,
+  },
+  DECLINED: {
+    label: 'Declined',
+    className: 'bg-burn text-paper border border-burn',
+    icon: XCircle,
   },
 };
 

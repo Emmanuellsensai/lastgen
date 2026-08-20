@@ -227,7 +227,8 @@ export interface SuspendBody {
 }
 
 export interface PayBody {
-  amountKobo: number;
+  source: 'wallet' | 'bank_account';
+  amountKobo?: number;
 }
 
 export interface AdvanceTimeBody {

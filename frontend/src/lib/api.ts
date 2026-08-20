@@ -183,6 +183,15 @@ export const api = {
     missPayment: (body: MissPaymentBody) =>
       post<{ loan: Loan; asset: Asset }>('/demo/miss-payment', body),
   },
+
+  auth: {
+    login: (body: { email: string; password: string }) =>
+      post<{ user: { id: string; email: string; fullName: string }; role: 'owner' | 'bank'; businessId: string; accessToken: string }>('/auth/login', body),
+    register: (body: { email: string; password: string; fullName: string; phone: string }) =>
+      post<{ user: { id: string; email: string; fullName: string }; role: 'owner' | 'bank'; businessId: string; accessToken: string }>('/auth/register', body),
+    verifyNin: (nin: string) =>
+      post<{ verified: boolean; owner: { firstName: string; lastName: string; dateOfBirth: string; phone: string } }>('/auth/verify-nin', { nin }),
+  },
 };
 
 export type Api = typeof api;

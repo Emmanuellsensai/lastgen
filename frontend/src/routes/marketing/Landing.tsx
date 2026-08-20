@@ -182,14 +182,9 @@ export default function Landing() {
             </Link>
           }
           right={
-            <>
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/bank">For banks</Link>
-              </Button>
-              <Button asChild size="sm">
-                <Link to="/burn">Open the demo</Link>
-              </Button>
-            </>
+            <Button asChild size="sm">
+              <Link to="/login">Open the demo</Link>
+            </Button>
           }
         />
       }
@@ -204,7 +199,7 @@ export default function Landing() {
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Button asChild size="lg">
-              <Link to="/burn">
+              <Link to="/login">
                 {HERO.ctaPrimary}
                 <ArrowRight size={20} weight="regular" />
               </Link>
@@ -320,8 +315,8 @@ export default function Landing() {
             </h2>
             <p className="mt-5 text-lg leading-relaxed text-ink-soft">{BANK.body}</p>
             <Button asChild size="lg" variant="outline" className="mt-10">
-              <Link to="/bank">
-                Open the credit desk
+              <Link to="/login">
+                See the credit desk
                 <ArrowRight size={20} weight="regular" />
               </Link>
             </Button>
@@ -376,7 +371,7 @@ export default function Landing() {
                 <p className="mb-4 font-medium text-ink">Product</p>
                 <ul className="flex flex-col gap-3 text-ink-mute">
                   <li>
-                    <Link to="/burn" className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Burn
                     </Link>
                   </li>
@@ -396,17 +391,17 @@ export default function Landing() {
                 <p className="mb-4 font-medium text-ink">Partners</p>
                 <ul className="flex flex-col gap-3 text-ink-mute">
                   <li>
-                    <Link to="/bank" className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Credit desk
                     </Link>
                   </li>
                   <li>
-                    <Link to="/bank/portfolio" className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Portfolio
                     </Link>
                   </li>
                   <li>
-                    <Link to="/demo" className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Demo control
                     </Link>
                   </li>
