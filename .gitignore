@@ -27,3 +27,7 @@ coverage/
 Thumbs.db
 *.log
 .claude/
+
+
+# build status update
+PROGRESS.md
