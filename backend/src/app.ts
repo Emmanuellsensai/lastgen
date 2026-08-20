@@ -20,6 +20,12 @@ export function createApp(env: Env, logger: Logger, repository: Repository): exp
 
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigins }));
+
+  // Logging first so request-scoped logging exists before body parsing runs.
+  // A malformed or oversized JSON body throws inside express.json; if that
+  // middleware ran first, the error handler would find no req.log.
+  app.use(pinoHttp({ logger }));
+
   app.use(
     express.json({
       // Preserve the raw body so the ALAT webhook can verify its HMAC-SHA512
@@ -29,7 +35,6 @@ export function createApp(env: Env, logger: Logger, repository: Repository): exp
       },
     }),
   );
-  app.use(pinoHttp({ logger }));
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
