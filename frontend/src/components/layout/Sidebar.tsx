@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { GlassPanel } from '@/components/ui/glass';
 import { NAV_GROUPS } from './navigation';
+import { Logo } from './Logo';
 
 /** Left rail on desktop. One glass sheet running the full height of the viewport. */
 export function Sidebar() {
@@ -15,9 +16,7 @@ export function Sidebar() {
       className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-7 rounded-none border-r border-line px-4 py-6 lg:flex"
     >
       <NavLink to="/" className="flex items-center gap-2.5 px-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-navy text-paper">
-          <span className="font-display text-base leading-none">L</span>
-        </span>
+        <Logo variant="mark" />
         <span className="font-display text-lg leading-none text-ink">Lastgen</span>
       </NavLink>
 

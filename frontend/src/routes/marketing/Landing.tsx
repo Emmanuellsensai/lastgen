@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
 import { AppShell, DeviceFrame, DEMO_IDS } from '@/components/layout';
+import { Logo } from '@/components/layout/Logo';
 import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
 import { BurnCounter, Money, PhotoStrip, StatusPill } from '@/components/lastgen';
 import { Button } from '@/components/ui/button';
@@ -176,9 +177,7 @@ export default function Landing() {
           clear
           left={
             <Link to="/" className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-navy text-paper">
-                <span className="font-display text-base leading-none">L</span>
-              </span>
+              <Logo variant="mark" />
               <span className="font-display text-lg leading-none text-ink">Lastgen</span>
             </Link>
           }
@@ -364,9 +363,7 @@ export default function Landing() {
           <div className="flex flex-wrap items-start justify-between gap-10">
             <div className="max-w-sm">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-navy text-paper">
-                  <span className="font-display text-base leading-none">L</span>
-                </span>
+                <Logo variant="mark" />
                 <span className="font-display text-lg leading-none text-ink">Lastgen</span>
               </div>
               <p className="mt-5 text-sm leading-relaxed text-ink-mute">
