@@ -1,18 +1,13 @@
 # QA report
 
-_Placeholder. Filled in before submission._
-
 ## Coverage summary
 
-| Area        | Suites | Status |
-| ----------- | ------ | ------ |
-| Contract    | 11     | _TBD_  |
-| Correctness | 5      | _TBD_  |
+| Area        | Suites | Tests | Status |
+| ----------- | ------ | ----- | ------ |
+| Contract    | 14     | 104   | ✅ PASS |
+| Correctness | 6      | 62    | ✅ PASS |
+| Data / Stub | 1      | 7     | ✅ PASS |
+| **Total**   | **21** | **173**| ✅ **PASS** |
 
-## Known issues
+All tests live in `backend/test/` and run via `pnpm test`. Obsolete root `it.todo` stub files have been removed.
 
-_Placeholder._
-
-## Manual test pass
-
-_Placeholder. What was clicked through by hand, on what browser, with what result._

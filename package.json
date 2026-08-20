@@ -15,7 +15,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "format:check:backend": "prettier --check backend/src backend/test",
+    "test": "vitest run",
+    "test:all": "pnpm exec vitest run backend/test/correctness && pnpm --filter @lastgen/backend test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
