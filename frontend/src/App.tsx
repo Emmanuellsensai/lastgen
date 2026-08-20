@@ -13,6 +13,7 @@ import Applications from '@/routes/bank/Applications';
 import CreditFile from '@/routes/bank/CreditFile';
 import Portfolio from '@/routes/bank/Portfolio';
 import DemoControl from '@/routes/demo/DemoControl';
+import Orchestrate from '@/routes/demo/Orchestrate';
 import Terms from '@/routes/legal/Terms';
 import NotFound from '@/routes/NotFound';
 
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/bank/file/:id" element={<RequireRole role="bank"><CreditFile /></RequireRole>} />
             <Route path="/bank/portfolio" element={<RequireRole role="bank"><Portfolio /></RequireRole>} />
             <Route path="/demo" element={<DemoControl />} />
+            <Route path="/demo/orchestrate" element={<Orchestrate />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ToastViewport />

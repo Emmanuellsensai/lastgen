@@ -9,9 +9,11 @@ import {
   Sparkle,
   SunHorizon,
 } from '@phosphor-icons/react';
-import { GlassCard, GlassSheet } from '@/components/ui/glass';
-import { StatusPill, Money } from '@/components/lastgen';
+import { GlassCard, GlassNav, GlassSheet } from '@/components/ui/glass';
+import { StatusPill, Money, BurnCounter } from '@/components/lastgen';
 import { Toast, ToastTitle } from '@/components/ui/toast';
+import { AppShell } from '@/components/layout';
+import { Logo } from '@/components/layout/Logo';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import type {
@@ -114,8 +116,28 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-paper-2">
-      <div className="mx-auto max-w-3xl px-5 pb-16 pt-10">
+    <AppShell
+      nav={
+        <GlassNav
+          left={
+            <Link to="/app" className="flex items-center gap-2.5">
+              <Logo variant="mark" />
+            </Link>
+          }
+          right={
+            <button
+              type="button"
+              onClick={() => { useSession.getState().signOut(); navigate('/login'); }}
+              className="flex items-center gap-1.5 text-sm text-ink-mute hover:text-ink"
+            >
+              <SignOut size={16} weight="regular" />
+              Log out
+            </button>
+          }
+        />
+      }
+    >
+      <div className="mx-auto max-w-3xl">
         {/* Business summary hero */}
         <GlassCard elevation={2} padding="lg">
           <div className="flex items-start justify-between gap-4">
@@ -131,8 +153,15 @@ export default function Dashboard() {
           </div>
           <div className="mt-6 flex flex-wrap items-end gap-8">
             <div>
-              <p className="text-sm text-ink-mute">Fuel spend</p>
-              <Money kobo={burn?.monthlyKobo ?? 0} size="lg" className="text-burn" />
+              <p className="text-sm text-ink-mute">Burning right now</p>
+              <div className="mt-3">
+                <BurnCounter
+                  ratePerSecondKobo={burn ? Math.round(burn.dailyKobo / 86400) : 187}
+                  startTimestamp={new Date(new Date().setHours(0, 0, 0, 0)).toISOString()}
+                  size="md"
+                  label="Burned since midnight"
+                />
+              </div>
             </div>
             <div>
               <p className="text-sm text-ink-mute">Loan payment</p>
@@ -213,7 +242,7 @@ export default function Dashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => setPayOpen(true)}
+                onClick={() => navigate(`/asset/${demoAssetId}`)}
                 className="flex items-center gap-2 self-start rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
               >
                 Pay now
@@ -270,19 +299,6 @@ export default function Dashboard() {
             </Link>
           </GlassCard>
         </div>
-
-        {/* Log out */}
-        <button
-          type="button"
-          onClick={() => {
-            useSession.getState().signOut();
-            navigate('/login');
-          }}
-          className="mt-6 flex items-center gap-1.5 text-sm text-ink-mute transition-colors duration-200 ease-lg hover:text-ink"
-        >
-          <SignOut size={16} weight="regular" />
-          Log out
-        </button>
       </div>
 
       {/* Pay sheet */}
@@ -315,6 +331,6 @@ export default function Dashboard() {
       <Toast open={toastOpen} onOpenChange={setToastOpen} tone="success">
         <ToastTitle>Payment received.</ToastTitle>
       </Toast>
-    </div>
+    </AppShell>
   );
 }

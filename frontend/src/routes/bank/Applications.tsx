@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppShell, PageIntro } from '@/components/layout';
 import { GlassCard, GlassNav } from '@/components/ui/glass';
@@ -12,32 +13,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-const ROWS = [
-  {
-    id: 'cf_biz_bilikisu_tailor',
-    name: 'Bilikisu Couture',
-    city: 'Ibadan',
-    burnKobo: 18_187_440,
-    paymentKobo: 16_690_755,
-  },
-  {
-    id: 'cf_biz_kelechi_cuts',
-    name: 'Kelechi Cuts Barbing Salon',
-    city: 'Lagos',
-    burnKobo: 15_238_470,
-    paymentKobo: 11_330_220,
-  },
-  {
-    id: 'cf_biz_ogunlade_welding',
-    name: 'Ogunlade Welding Works',
-    city: 'Ibadan',
-    burnKobo: 60_953_340,
-    paymentKobo: 38_875_948,
-  },
-];
+import { api } from '@/lib/api';
+import type { CreditFile, CreditFileStatus } from '@/types/api';
+import type { PillStatus } from '@/components/lastgen/StatusPill';
 
 export default function Applications() {
+  const [files, setFiles] = useState<CreditFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('PENDING');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.credit.applications({ status: filter as CreditFileStatus })
+      .then((res) => { if (!cancelled) setFiles(res.items); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [filter]);
+
   return (
     <AppShell
       nav={
@@ -56,56 +50,59 @@ export default function Applications() {
         description="Credit files waiting on a decision, each carrying a verified burn profile and a priced quote."
       />
 
-      <Tabs defaultValue="pending">
+      <Tabs value={filter} onValueChange={setFilter}>
         <TabsList>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="declined">Declined</TabsTrigger>
+          <TabsTrigger value="PENDING">Pending</TabsTrigger>
+          <TabsTrigger value="APPROVED">Approved</TabsTrigger>
+          <TabsTrigger value="DECLINED">Declined</TabsTrigger>
         </TabsList>
       </Tabs>
 
       <GlassCard elevation={1} className="mt-8" padding="sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Business</TableHead>
-              <TableHead>City</TableHead>
-              <TableHead>Monthly burn</TableHead>
-              <TableHead>Instalment</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {ROWS.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="font-medium text-ink">{row.name}</TableCell>
-                <TableCell>{row.city}</TableCell>
-                <TableCell>
-                  <Money kobo={row.burnKobo} size="sm" />
-                </TableCell>
-                <TableCell>
-                  <Money kobo={row.paymentKobo} size="sm" className="text-success" />
-                </TableCell>
-                <TableCell>
-                  <StatusPill status="PENDING" size="sm" />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to={`/bank/file/${row.id}`}>Open</Link>
-                  </Button>
-                </TableCell>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-ink-mute">Loading applications...</p>
+          </div>
+        ) : files.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-ink-mute">No applications found.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Business</TableHead>
+                <TableHead>City</TableHead>
+                <TableHead>Monthly burn</TableHead>
+                <TableHead>Instalment</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </GlassCard>
-
-      <GlassCard elevation={1} className="mt-8" title="Applications queue">
-        <p className="leading-relaxed text-ink-soft">
-          The finished queue filters by status through the credit applications endpoint, supports
-          bulk triage and links each row into the credit file.
-        </p>
+            </TableHeader>
+            <TableBody>
+              {files.map((file) => (
+                <TableRow key={file.id}>
+                  <TableCell className="font-medium text-ink">{file.business.name}</TableCell>
+                  <TableCell>{file.business.city}</TableCell>
+                  <TableCell>
+                    <Money kobo={file.burn.monthlyKobo} size="sm" />
+                  </TableCell>
+                  <TableCell>
+                    <Money kobo={file.quote.monthlyPaymentKobo} size="sm" className="text-success" />
+                  </TableCell>
+                  <TableCell>
+                    <StatusPill status={file.status as PillStatus} size="sm" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to={`/bank/file/${file.id}`}>Open</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </GlassCard>
     </AppShell>
   );
