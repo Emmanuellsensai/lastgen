@@ -26,13 +26,17 @@ describe('payment adapter seam', () => {
 
   it('alat adapter accepts a correctly signed notification', () => {
     const adapter = createAlatAdapter({ apiKey: API_KEY });
-    expect(adapter.verifyWebhookSignature({ rawBody, signature: sign(rawBody, API_KEY) })).toBe(true);
+    expect(adapter.verifyWebhookSignature({ rawBody, signature: sign(rawBody, API_KEY) })).toBe(
+      true,
+    );
   });
 
   it('alat adapter rejects a tampered body', () => {
     const adapter = createAlatAdapter({ apiKey: API_KEY });
     const tampered = Buffer.from(JSON.stringify({ transactionReference: 'T-1', amount: 999 }));
-    expect(adapter.verifyWebhookSignature({ rawBody: tampered, signature: sign(rawBody, API_KEY) })).toBe(false);
+    expect(
+      adapter.verifyWebhookSignature({ rawBody: tampered, signature: sign(rawBody, API_KEY) }),
+    ).toBe(false);
   });
 
   it('alat adapter rejects a missing signature when a key is configured', () => {

@@ -28,7 +28,11 @@ const MODEL = 'gemini-1.5-flash';
 export async function extractReceipt(input: ExtractReceiptInput): Promise<ReceiptExtraction> {
   if (input.geminiApiKey && input.buffer) {
     try {
-      return await extractWithGemini(input.buffer, input.mimeType ?? 'image/jpeg', input.geminiApiKey);
+      return await extractWithGemini(
+        input.buffer,
+        input.mimeType ?? 'image/jpeg',
+        input.geminiApiKey,
+      );
     } catch {
       // Fall through to the deterministic mock; never block the flow.
     }
@@ -36,12 +40,15 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
   return mockExtraction(input);
 }
 
-async function extractWithGemini(buffer: Buffer, mimeType: string, apiKey: string): Promise<ReceiptExtraction> {
+async function extractWithGemini(
+  buffer: Buffer,
+  mimeType: string,
+  apiKey: string,
+): Promise<ReceiptExtraction> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
     const response = await fetch(url, {
       method: 'POST',
       signal: controller.signal,

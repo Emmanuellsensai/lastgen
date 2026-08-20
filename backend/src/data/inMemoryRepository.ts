@@ -163,11 +163,7 @@ export class InMemoryRepository implements Repository {
     return log;
   }
 
-  addReceiptLog(
-    businessId: string,
-    extraction: ReceiptExtraction,
-    receiptUrl: string,
-  ): FuelLog {
+  addReceiptLog(businessId: string, extraction: ReceiptExtraction, receiptUrl: string): FuelLog {
     this.findBusinessOrThrow(businessId);
     const log: FuelLog = {
       id: this.nextId('fl'),
@@ -312,7 +308,11 @@ export class InMemoryRepository implements Repository {
       throw new ApiError('INVALID_TRANSITION', `Credit file is already ${file.status}`, 409);
     }
     if (file.quote.monthlySavingsKobo <= 0) {
-      throw new ApiError('QUOTE_NOT_VIABLE', 'The attached quote does not save the business money', 422);
+      throw new ApiError(
+        'QUOTE_NOT_VIABLE',
+        'The attached quote does not save the business money',
+        422,
+      );
     }
 
     file.status = 'APPROVED';
@@ -422,12 +422,7 @@ export class InMemoryRepository implements Repository {
     return this.state.installments[loanId] ?? [];
   }
 
-  payLoan(
-    loanId: string,
-    amountKobo: number,
-    source: PaymentSource,
-    reference: string,
-  ): PayResult {
+  payLoan(loanId: string, amountKobo: number, source: PaymentSource, reference: string): PayResult {
     const loan = this.findLoanOrThrow(loanId);
     const asset = this.findAssetOrThrow(loan.assetId);
     const result = transition(asset, loan, this.businessFor(asset), 'PAY', {

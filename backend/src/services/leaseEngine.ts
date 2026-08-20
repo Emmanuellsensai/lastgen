@@ -83,9 +83,8 @@ export function buildSchedule(
 
   for (let n = 1; n <= tenorMonths; n += 1) {
     const interestKobo = Math.round(balanceKobo * rate);
-    const principalPart = n === tenorMonths
-      ? balanceKobo
-      : Math.min(balanceKobo, payment - interestKobo);
+    const principalPart =
+      n === tenorMonths ? balanceKobo : Math.min(balanceKobo, payment - interestKobo);
     balanceKobo = Math.max(0, balanceKobo - principalPart);
     const dueAt = new Date(firstDueAt);
     dueAt.setMonth(dueAt.getMonth() + n - 1);

@@ -18,9 +18,7 @@ describe('webhook idempotency', () => {
 
     repo.settleAlatWebhook('ref-replay-1', amountKobo, loan.id);
     const balanceAfterFirst = loan.balanceKobo;
-    const paidAfterFirst = repo
-      .scheduleFor(loan.id)
-      .filter((i) => i.paidAt).length;
+    const paidAfterFirst = repo.scheduleFor(loan.id).filter((i) => i.paidAt).length;
 
     expect(balanceAfterFirst).toBe(balanceBefore - amountKobo);
     expect(balanceAfterFirst).toBeGreaterThanOrEqual(0);

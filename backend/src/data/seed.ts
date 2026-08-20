@@ -394,7 +394,12 @@ function buildCreditFile(
 /* ------------------------------------------------------------------ */
 
 /** A solar day collapsed to six readings, repeated over the requested window. */
-function buildMeterReadings(assetId: string, capacityKw: number, days: number, rand: Random): MeterReading[] {
+function buildMeterReadings(
+  assetId: string,
+  capacityKw: number,
+  days: number,
+  rand: Random,
+): MeterReading[] {
   const readings: MeterReading[] = [];
   const slots = [6, 9, 12, 15, 18, 21];
   const curve = [0.18, 0.72, 1.0, 0.81, 0.24, 0.0];
@@ -545,7 +550,8 @@ function buildPortfolio(rand: Random): PortfolioRow[] {
         controllerId: `CTL-${pad(i + 2207, 5)}`,
         status,
         installedAt,
-        suspendedAt: status === 'SUSPENDED' ? daysAgo(intBetween(rand, 2, 30)).toISOString() : undefined,
+        suspendedAt:
+          status === 'SUSPENDED' ? daysAgo(intBetween(rand, 2, 30)).toISOString() : undefined,
         suspendReason: status === 'SUSPENDED' ? pick(rand, SUSPEND_REASONS) : undefined,
       },
       loan: {

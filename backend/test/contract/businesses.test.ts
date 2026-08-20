@@ -35,9 +35,13 @@ describe('businesses contract', () => {
   });
 
   it('honours explicit generatorKva and hoursPerDay', async () => {
-    const res = await request(app)
-      .post('/api/businesses')
-      .send({ name: 'Koko Bakery', type: 'bakery', city: 'Lagos', generatorKva: 7.5, hoursPerDay: 16 });
+    const res = await request(app).post('/api/businesses').send({
+      name: 'Koko Bakery',
+      type: 'bakery',
+      city: 'Lagos',
+      generatorKva: 7.5,
+      hoursPerDay: 16,
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.data.generatorKva).toBe(7.5);

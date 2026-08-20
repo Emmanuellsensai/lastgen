@@ -60,11 +60,7 @@ export interface Repository {
 
   /* Fuel logs and burn --------------------------------------------- */
   addFuelLog(businessId: string, input: CreateFuelLogBody): FuelLog;
-  addReceiptLog(
-    businessId: string,
-    extraction: ReceiptExtraction,
-    receiptUrl: string,
-  ): FuelLog;
+  addReceiptLog(businessId: string, extraction: ReceiptExtraction, receiptUrl: string): FuelLog;
   fuelLogsFor(businessId: string, limit?: number): FuelLog[];
   burnProfileFor(businessId: string): BurnProfile | undefined;
   recomputeBurn(businessId: string): BurnProfile | undefined;
@@ -93,12 +89,7 @@ export interface Repository {
   getLoan(id: string): Loan | undefined;
   loanByAsset(assetId: string): Loan | undefined;
   scheduleFor(loanId: string): Installment[];
-  payLoan(
-    loanId: string,
-    amountKobo: number,
-    source: PaymentSource,
-    reference: string,
-  ): PayResult;
+  payLoan(loanId: string, amountKobo: number, source: PaymentSource, reference: string): PayResult;
 
   /* Portfolio ------------------------------------------------------ */
   portfolioStats(): PortfolioStats;

@@ -20,13 +20,11 @@ describe('quotes contract', () => {
     const reference = seed.quotes.find((q) => q.businessId === DEMO_BUSINESS_ID);
     expect(reference).toBeDefined();
 
-    const res = await request(app)
-      .post(`/api/businesses/${DEMO_BUSINESS_ID}/quote`)
-      .send({
-        systemId: reference!.system.id,
-        tenorMonths: reference!.tenorMonths,
-        depositKobo: reference!.depositKobo,
-      });
+    const res = await request(app).post(`/api/businesses/${DEMO_BUSINESS_ID}/quote`).send({
+      systemId: reference!.system.id,
+      tenorMonths: reference!.tenorMonths,
+      depositKobo: reference!.depositKobo,
+    });
 
     expect(res.status).toBe(201);
     const { id: _id, ...quote } = res.body.data;

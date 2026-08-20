@@ -8,10 +8,7 @@ import { createSimulatedAdapter } from './simulatedAdapter.js';
 // selected with PAYMENT_ADAPTER=alat and requires ALAT_BASE_URL.
 
 export function paymentAdapterFor(
-  env: Pick<
-    Env,
-    'paymentAdapter' | 'alatBaseUrl' | 'alatChannelId' | 'alatApiKey'
-  >,
+  env: Pick<Env, 'paymentAdapter' | 'alatBaseUrl' | 'alatChannelId' | 'alatApiKey'>,
 ): PaymentAdapter {
   if (env.paymentAdapter === 'alat' && env.alatBaseUrl) {
     return createAlatAdapter({

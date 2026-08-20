@@ -95,9 +95,7 @@ describe('assets contract', () => {
   });
 
   it('rejects suspending an owned asset', async () => {
-    const res = await request(app)
-      .post('/api/assets/ast_p000/suspend')
-      .send({ reason: 'Overdue' });
+    const res = await request(app).post('/api/assets/ast_p000/suspend').send({ reason: 'Overdue' });
 
     expect(res.status).toBe(409);
     expect(res.body.error).toEqual({
@@ -122,9 +120,7 @@ describe('assets contract', () => {
   });
 
   it('returns the contract 404 when suspending an unknown asset', async () => {
-    const res = await request(app)
-      .post('/api/assets/nope/suspend')
-      .send({ reason: 'Overdue' });
+    const res = await request(app).post('/api/assets/nope/suspend').send({ reason: 'Overdue' });
     expect(res.status).toBe(404);
     expect(res.body.error.message).toBe('Asset not found');
   });
