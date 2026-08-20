@@ -794,6 +794,34 @@ const walletHandlers: HttpHandler[] = [
     });
   }),
 
+    http.post(`${BASE}/auth/login`, async ({ request }) => {
+    await lag();
+    const body = (await request.json()) as { email: string; password: string };
+    if (!body.email || !body.password) {
+      return fail('VALIDATION', 'Email and password are required');
+    }
+    return ok({
+      user: { id: 'demo-user', email: body.email, fullName: 'Adaeze Okafor' },
+      role: 'owner',
+      businessId: DEMO_BUSINESS_ID,
+      accessToken: 'demo-token-xxx',
+    });
+  }),
+
+  http.post(`${BASE}/auth/register`, async ({ request }) => {
+    await lag();
+    const body = (await request.json()) as { email: string; password: string; fullName: string; phone: string };
+    if (!body.email || !body.password || !body.fullName) {
+      return fail('VALIDATION', 'All fields are required');
+    }
+    return ok({
+      user: { id: 'demo-user-new', email: body.email, fullName: body.fullName },
+      role: 'owner',
+      businessId: DEMO_BUSINESS_ID,
+      accessToken: 'demo-token-xxx',
+    });
+  }),
+
   http.get(`${BASE}/me/session`, async () => {
     await lag();
     return ok({

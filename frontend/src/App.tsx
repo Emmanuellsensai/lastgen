@@ -2,8 +2,10 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ToastProvider, ToastViewport } from '@/components/ui/toast';
 import RequireRole from '@/components/layout/RequireRole';
+import RequireAdmin from '@/components/layout/RequireAdmin';
 import Landing from '@/routes/marketing/Landing';
 import Login from '@/routes/auth/Login';
+import Register from '@/routes/auth/Register';
 import Dashboard from '@/routes/owner/Dashboard';
 import Burn from '@/routes/owner/Burn';
 import Quote from '@/routes/owner/Quote';
@@ -25,17 +27,25 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/legal/terms" element={<Terms />} />
+
+            {/* Owner routes */}
             <Route path="/app" element={<RequireRole role="owner"><Dashboard /></RequireRole>} />
             <Route path="/burn" element={<RequireRole role="owner"><Burn /></RequireRole>} />
             <Route path="/quote/:id" element={<RequireRole role="owner"><Quote /></RequireRole>} />
             <Route path="/asset/:id" element={<RequireRole role="owner"><Asset /></RequireRole>} />
             <Route path="/wrapped/:id" element={<RequireRole role="owner"><Wrapped /></RequireRole>} />
+
+            {/* Bank routes */}
             <Route path="/bank" element={<RequireRole role="bank"><Applications /></RequireRole>} />
             <Route path="/bank/file/:id" element={<RequireRole role="bank"><CreditFile /></RequireRole>} />
             <Route path="/bank/portfolio" element={<RequireRole role="bank"><Portfolio /></RequireRole>} />
-            <Route path="/demo" element={<DemoControl />} />
-            <Route path="/demo/orchestrate" element={<Orchestrate />} />
+
+            {/* Admin-only routes */}
+            <Route path="/demo" element={<RequireAdmin><DemoControl /></RequireAdmin>} />
+            <Route path="/demo/orchestrate" element={<RequireAdmin><Orchestrate /></RequireAdmin>} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ToastViewport />

@@ -14,7 +14,6 @@ import type {
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
-  CreateWalletBody,
   CreditFile,
   CreditFileDetail,
   DeclineBody,
@@ -32,16 +31,17 @@ import type {
   PagedEnvelope,
   PayBody,
   PayResult,
-  PaymentStatus,
   PortfolioAssetsQuery,
   PortfolioStats,
   Quote,
   SolarSystem,
   SuspendBody,
   SystemsQuery,
+  CreateWalletBody,
+  PaymentStatus,
   Wallet,
   WalletTransaction,
-  WrappedPayload,
+    WrappedPayload,
 } from '@/types/api';
 
 export const API_MODE: ApiMode = (import.meta.env.VITE_API_MODE as ApiMode) ?? 'mock';
@@ -205,6 +205,14 @@ export const api = {
       request<PagedEnvelope<FuelLog>>(`/businesses/${businessId}/fuel-logs`, {
         query: { limit, offset },
       }),
+  },
+  auth: {
+    login: (body: { email: string; password: string }) =>
+      post<{ user: { id: string; email: string; fullName: string }; role: 'owner' | 'bank'; businessId: string; accessToken: string }>('/auth/login', body),
+    register: (body: { email: string; password: string; fullName: string; phone: string }) =>
+      post<{ user: { id: string; email: string; fullName: string }; role: 'owner' | 'bank'; businessId: string; accessToken: string }>('/auth/register', body),
+    verifyNin: (nin: string) =>
+      post<{ verified: boolean; owner: { firstName: string; lastName: string; dateOfBirth: string; phone: string } }>('/auth/verify-nin', { nin }),
   },
 };
 
