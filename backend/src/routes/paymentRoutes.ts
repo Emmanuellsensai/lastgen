@@ -13,12 +13,10 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
 
   router.post('/loans/:id/pay', (req, res) => {
     const body = (req.body ?? {}) as PayBody;
-    const result = repo.payLoan(
-      req.params.id,
-      body.amountKobo,
-      'SIMULATED',
-      adapter.makeReference(),
-    );
+    // The ledger records the provider that actually executed the payment, so
+    // an ALAT settlement is never labelled SIMULATED.
+    const source = adapter.name === 'alat' ? 'ALAT' : 'SIMULATED';
+    const result = repo.payLoan(req.params.id, body.amountKobo, source, adapter.makeReference());
     res.json(ok(result));
   });
 

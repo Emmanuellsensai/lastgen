@@ -45,7 +45,9 @@ describe('payments contract', () => {
     const asset = repo.getAsset(loan.assetId)!;
     const balanceKobo = loan.balanceKobo;
 
-    const res = await request(app).post(`/api/loans/${loan.id}/pay`).send({ amountKobo: balanceKobo });
+    const res = await request(app)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ amountKobo: balanceKobo });
 
     expect(res.status).toBe(200);
     expect(res.body.data.loan.status).toBe('CLOSED');
@@ -53,6 +55,22 @@ describe('payments contract', () => {
     expect(res.body.data.asset.status).toBe('OWNED');
     expect(asset.status).toBe('OWNED');
     expect(loan.status).toBe('CLOSED');
+  });
+
+  it('records the ALAT source when the alat adapter is active', async () => {
+    const { app: alatApp, repo: alatRepo } = createTestApp({
+      paymentAdapter: 'alat',
+      env: { ALAT_BASE_URL: 'https://alat.example.com' },
+    });
+    const loan = alatRepo.getLoan('loan_biz_adaeze_frozen')!;
+
+    const res = await request(alatApp)
+      .post(`/api/loans/${loan.id}/pay`)
+      .send({ amountKobo: 36_654_539 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.payment.source).toBe('ALAT');
+    expect(res.body.data.payment.reference).toMatch(/^ALAT-/);
   });
 
   it('returns the contract 404 for an unknown loan', async () => {
