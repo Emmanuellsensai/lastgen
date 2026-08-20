@@ -6,7 +6,7 @@
 **Role:** Backend engineering
 **Branch:** `feat/backend`
 **Document status:** Living handoff — updated at the end of every phase
-**Last updated:** 19 August 2026
+**Last updated:** 20 August 2026
 
 ## 1. Purpose
 
@@ -54,40 +54,45 @@ reproduce their externally observable behaviour without importing any code from
 
 ## 4. Status matrix
 
-| Deliverable | Status | Notes |
-| --- | --- | --- |
-| Supabase client | ✅ | Lazy-init since Phase 0 |
-| Response envelope helpers | ✅ | `lib/envelope.ts` |
-| Centralized error handling | ✅ | `middleware/errorHandler.ts` |
-| Auth middleware (`requireAuth`) | ✅ | `middleware/auth.ts` |
-| Validation factories (Zod) | ✅ | `middleware/validate.ts` |
-| Typed env config | ✅ | `config/env.ts` (Phase 0) |
-| Frozen constants | ✅ | `config/constants.ts` (Phase 0) |
-| Backend-owned API types | ✅ | `types/api.ts` (Phase 0) |
-| App factory (`createApp`) | ✅ | `app.ts` (Phase 1) |
-| `/health` + `/api` mount | ✅ | `index.ts` → `app.ts` |
-| burnEngine | ✅ | `services/burnEngine.ts` |
-| leaseEngine | ✅ | `services/leaseEngine.ts` |
-| assetStateMachine | ✅ | `services/assetStateMachine.ts` (Phase 1) |
-| loanStateMachine | ✅ | `services/loanStateMachine.ts` (Phase 1) |
-| meterSimulator | ✅ | `services/meterSimulator.ts` (Phase 1) |
-| impactEngine | ✅ | `services/impactEngine.ts` (Phase 1) |
-| visionService | ✅ | `services/visionService.ts` (Phase 1) |
-| Payment adapters (simulated/alat) | ✅ | Full seam + HMAC signature verification (Phase 4) |
-| ALAT webhook | ✅ | `/webhooks/alat` replay-safe on `transactionReference` (Phase 4) |
-| Repository layer | 🚧 | `repository.ts` + `inMemoryRepository.ts` (Phase 2); Supabase at Phase 6 |
-| Backend seed data | ✅ | `data/seed.ts` (Phase 2, byte-for-byte with MSW) |
-| Asset status audit migration | ✅ | `migrations/audit.sql` (Phase 0; repo writes history + realtime publication Phase 2) |
-| Backend test home | ✅ | `backend/test/` — vitest config + seed-parity live (Phase 2) |
-| API routes (all domains) | ✅ | Happy-path done Phase 3; payments Phase 4; portfolio/impact Phase 5; demo Phase 6 |
-| Auth boundary | ✅ | `makeRequireAuth` demo-skip + Supabase bearer (fail-closed) (Phase 3) |
-| Demo routes | ⬜ | Phase 6 |
-| Backend README endpoint docs | 🚧 | Scaffolded; full docs Phase 6 |
-| Portfolio endpoints | ✅ | `/portfolio/stats`, `/portfolio/assets`, `/portfolio/export` (Phase 5) |
-| Impact endpoints | ✅ | `/businesses/:id/impact`, `/businesses/:id/wrapped` (Phase 5) |
-| Contract tests (11 suites) | 🚧 | 10 live (Phase 5); demo Phase 6 |
-| Correctness tests | 🚧 | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter, impact-parity live; integration Phase 7 |
-| Render deployment verification | ⬜ | Phase 6 |
+| Deliverable                       | Status | Notes                                                                                                                                              |
+| --------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase client                   | ✅     | Lazy-init since Phase 0                                                                                                                            |
+| Response envelope helpers         | ✅     | `lib/envelope.ts`                                                                                                                                  |
+| Centralized error handling        | ✅     | `middleware/errorHandler.ts`                                                                                                                       |
+| Auth middleware (`requireAuth`)   | ✅     | `middleware/auth.ts`                                                                                                                               |
+| Validation factories (Zod)        | ✅     | `middleware/validate.ts`                                                                                                                           |
+| Typed env config                  | ✅     | `config/env.ts` (Phase 0)                                                                                                                          |
+| Frozen constants                  | ✅     | `config/constants.ts` (Phase 0)                                                                                                                    |
+| Backend-owned API types           | ✅     | `types/api.ts` (Phase 0)                                                                                                                           |
+| App factory (`createApp`)         | ✅     | `app.ts` (Phase 1)                                                                                                                                 |
+| `/health` + `/api` mount          | ✅     | `index.ts` → `app.ts`                                                                                                                              |
+| burnEngine                        | ✅     | `services/burnEngine.ts`                                                                                                                           |
+| leaseEngine                       | ✅     | `services/leaseEngine.ts`                                                                                                                          |
+| assetStateMachine                 | ✅     | `services/assetStateMachine.ts` (Phase 1)                                                                                                          |
+| loanStateMachine                  | ✅     | `services/loanStateMachine.ts` (Phase 1)                                                                                                           |
+| meterSimulator                    | ✅     | `services/meterSimulator.ts` (Phase 1)                                                                                                             |
+| impactEngine                      | ✅     | `services/impactEngine.ts` (Phase 1)                                                                                                               |
+| visionService                     | ✅     | `services/visionService.ts` (Phase 1)                                                                                                              |
+| Payment adapters (simulated/alat) | ✅     | Full seam + HMAC signature verification (Phase 4) + real HTTPS collect/pollStatus client (Phase 6)                                                 |
+| ALAT webhook                      | ✅     | `/webhooks/alat` replay-safe on `transactionReference` (Phase 4); settles booked payments by reference (Phase 6)                                   |
+| Repository layer                  | ✅     | `repository.ts` + `inMemoryRepository.ts` (Phase 2) + full `SupabaseRepository` on an async seam (Phase 6)                                         |
+| Backend seed data                 | ✅     | `data/seed.ts` (Phase 2, byte-for-byte with MSW)                                                                                                   |
+| Asset status audit migration      | ✅     | `migrations/audit.sql` (Phase 0; repo writes history + realtime publication Phase 2)                                                               |
+| Payments v2 + wallets migration   | ✅     | `migrations/payments-v2.sql` (status, wallets, wallet_transactions, realtime) (Phase 6)                                                            |
+| Payment lifecycle                 | ✅     | pending → SUCCESS/FAILED/EXPIRED; slim pay + status endpoints (Phase 6)                                                                            |
+| Business wallets                  | ✅     | create (demo pre-fund NGN 50k)/balance/statement; 402-guarded wallet pay (Phase 6)                                                                 |
+| Backend test home                 | ✅     | `backend/test/` — vitest config + seed-parity live (Phase 2)                                                                                       |
+| API routes (all domains)          | ✅     | Happy-path done Phase 3; payments Phase 4; portfolio/impact Phase 5; demo + payment/wallet Phase 6                                                 |
+| Auth boundary                     | ✅     | `makeRequireAuth` demo-skip + Supabase bearer (fail-closed) (Phase 3)                                                                              |
+| Demo routes                       | ✅     | `/demo/reset`, `/demo/advance-time`, `/demo/miss-payment` (Phase 6, demo mode only)                                                                |
+| Backend README endpoint docs      | ✅     | Full surface incl. payments/wallets + env (Phase 6)                                                                                                |
+| Portfolio endpoints               | ✅     | `/portfolio/stats`, `/portfolio/assets`, `/portfolio/export` (Phase 5)                                                                             |
+| Impact endpoints                  | ✅     | `/businesses/:id/impact`, `/businesses/:id/wrapped` (Phase 5)                                                                                      |
+| Contract tests                    | ✅     | 20 files / 156 assertions (Phase 6)                                                                                                                |
+| Correctness tests                 | ✅     | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter (incl. ALAT HTTPS client), impact-parity, supabase-repository stub live |
+| Supabase repository               | ✅     | Full `Repository` implementation on an async seam + `repositoryFor(env)` (Phase 6)                                                                 |
+| Payment/wallet handoff            | ✅     | `docs/PAYMENT_EXTENSION.md` — spec verbatim + demo fallbacks (Phase 6)                                                                             |
+| Render deployment verification    | ⬜     | Needs live Supabase + ALAT credentials                                                                                                             |
 
 ## 5. Implemented foundation (Phase 0)
 
@@ -169,7 +174,7 @@ written.
 - `transition(asset, loan, business, action, ctx)` is the single function that
   may change an asset status. Actions: `PAY`, `SUSPEND`, `RESTORE`,
   `MISS_PAYMENT`, `OVERDUE`. Returns `{ asset, loan, from, to, loanFrom, loanTo,
-  reason }` so the orchestration layer can persist, write the audit trail, and
+reason }` so the orchestration layer can persist, write the audit trail, and
   broadcast without reading internals.
 - Frozen transitions: ACTIVE → GRACE/OWNED; GRACE → SUSPENDED/ACTIVE/OWNED;
   SUSPENDED → ACTIVE (payment). Payments restore GRACE/SUSPENDED assets, clear
@@ -201,7 +206,7 @@ written.
 
 - `extractReceipt` — Gemini `gemini-1.5-flash` call with an 8-second
   AbortController timeout; returns `{ litres, amountKobo, pricePerLitreKobo,
-  confidence }`.
+confidence }`.
 - Graceful deterministic mock fallback when `GEMINI_API_KEY` is unset so the
   demo and correctness suites never depend on a live model.
 
@@ -299,23 +304,31 @@ written.
 
 ## 7. Decision register
 
-| Decision | Choice | Rationale |
-| --- | --- | --- |
-| Money arithmetic | Float intermediates + single `Math.round` at kobo | Contract formula uses a fractional rate; this guarantees mock/live parity to the kobo |
-| Asset audit trail | `backend/migrations/audit.sql` | schema.sql is off-limits; additive migration satisfies the assignment without contract change |
-| Burn verification threshold | 14 days | Backend assignment value; MSW mock uses 30 — noted as demo-parity caveat |
-| PR strategy | One branch (`feat/backend`), one PR to `main` | Fastest path to the Friday demo; conventional commits per phase |
-| Supabase boot behaviour | Lazy client, fail fast on first DB use | Demo mode boots without keys; production still refuses to run unconfigured |
-| Demo authentication | Skip `requireAuth` in demo mode | Demo never asks for a JWT; production enforces Bearer on every contract route |
-| Persistence | In-memory repository first; Supabase at Phase 6 | Fastest path to a live demo without credentials; repository interface isolates the swap |
-| Medical-flag semantics | Bank `SUSPEND` throws `MEDICAL_FLAG`; automated paths silently stay GRACE | Matches the MSW reference exactly — the guard is enforced in every suspension path |
-| App composition | `createApp(env, logger, repository)` factory | `app.ts` builds the Express app; `index.ts` wires the in-memory repo; tests inject their own |
-| Reset determinism | Fresh PRNG per seed build | Frontend resets drift (module-level PRNG); backend resets reproduce the first build exactly |
-| Auth failure mode | Fail closed with `UNAUTHORIZED` | Express 4 drops rejected promises; wrapping the Supabase lookup prevents hung requests |
-| Webhook signature | HMAC-SHA512 over the raw body, verified in constant time | ALAT signs notifications; the simulated adapter is demo-only and accepts everything |
-| Webhook placement | Mounted before the auth boundary | ALAT authenticates via its own signature, never a Lastgen bearer token |
-| Impact source | One `computeImpact` engine behind `/impact` and `/wrapped` | Guarantees the parity gate: the two endpoints share the same numbers |
-| Impact windows | 30 / 365 / 730 days | Mirrors the MSW `impactFor` `days` switch exactly |
+| Decision                    | Choice                                                                           | Rationale                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Money arithmetic            | Float intermediates + single `Math.round` at kobo                                | Contract formula uses a fractional rate; this guarantees mock/live parity to the kobo         |
+| Asset audit trail           | `backend/migrations/audit.sql`                                                   | schema.sql is off-limits; additive migration satisfies the assignment without contract change |
+| Burn verification threshold | 14 days                                                                          | Backend assignment value; MSW mock uses 30 — noted as demo-parity caveat                      |
+| PR strategy                 | One branch (`feat/backend`), one PR to `main`                                    | Fastest path to the Friday demo; conventional commits per phase                               |
+| Supabase boot behaviour     | Lazy client, fail fast on first DB use                                           | Demo mode boots without keys; production still refuses to run unconfigured                    |
+| Demo authentication         | Skip `requireAuth` in demo mode                                                  | Demo never asks for a JWT; production enforces Bearer on every contract route                 |
+| Persistence                 | In-memory repository first; Supabase at Phase 6                                  | Fastest path to a live demo without credentials; repository interface isolates the swap       |
+| Medical-flag semantics      | Bank `SUSPEND` throws `MEDICAL_FLAG`; automated paths silently stay GRACE        | Matches the MSW reference exactly — the guard is enforced in every suspension path            |
+| App composition             | `createApp(env, logger, repository)` factory                                     | `app.ts` builds the Express app; `index.ts` wires the in-memory repo; tests inject their own  |
+| Reset determinism           | Fresh PRNG per seed build                                                        | Frontend resets drift (module-level PRNG); backend resets reproduce the first build exactly   |
+| Auth failure mode           | Fail closed with `UNAUTHORIZED`                                                  | Express 4 drops rejected promises; wrapping the Supabase lookup prevents hung requests        |
+| Webhook signature           | HMAC-SHA512 over the raw body, verified in constant time                         | ALAT signs notifications; the simulated adapter is demo-only and accepts everything           |
+| Webhook placement           | Mounted before the auth boundary                                                 | ALAT authenticates via its own signature, never a Lastgen bearer token                        |
+| Impact source               | One `computeImpact` engine behind `/impact` and `/wrapped`                       | Guarantees the parity gate: the two endpoints share the same numbers                          |
+| Impact windows              | 30 / 365 / 730 days                                                              | Mirrors the MSW `impactFor` `days` switch exactly                                             |
+| Payment response            | Slim `{ paymentId, platformTransactionReference, status }`                       | Frontend renders the consent sheet without loan internals (handoff spec)                      |
+| Payment lifecycle           | Book `pending_authorisation`, settle via webhook/poll/wallet in one transaction  | Same atomic `applySettlement` primitive for every entry path                                  |
+| Wallet source of truth      | Business cash wallet (`035`/`NGN`), demo pre-funded NGN 50k on create            | Demo needs a funded wallet; live starts at 0, funded externally, no top-up endpoint           |
+| Wallet ownership            | `/wallets/*` resolves business from `req.user` via `businessForOwner`            | Authz invariant: no cross-user access, never trust the body                                   |
+| ALAT integration            | Real HTTPS adapter (transfer-fund-request + CheckTransactionStatus), mock-tested | No sandbox credentials available; `fetchFn` injectable keeps the wire contract pinned         |
+| Supabase correctness        | Full `SupabaseRepository` on an async `Repository` seam                          | supabase-js is async; converting the seam (not casting) keeps the interface honest            |
+| Wallet debit atomicity      | Single `UPDATE … WHERE balance_kobo >= amount` (compare-and-swap)                | The 402 guard is race-free in Postgres without a server-side function                         |
+| Demo realtime               | No Supabase Realtime in demo → frontend polls status then re-fetches the loan    | Documented in the handoff; `payment.status_changed` only on a Supabase deployment             |
 
 ## 8. Phase log
 
@@ -408,8 +421,8 @@ written.
 ### Phase 5 — Portfolio and impact parity (complete)
 
 - Added `Repository.impactFor` wired through `computeImpact` (burn + asset loan
-  + readings), plus portfolio and impact routers mounted after the auth
-  boundary.
+  - readings), plus portfolio and impact routers mounted after the auth
+    boundary.
 - Added 17 assertions: impact-parity (6), portfolio contract (5), impact
   contract (6).
 - Verification: typecheck ✅, lint ✅, shared correctness ✅ (33/33), backend
@@ -417,9 +430,41 @@ written.
   wrapped, 404) ✅.
 - **Impact parity review gate demonstrated.**
 
-### Phase 6 — Demo, README, deploy — pending
+### Phase 6 — Payment lifecycle, wallets, Supabase (complete)
 
-- Demo routes driving the real state machine; endpoint docs; Render verification
+Pulled forward as the payment/wallet extension; spec in `docs/PAYMENT_EXTENSION.md`:
+
+- **Payment lifecycle** — `PaymentStatus` + `Payment.status`/
+  `platformTransactionReference`; adapter seam `collect()`; simulated adapter
+  auto-settles after `SETTLE_AFTER_MS`; repository
+  `startPayment`/`settlePayment`/`failPayment`/`expirePayment`/`paymentByRefOrId`.
+  Slim `POST /loans/:id/pay` response; `GET /payments/:reference/status`
+  (reference or id) reconciles stale pendings against the provider.
+- **Real ALAT client** — `collect()` → `transfer-fund-request`
+  (Ocp-Apim-Subscription-Key + merchant `sourceAccountNumber`), `pollStatus()` →
+  `CheckTransactionStatus`; provider statuses mapped; 4xx → VALIDATION, 5xx/
+  network → UNAVAILABLE. Wire contract pinned by the correctness suite via an
+  injected `fetchFn`.
+- **Wallets** — `POST /wallets/create` (KYC'd, idempotent, demo pre-fund NGN
+  50k), `GET /wallets/balance`, `GET /wallets/statement`; `source='wallet'` pays
+  via a 402-guarded debit + atomic settlement. Ownership from `req.user`.
+  `nextId` serial-increment bug fixed (ids are unique now).
+- **Async seam** — `Repository` returns promises; in-memory repo, routes and
+  tests await it; `settlePayment` re-checks status after awaits for exactly-once
+  settlement under the simulated-consent race.
+- **`payments-v2.sql`** — additive migration: `payment_status`, `payments.status`
+  - platform reference, `WALLET` source, `wallets`/`wallet_kyc`/
+    `wallet_transactions` with RLS, realtime publication for payments/wallets.
+- **Full `SupabaseRepository`** — every `Repository` method on supabase-js,
+  reusing the pure engines; `repositoryFor(env)` + fail-fast live guard;
+  `index.ts` loads `.env`. Stub suite `test/data/supabase-repository.test.ts`.
+- **Demo/README** — demo routes completed in the remediation pass; README,
+  `.env.example` and this document cover the payment/wallet surface,
+  `ALAT_SOURCE_ACCOUNT`/`SETTLE_AFTER_MS`, and the Supabase store.
+- Verification: typecheck ✅, typecheck:test ✅, lint ✅ (0 errors), shared
+  correctness ✅ (33/33), backend suite ✅ (**156/156, 20 files**),
+  format:check:backend ✅, demo boot smoke ✅ (wallet create pre-funded; bank pay
+  pending → auto SUCCESS; wallet pay SUCCESS + debit; statement ordering).
 
 ### Remediation pass — audit of Phases 0–5 (complete)
 
@@ -432,8 +477,8 @@ Read-only audit (two explorer sweeps + manual verification) → 11 fixes:
   the roadmap's 11 contract suites (`demo.test.ts`, 8 tests).
 - Payment source is adapter-accurate (ALAT vs SIMULATED).
 - Graceful shutdown (SIGINT/SIGTERM), committed `.npmrc`, `tsconfig.test.json`
-  + `typecheck:test`, CI workflow, dead code removed (burnEngine, validate/zod,
-  unused meterSimulator exports, pino-pretty), Prettier pass over backend.
+  - `typecheck:test`, CI workflow, dead code removed (burnEngine, validate/zod,
+    unused meterSimulator exports, pino-pretty), Prettier pass over backend.
 - Docs refreshed: `README.md`, `AUDIT.md` §19, `loanRoutes.ts` comment.
 - Deferred to Phase 6: Supabase repository (live data is auth-only),
   re-plumb `lib/supabase.ts` through `Env`, receipt image hosting.
@@ -444,52 +489,58 @@ Read-only audit (two explorer sweeps + manual verification) → 11 fixes:
 
 ## 9. PR/commit log
 
-| Commit | Scope |
-| --- | --- |
-| `chore(backend): add typed env config and frozen contract constants` | `config/env.ts`, `config/constants.ts`, burnEngine constants refactor |
-| `feat(backend): add backend-owned API types mirroring docs/CONTRACT.md` | `types/api.ts` |
-| `refactor(backend): lazy-init supabase client for demo-first boot` | `lib/supabase.ts`, `middleware/auth.ts`, `index.ts` |
-| `test(backend): prove vitest module resolution with lease-math smoke test` | `tests/correctness/lease-math.test.ts` |
-| `feat(backend): add asset status audit migration` | `migrations/audit.sql` |
-| `docs(backend): rewrite BACKEND_PROGRESS.md as living handoff` | `backend/BACKEND_PROGRESS.md` |
-| `docs(backend): refresh AUDIT.md for phase 0 state` | `backend/AUDIT.md` |
-| `refactor(backend): split app factory from process entry point` | `app.ts`, `index.ts` |
-| `feat(backend): add loan and asset state machines` | `services/loanStateMachine.ts`, `services/assetStateMachine.ts` |
-| `feat(backend): add deterministic meter simulator and impact engine` | `services/meterSimulator.ts`, `services/impactEngine.ts`, `config/constants.ts` |
-| `feat(backend): add receipt vision service with mock fallback` | `services/visionService.ts` |
-| `test(backend): fill correctness suites for lease, state machine, medical guard` | `tests/correctness/lease-math.test.ts`, `tests/correctness/asset-state-machine.test.ts`, `tests/correctness/medical-flag-guard.test.ts` |
-| `docs(backend): document phase 1 engines and verification` | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
-| `docs: add frontend integration guide` | `GUIDE.md` |
-| `docs: add backend roadmap` | `backend/ROADMAP.md` |
-| `feat(backend): add deterministic in-memory seed` | `data/seed.ts` |
-| `feat(backend): add repository interface and in-memory implementation` | `data/repository.ts`, `data/inMemoryRepository.ts` |
-| `feat(backend): add asset realtime publication to audit migration` | `migrations/audit.sql` |
-| `test(backend): add backend test home and seed-parity suite` | `backend/package.json`, `backend/vitest.config.ts`, `backend/test/correctness/seed-parity.test.ts` |
-| `docs(backend): document phase 2 data layer` | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
-| `chore(backend): document full env surface and env hygiene` | `backend/.env.example`, `.gitignore` |
-| `feat(backend): add auth demo-skip factory` | `middleware/auth.ts` |
-| `feat(backend): add business and fuel-log routes` | `routes/businessRoutes.ts`, `routes/helpers.ts` |
-| `feat(backend): add systems, quotes, credit, asset, loan routes` | `routes/systemRoutes.ts`, `routes/quoteRoutes.ts`, `routes/creditRoutes.ts`, `routes/assetRoutes.ts`, `routes/loanRoutes.ts` |
-| `feat(backend): mount api router with contract 404` | `routes/index.ts`, `app.ts`, `index.ts`, `package.json` |
-| `test(backend): add phase 3 contract suites` | `backend/test/helpers.ts`, `backend/test/contract/*` |
-| `docs(backend): document phase 3 api surface` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
-| `feat(backend): complete payment adapter seam` | `adapters/paymentAdapter.ts`, `adapters/simulatedAdapter.ts`, `adapters/alatAdapter.ts`, `adapters/factory.ts` |
-| `feat(backend): add loan pay and alat webhook routes` | `routes/paymentRoutes.ts`, `routes/webhookRoutes.ts`, `routes/index.ts`, `app.ts`, `middleware/auth.ts` |
-| `test(backend): add webhook idempotency and payment suites` | `backend/test/correctness/webhook-idempotency.test.ts`, `backend/test/correctness/payment-adapter.test.ts`, `backend/test/contract/webhooks.test.ts`, `backend/test/contract/payments.test.ts` |
-| `docs(backend): document phase 4 payments` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
-| `feat(backend): add impact projection to repository seam` | `src/data/repository.ts`, `src/data/inMemoryRepository.ts` |
-| `feat(backend): add portfolio and impact routes` | `src/routes/portfolioRoutes.ts`, `src/routes/impactRoutes.ts`, `src/routes/index.ts` |
-| `test(backend): add impact parity and portfolio suites` | `backend/test/correctness/impact-parity.test.ts`, `backend/test/contract/portfolio.test.ts`, `backend/test/contract/impact.test.ts` |
-| `docs(backend): document phase 5 portfolio and impact` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
-| `fix(backend): map json transport errors to contract responses` | `app.ts`, `middleware/errorHandler.ts`, `backend/test/contract/errors.test.ts` |
-| `feat(backend): add demo control routes` | `routes/demoRoutes.ts`, `routes/index.ts`, `backend/test/helpers.ts`, `backend/test/contract/demo.test.ts` |
-| `fix(backend): record adapter-accurate payment source` | `routes/paymentRoutes.ts`, `backend/test/contract/payments.test.ts` |
-| `feat(backend): graceful shutdown on sigint/sigterm` | `index.ts` |
-| `chore(backend): drop dead burn engine and validator` | `services/burnEngine.ts`, `middleware/validate.ts`, `config/constants.ts`, `services/meterSimulator.ts`, `backend/package.json` |
-| `build(backend): typecheck test sources` | `tsconfig.test.json`, `backend/package.json` |
-| `ci: add backend gate workflow and commit install policy` | `.github/workflows/ci.yml`, `.npmrc`, root `package.json` |
-| `style(backend): format sources with prettier` | `backend/src`, `backend/test` |
-| `docs(backend): refresh readme and audit after remediation` | `backend/README.md`, `backend/AUDIT.md`, `backend/BACKEND_PROGRESS.md`, `routes/loanRoutes.ts` |
+| Commit                                                                              | Scope                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chore(backend): add typed env config and frozen contract constants`                | `config/env.ts`, `config/constants.ts`, burnEngine constants refactor                                                                                                                          |
+| `feat(backend): add backend-owned API types mirroring docs/CONTRACT.md`             | `types/api.ts`                                                                                                                                                                                 |
+| `refactor(backend): lazy-init supabase client for demo-first boot`                  | `lib/supabase.ts`, `middleware/auth.ts`, `index.ts`                                                                                                                                            |
+| `test(backend): prove vitest module resolution with lease-math smoke test`          | `tests/correctness/lease-math.test.ts`                                                                                                                                                         |
+| `feat(backend): add asset status audit migration`                                   | `migrations/audit.sql`                                                                                                                                                                         |
+| `docs(backend): rewrite BACKEND_PROGRESS.md as living handoff`                      | `backend/BACKEND_PROGRESS.md`                                                                                                                                                                  |
+| `docs(backend): refresh AUDIT.md for phase 0 state`                                 | `backend/AUDIT.md`                                                                                                                                                                             |
+| `refactor(backend): split app factory from process entry point`                     | `app.ts`, `index.ts`                                                                                                                                                                           |
+| `feat(backend): add loan and asset state machines`                                  | `services/loanStateMachine.ts`, `services/assetStateMachine.ts`                                                                                                                                |
+| `feat(backend): add deterministic meter simulator and impact engine`                | `services/meterSimulator.ts`, `services/impactEngine.ts`, `config/constants.ts`                                                                                                                |
+| `feat(backend): add receipt vision service with mock fallback`                      | `services/visionService.ts`                                                                                                                                                                    |
+| `test(backend): fill correctness suites for lease, state machine, medical guard`    | `tests/correctness/lease-math.test.ts`, `tests/correctness/asset-state-machine.test.ts`, `tests/correctness/medical-flag-guard.test.ts`                                                        |
+| `docs(backend): document phase 1 engines and verification`                          | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md`                                                                                                                                              |
+| `docs: add frontend integration guide`                                              | `GUIDE.md`                                                                                                                                                                                     |
+| `docs: add backend roadmap`                                                         | `backend/ROADMAP.md`                                                                                                                                                                           |
+| `feat(backend): add deterministic in-memory seed`                                   | `data/seed.ts`                                                                                                                                                                                 |
+| `feat(backend): add repository interface and in-memory implementation`              | `data/repository.ts`, `data/inMemoryRepository.ts`                                                                                                                                             |
+| `feat(backend): add asset realtime publication to audit migration`                  | `migrations/audit.sql`                                                                                                                                                                         |
+| `test(backend): add backend test home and seed-parity suite`                        | `backend/package.json`, `backend/vitest.config.ts`, `backend/test/correctness/seed-parity.test.ts`                                                                                             |
+| `docs(backend): document phase 2 data layer`                                        | `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md`                                                                                                                                              |
+| `chore(backend): document full env surface and env hygiene`                         | `backend/.env.example`, `.gitignore`                                                                                                                                                           |
+| `feat(backend): add auth demo-skip factory`                                         | `middleware/auth.ts`                                                                                                                                                                           |
+| `feat(backend): add business and fuel-log routes`                                   | `routes/businessRoutes.ts`, `routes/helpers.ts`                                                                                                                                                |
+| `feat(backend): add systems, quotes, credit, asset, loan routes`                    | `routes/systemRoutes.ts`, `routes/quoteRoutes.ts`, `routes/creditRoutes.ts`, `routes/assetRoutes.ts`, `routes/loanRoutes.ts`                                                                   |
+| `feat(backend): mount api router with contract 404`                                 | `routes/index.ts`, `app.ts`, `index.ts`, `package.json`                                                                                                                                        |
+| `test(backend): add phase 3 contract suites`                                        | `backend/test/helpers.ts`, `backend/test/contract/*`                                                                                                                                           |
+| `docs(backend): document phase 3 api surface`                                       | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md`                                                                                                                        |
+| `feat(backend): complete payment adapter seam`                                      | `adapters/paymentAdapter.ts`, `adapters/simulatedAdapter.ts`, `adapters/alatAdapter.ts`, `adapters/factory.ts`                                                                                 |
+| `feat(backend): add loan pay and alat webhook routes`                               | `routes/paymentRoutes.ts`, `routes/webhookRoutes.ts`, `routes/index.ts`, `app.ts`, `middleware/auth.ts`                                                                                        |
+| `test(backend): add webhook idempotency and payment suites`                         | `backend/test/correctness/webhook-idempotency.test.ts`, `backend/test/correctness/payment-adapter.test.ts`, `backend/test/contract/webhooks.test.ts`, `backend/test/contract/payments.test.ts` |
+| `docs(backend): document phase 4 payments`                                          | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md`                                                                                                                        |
+| `feat(backend): add impact projection to repository seam`                           | `src/data/repository.ts`, `src/data/inMemoryRepository.ts`                                                                                                                                     |
+| `feat(backend): add portfolio and impact routes`                                    | `src/routes/portfolioRoutes.ts`, `src/routes/impactRoutes.ts`, `src/routes/index.ts`                                                                                                           |
+| `test(backend): add impact parity and portfolio suites`                             | `backend/test/correctness/impact-parity.test.ts`, `backend/test/contract/portfolio.test.ts`, `backend/test/contract/impact.test.ts`                                                            |
+| `docs(backend): document phase 5 portfolio and impact`                              | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md`                                                                                                                        |
+| `fix(backend): map json transport errors to contract responses`                     | `app.ts`, `middleware/errorHandler.ts`, `backend/test/contract/errors.test.ts`                                                                                                                 |
+| `feat(backend): add demo control routes`                                            | `routes/demoRoutes.ts`, `routes/index.ts`, `backend/test/helpers.ts`, `backend/test/contract/demo.test.ts`                                                                                     |
+| `fix(backend): record adapter-accurate payment source`                              | `routes/paymentRoutes.ts`, `backend/test/contract/payments.test.ts`                                                                                                                            |
+| `feat(backend): graceful shutdown on sigint/sigterm`                                | `index.ts`                                                                                                                                                                                     |
+| `chore(backend): drop dead burn engine and validator`                               | `services/burnEngine.ts`, `middleware/validate.ts`, `config/constants.ts`, `services/meterSimulator.ts`, `backend/package.json`                                                                |
+| `build(backend): typecheck test sources`                                            | `tsconfig.test.json`, `backend/package.json`                                                                                                                                                   |
+| `ci: add backend gate workflow and commit install policy`                           | `.github/workflows/ci.yml`, `.npmrc`, root `package.json`                                                                                                                                      |
+| `style(backend): format sources with prettier`                                      | `backend/src`, `backend/test`                                                                                                                                                                  |
+| `docs(backend): refresh readme and audit after remediation`                         | `backend/README.md`, `backend/AUDIT.md`, `backend/BACKEND_PROGRESS.md`, `routes/loanRoutes.ts`                                                                                                 |
+| `Merge remote-tracking branch 'origin/main' into feat/backend`                      | `db380b1` — lockfile only (`@phosphor-icons/react` in, `zod`/`pino-pretty`/`lucide-react` out)                                                                                                 |
+| `feat(backend): add payment lifecycle and status endpoint`                          | `30399e0` — `PaymentStatus`, `collect()` seam, simulated auto-settle, slim pay/status endpoints, settle-by-reference webhook                                                                   |
+| `feat(backend): add business wallets with demo pre-funding`                         | `30246fe` — `wallets`/`wallet_transactions` state, create/balance/statement routes, 402-guarded wallet pay, `nextId` fix                                                                       |
+| `feat(backend): real ALAT HTTPS client with status reconciliation`                  | `0f613d8` — `transfer-fund-request` + `CheckTransactionStatus` polling, provider status mapping, poll reconciles stale pendings                                                                |
+| `feat(backend): wire Supabase with payments-v2 migration and async repository seam` | `…` — full `SupabaseRepository`, `repositoryFor(env)`, async `Repository`, `.env` loading, `payments-v2.sql`, stub suite                                                                       |
+| `docs(backend): payment/wallet handoff spec and doc refresh`                        | `docs/PAYMENT_EXTENSION.md`, `backend/README.md`, `backend/.env.example`, `backend/AUDIT.md`, `backend/BACKEND_PROGRESS.md`                                                                    |
 
 ## 10. Risks and open items
 
@@ -507,6 +558,14 @@ Read-only audit (two explorer sweeps + manual verification) → 11 fixes:
   becomes mandatory. Confirm before production use.
 - **Schema not yet applied** — the audit migration and schema exist as SQL; they
   are applied to the live Supabase project in Phase 6 with credentials.
+- **Supabase paths stub-tested only** — the full `SupabaseRepository` and the
+  realtime publication are verified against a stubbed client and by SQL review;
+  nothing has run against a live project (no credentials). Apply
+  `supabase/schema.sql` → `backend/migrations/audit.sql` →
+  `backend/migrations/payments-v2.sql` in order, then run the live smoke.
+- **Async repository seam** — the `Repository` interface is now Promise-returning
+  so the DB-backed implementation is honest. All routes and tests await it; the
+  demo boot smoke and the 156-test suite pin the behaviour.
 - **Backend tests are backend-owned** — new suites live in `backend/test/`
   (`pnpm --filter @lastgen/backend test`); the shared `/tests/` directory is
   only touched for the three committed correctness suites. No further `/tests/`
@@ -556,6 +615,11 @@ Read-only audit (two explorer sweeps + manual verification) → 11 fixes:
 - [x] Impact parity review gate demonstrated
 - [x] Remediation audit of Phases 0–5: JSON error handling, demo routes + suite, adapter-accurate payment source, graceful shutdown
 - [x] Remediation: committed `.npmrc`, `tsconfig.test.json`, CI workflow, dead code removed, Prettier pass, docs refreshed
-- [ ] Supabase repository (Phase 6, needs envs)
-- [ ] Demo/README/deploy final pass (Phase 6)
+- [x] Payment lifecycle (pending → SUCCESS/FAILED/EXPIRED) + slim pay/status endpoints (Phase 6)
+- [x] Business wallets: create/balance/statement + 402-guarded wallet pay + demo pre-fund (Phase 6)
+- [x] Real ALAT HTTPS client (transfer-fund-request + CheckTransactionStatus) + status reconciliation (Phase 6)
+- [x] `payments-v2.sql` migration (status, wallets, wallet_transactions, realtime) (Phase 6)
+- [x] Full `SupabaseRepository` + async repository seam + `repositoryFor(env)` + `.env` loading (Phase 6)
+- [x] `docs/PAYMENT_EXTENSION.md` handoff + README/env/audit/progress refresh (Phase 6)
+- [ ] Render deployment with live Supabase + ALAT credentials (Phase 6/7)
 - [ ] Integration suite + final PR (Phase 7)

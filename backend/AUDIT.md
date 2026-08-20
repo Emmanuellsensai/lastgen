@@ -818,7 +818,7 @@ Phase 1 (domain engines) is complete on branch `feat/backend`:
   guard enforced inside every suspension path: bank `SUSPEND` throws
   `MEDICAL_FLAG` (409); automated paths keep a flagged business in GRACE.
 - **Added** `src/services/meterSimulator.ts` — deterministic `mulberry32(20260819)`
-  + `hashString` streams, 6 daily slots, `tick`.
+  - `hashString` streams, 6 daily slots, `tick`.
 - **Added** `src/services/impactEngine.ts` — 30/365/730-day windows, wrapped
   yearly summary, months-to-ownership.
 - **Added** `src/services/visionService.ts` — Gemini receipt extraction with an
@@ -1009,3 +1009,70 @@ repository work.
 
 Current counts: backend suites 17 files, 112 assertions; shared correctness
 33/33; `pnpm typecheck`, `typecheck:test`, `lint`, `format:check:backend` clean.
+
+## 20. Phase 6 — Payments v2 + wallets + full Supabase repository (done)
+
+Branched work on `feat/backend` for the payment/wallet extension specified in
+`docs/PAYMENT_EXTENSION.md` (a separate document; `docs/CONTRACT.md` untouched).
+Commits: `30399e0` (lifecycle), `30246fe` (wallets), `0f613d8` (real ALAT
+client), `…` (Supabase) on top of the `origin/main` merge `db380b1`.
+
+- **Payment lifecycle** — `PaymentStatus` (`pending_authorisation`/`authorised`/
+  `SUCCESS`/`FAILED`/`EXPIRED`); `Payment` gains `status` +
+  `platformTransactionReference?`; `PaymentSource` gains `WALLET`. The adapter
+  seam grows `collect()`; the simulated adapter settles in-process after
+  `SETTLE_AFTER_MS` (0 = synchronous), the ALAT adapter books
+  `pending_authorisation`. Repository gains `startPayment`/`settlePayment`
+  (idempotent, shares the atomic `applySettlement`)/`failPayment`/
+  `expirePayment`/`setPaymentPlatformReference`/`paymentByRefOrId`.
+  `POST /loans/:id/pay` returns the slim `{ paymentId, platformTransactionReference,
+status }`; `GET /payments/:reference/status` accepts the reference or the id
+  and reconciles a stale pending payment against the provider.
+- **Real ALAT HTTPS client** — `collect()` POSTs `transfer-fund-request`
+  (Ocp-Apim-Subscription-Key, merchant `sourceAccountNumber`), `pollStatus()`
+  GETs `CheckTransactionStatus/{channelId}/{reference}` and maps provider
+  statuses onto the PaymentStatus vocabulary. 4xx → `VALIDATION`, 5xx/network →
+  `UNAVAILABLE`. `fetchFn` is injectable; the wire contract is pinned by the
+  correctness suite.
+- **Wallets** — `POST /wallets/create` (KYC'd 035/NGN virtual account,
+  idempotent per business, **pre-funded NGN 50,000 in demo mode**),
+  `GET /wallets/balance`, `GET /wallets/statement?limit&before`. Business is
+  resolved from `req.user` via `businessForOwner` (demo-user →
+  `biz_adaeze_frozen`); `source='wallet'` pays debit the balance with a 402
+  guard and settle loan + asset in the same transaction as the debit.
+  New suite `wallet.test.ts` (10) + payments suite extended. Fix landed during
+  wallets: `nextId` never incremented its serial, so every generated id
+  collided at `*_00000` — now incremented (unique ids).
+- **Async repository seam** — the `Repository` interface now returns promises so
+  the DB-backed implementation is honest (no `as unknown` casts). In-memory
+  repo, all routes and the test suites `await` it; the simulated adapter's
+  in-process consent races are exactly-once via the post-await status
+  re-check in `settlePayment`.
+- **Migration `migrations/payments-v2.sql`** — additive, idempotent:
+  `payment_status` enum, `payments.status` (default `SUCCESS`) +
+  `platform_transaction_reference`, `WALLET` added to `payment_source`,
+  `wallets` + `wallet_kyc` + `wallet_transactions` tables with RLS, and the
+  `supabase_realtime` publication gains `payments`/`wallets`/
+  `wallet_transactions` so the frontend can watch `payment.status_changed`.
+- **Full `SupabaseRepository`** — implements every `Repository` method against
+  supabase-js reusing the pure engines (asset/loan state machines, lease/
+  impact), camelCase↔snake_case mapping, money as kobo, atomic wallet
+  compare-and-swap (`UPDATE … WHERE balance_kobo >= amount`), idempotent
+  settle/create. `repositoryFor(env)` selects it when Supabase credentials are
+  present, refuses live mode without them, and falls back to the in-memory seed
+  in demo mode. `index.ts` loads `backend/.env` if present so
+  `cp .env.example .env` works as documented. Stub client suite
+  `test/data/supabase-repository.test.ts` (7).
+- **Env** — `ALAT_SOURCE_ACCOUNT` and `SETTLE_AFTER_MS` documented in
+  `.env.example`; `Env.alatSourceAccount`/`settleAfterMs` typed in `env.ts`.
+- **Handoff** — `docs/PAYMENT_EXTENSION.md` (spec verbatim + backend decisions +
+  demo-mode fallbacks: no realtime in demo → poll status then re-fetch the loan).
+
+Verification: `pnpm typecheck` ✅, `pnpm typecheck:test` ✅, `pnpm lint` ✅ (0
+errors), shared correctness 33/33 ✅, `pnpm --filter @lastgen/backend test`
+**156/156 (20 files)** ✅, `format:check:backend` ✅, demo boot smoke ✅ (health;
+wallet create pre-funded; bank pay → pending → auto SUCCESS after the window;
+wallet pay → SUCCESS + debit; statement ordering; status by id). `/supabase/
+schema.sql` and `docs/CONTRACT.md` untouched (payments-v2 is a separate additive
+migration). Not yet applied to a live project (no credentials) — the Supabase
+paths are stub-tested only.
