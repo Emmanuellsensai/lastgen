@@ -17,8 +17,8 @@ export interface AdapterDeps {
   settle?: (reference: string) => void;
 }
 
-export function paymentAdapterFor(
-  env: Pick<
+export type PaymentAdapterEnv = Partial<
+  Pick<
     Env,
     | 'paymentAdapter'
     | 'alatBaseUrl'
@@ -27,9 +27,10 @@ export function paymentAdapterFor(
     | 'alatSourceAccount'
     | 'alatAmountUnit'
     | 'settleAfterMs'
-  >,
-  deps: AdapterDeps = {},
-): PaymentAdapter {
+  >
+>;
+
+export function paymentAdapterFor(env: PaymentAdapterEnv, deps: AdapterDeps = {}): PaymentAdapter {
   if (env.paymentAdapter === 'alat') {
     if (!env.alatBaseUrl) {
       // No provider endpoint configured: fall back to the simulated adapter so

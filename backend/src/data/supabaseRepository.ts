@@ -1007,7 +1007,10 @@ export class SupabaseRepository implements Repository {
   /* Async implementations                                               */
   /* ------------------------------------------------------------------ */
 
-  private async runCreateBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business> {
+  private async runCreateBusiness(
+    input: CreateBusinessBody,
+    ownerId?: string | null,
+  ): Promise<Business> {
     if (!input?.name || !input?.type || !input?.city) {
       throw new ApiError('VALIDATION', 'name, type and city are required', 400);
     }

@@ -28,7 +28,7 @@ live split. The contract and the frontend remain untouched.
 | ALAT adapter | Real HTTPS client — `transfer-fund-request` + `CheckTransactionStatus` polling with `Ocp-Apim-Subscription-Key`; simulated in-process adapter for demos/tests. |
 | Wallets | `POST /wallets/create` (KYC'd 035/NGN virtual account, idempotent, demo pre-funded NGN 50,000), `GET /wallets/balance`, `GET /wallets/statement`; 402-guarded wallet pay settling loan + asset in one transaction. |
 | Migrations | `backend/migrations/audit.sql` + `backend/migrations/payments-v2.sql` + `backend/migrations/payments-v3-atomic.sql` — additive, idempotent (audit trail, payment status, wallets + wallet_transactions, realtime publication, atomic Postgres settlement RPC functions). |
-| Tests | **161 backend tests across 20 files** (contract + correctness + Supabase stub) passing 100% green. |
+| Tests | **166 backend tests across 21 files** (contract + correctness + E2E + Supabase stub) passing 100% green. |
 | Docs | `backend/README.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md`, and `docs/PAYMENT_EXTENSION.md` (frontend handoff). |
 
 ### Not in this PR (by design)

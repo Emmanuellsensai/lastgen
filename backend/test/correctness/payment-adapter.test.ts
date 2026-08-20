@@ -206,7 +206,7 @@ describe('alat HTTPS client', () => {
   });
 
   it('sends the amount in naira when ALAT_AMOUNT_UNIT=naira', async () => {
-    const fetch = stubFetch((url, init) => {
+    const fetch = stubFetch((_url, init) => {
       expect(JSON.parse(String(init?.body))).toMatchObject({ amount: '2500' });
       return jsonResponse({});
     });
