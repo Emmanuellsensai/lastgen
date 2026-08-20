@@ -3,8 +3,8 @@ import type { Repository } from '../data/repository.js';
 import { ok } from '../lib/envelope.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
-// Loans: read-only in Phase 3. Payment settlement (POST /loans/:id/pay) and
-// the ALAT webhook arrive with the payment work in Phase 4.
+// Loans: read-only lookups. Payment settlement (POST /loans/:id/pay) lives in
+// paymentRoutes.ts and the ALAT webhook in webhookRoutes.ts.
 
 export function createLoanRouter(repo: Repository): Router {
   const router = Router();

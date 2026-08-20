@@ -963,3 +963,49 @@ test` 100/100 green, demo boot smoke (stats, assets?status=SUSPENDED, export,
 impact, wrapped?year=2025 → 200; unknown business → 404).
 `/supabase/schema.sql`, `docs/CONTRACT.md`, and `/frontend` were not modified.
 **Impact parity review gate demonstrated.**
+
+## 19. Remediation audit — Phases 0–5 (done)
+
+A read-only audit of Phases 0–5 plus the frontend and backend wiring produced
+the following fixes (HEAD `95cef89` → this commit).
+
+- **JSON transport errors** — `pinoHttp` now mounts before `express.json` so
+  request logging exists before body parsing. Body-parser failures map to
+  contract JSON: `entity.parse.failed` → `400 VALIDATION "Invalid JSON body"`,
+  `entity.too.large` → `413 PAYLOAD_TOO_LARGE`. Previously a malformed or
+  oversized body crashed the error handler (`req.log` undefined) and returned
+  the Express HTML 500. New suite `test/contract/errors.test.ts` (3).
+- **Demo routes** — `routes/demoRoutes.ts` (`POST /demo/reset`,
+  `/demo/advance-time`, `/demo/miss-payment`) mounted before the auth boundary
+  only when `DEMO_MODE=true`, per `docs/CONTRACT.md` ("unauthenticated, demo
+  only"). Live deployments return the auth 401 instead. New suite
+  `test/contract/demo.test.ts` (8), completing the roadmap's 11 contract suites.
+- **Payment source** — `POST /loans/:id/pay` now records the adapter-accurate
+  source (`ALAT` when the ALAT adapter is active, `SIMULATED` otherwise)
+  instead of always `SIMULATED`. Contract test extended (1).
+- **Graceful shutdown** — `index.ts` closes the server and exits 0 on
+  SIGINT/SIGTERM.
+- **Install policy** — committed `.npmrc` (`ignore-scripts=true`) with an
+  explanatory comment; prevents the Windows/Node 24 esbuild/msw postinstall
+  crash on fresh clones.
+- **Test typechecking** — `tsconfig.test.json` + `typecheck:test` script so
+  `backend/test` is typechecked (was runtime-only via vitest).
+- **CI** — `.github/workflows/ci.yml`: install, both typechecks, lint, shared
+  correctness, backend suites, backend format check on push/PR.
+- **Dead code removed** — `services/burnEngine.ts` (unused, divergent
+  `VERIFIED_BURN_DAYS=14` vs the live `30` path), `middleware/validate.ts` +
+  `zod` dependency (unused), unused `meterSimulator` exports
+  (`simulateReadings`, `tick`), `pino-pretty` devDependency.
+- **Formatting** — Prettier applied to `backend/src` and `backend/test`; root
+  `format:check:backend` and `test:all` scripts added.
+- **Docs** — `backend/README.md` rewritten (endpoint surface, quickstart,
+  demo/live, tests, deploy, receipt-image caveat); `loanRoutes.ts` stale Phase 4
+  comment fixed.
+
+Intentionally deferred to Phase 6 (Supabase): the `supabaseRepository`, live
+data wiring (currently auth-only), and receipt image hosting. `lib/supabase.ts`
+still reads `process.env` directly — to be re-plumbed through `Env` with the
+repository work.
+
+Current counts: backend suites 17 files, 112 assertions; shared correctness
+33/33; `pnpm typecheck`, `typecheck:test`, `lint`, `format:check:backend` clean.

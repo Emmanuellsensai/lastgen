@@ -421,6 +421,23 @@ written.
 
 - Demo routes driving the real state machine; endpoint docs; Render verification
 
+### Remediation pass — audit of Phases 0–5 (complete)
+
+Read-only audit (two explorer sweeps + manual verification) → 11 fixes:
+
+- JSON transport errors: `pinoHttp` before `express.json`; body-parser failures
+  map to contract JSON (400 malformed / 413 oversized) instead of crashing the
+  error handler into an HTML 500.
+- Demo routes (`demoRoutes.ts`) mounted pre-auth in demo mode only; completes
+  the roadmap's 11 contract suites (`demo.test.ts`, 8 tests).
+- Payment source is adapter-accurate (ALAT vs SIMULATED).
+- Graceful shutdown (SIGINT/SIGTERM), committed `.npmrc`, `tsconfig.test.json`
+  + `typecheck:test`, CI workflow, dead code removed (burnEngine, validate/zod,
+  unused meterSimulator exports, pino-pretty), Prettier pass over backend.
+- Docs refreshed: `README.md`, `AUDIT.md` §19, `loanRoutes.ts` comment.
+- Deferred to Phase 6: Supabase repository (live data is auth-only),
+  re-plumb `lib/supabase.ts` through `Env`, receipt image hosting.
+
 ### Phase 7 — Integration and PR — pending
 
 - Full happy-path integration suite; finalize docs; single PR to `main`
@@ -464,15 +481,24 @@ written.
 | `feat(backend): add portfolio and impact routes` | `src/routes/portfolioRoutes.ts`, `src/routes/impactRoutes.ts`, `src/routes/index.ts` |
 | `test(backend): add impact parity and portfolio suites` | `backend/test/correctness/impact-parity.test.ts`, `backend/test/contract/portfolio.test.ts`, `backend/test/contract/impact.test.ts` |
 | `docs(backend): document phase 5 portfolio and impact` | `backend/ROADMAP.md`, `backend/BACKEND_PROGRESS.md`, `backend/AUDIT.md` |
+| `fix(backend): map json transport errors to contract responses` | `app.ts`, `middleware/errorHandler.ts`, `backend/test/contract/errors.test.ts` |
+| `feat(backend): add demo control routes` | `routes/demoRoutes.ts`, `routes/index.ts`, `backend/test/helpers.ts`, `backend/test/contract/demo.test.ts` |
+| `fix(backend): record adapter-accurate payment source` | `routes/paymentRoutes.ts`, `backend/test/contract/payments.test.ts` |
+| `feat(backend): graceful shutdown on sigint/sigterm` | `index.ts` |
+| `chore(backend): drop dead burn engine and validator` | `services/burnEngine.ts`, `middleware/validate.ts`, `config/constants.ts`, `services/meterSimulator.ts`, `backend/package.json` |
+| `build(backend): typecheck test sources` | `tsconfig.test.json`, `backend/package.json` |
+| `ci: add backend gate workflow and commit install policy` | `.github/workflows/ci.yml`, `.npmrc`, root `package.json` |
+| `style(backend): format sources with prettier` | `backend/src`, `backend/test` |
+| `docs(backend): refresh readme and audit after remediation` | `backend/README.md`, `backend/AUDIT.md`, `backend/BACKEND_PROGRESS.md`, `routes/loanRoutes.ts` |
 
 ## 10. Risks and open items
 
 - **Vitest `.js` → `.ts` resolution** — proven working by the Phase 0 smoke test;
   if a future suite hits resolution failures, stop and report rather than
   work around scope rules.
-- **Verified-threshold divergence** — backend uses 14 days (assignment), MSW
-  uses 30. Demo data may show fewer verified profiles; confirm with the team
-  lead if it becomes visible in the demo.
+- **Verified-burn threshold** — `recomputeBurn` marks a profile verified at
+  30+ observed days, matching the MSW reference exactly. The former
+  `VERIFIED_BURN_DAYS=14` constant was removed with the unused `burnEngine`.
 - **Live auth needs Supabase** — bearer verification requires
   `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; until Phase 6 the live path fails
   closed with `UNAUTHORIZED` (never hangs).
@@ -487,9 +513,10 @@ written.
   edits are expected.
 - **`gh` CLI not authenticated** — the PR is opened manually by the team lead
   from the pushed `feat/backend` branch.
-- **`.npmrc` is intentionally untracked** — the local `ignore-scripts=true`
-  workaround for the Windows esbuild postinstall crash must never be committed
-  (it would break the Render build).
+- **`.npmrc` is committed** — `ignore-scripts=true` is a deliberate repo-wide
+  install policy (Windows/Node 24 esbuild/msw postinstall crash). `render.yaml`
+  uses `pnpm install --frozen-lockfile`, which honours it; the esbuild/msw
+  `allowBuilds` whitelist in `pnpm-workspace.yaml` stays as a guard.
 
 ## 11. Working checklist
 
@@ -527,7 +554,8 @@ written.
 - [x] Impact-parity + portfolio/impact contract suites (Phase 5)
 - [x] Phase 5 verification (typecheck, lint, shared suites, backend suite, demo boot smoke)
 - [x] Impact parity review gate demonstrated
-- [ ] Demo routes + Supabase repository (Phase 6, needs envs)
-- [ ] Portfolio + impact parity (Phase 5)
-- [ ] Demo routes + README + deploy (Phase 6)
+- [x] Remediation audit of Phases 0–5: JSON error handling, demo routes + suite, adapter-accurate payment source, graceful shutdown
+- [x] Remediation: committed `.npmrc`, `tsconfig.test.json`, CI workflow, dead code removed, Prettier pass, docs refreshed
+- [ ] Supabase repository (Phase 6, needs envs)
+- [ ] Demo/README/deploy final pass (Phase 6)
 - [ ] Integration suite + final PR (Phase 7)
