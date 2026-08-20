@@ -155,6 +155,30 @@ export interface Payment {
   platformTransactionReference?: string;
 }
 
+/** Business cash wallet backed by a virtual account (bankCode 035, Wema/ALAT). */
+export interface Wallet {
+  id: string;
+  businessId: string;
+  accountNumber: string;
+  bankCode: string;
+  balanceKobo: number;
+  currency: string;
+  createdAt: string;
+}
+
+export type WalletDirection = 'IN' | 'OUT';
+
+export interface WalletTransaction {
+  id: string;
+  walletId: string;
+  ts: string;
+  direction: WalletDirection;
+  amountKobo: number;
+  description: string;
+  reference: string;
+  category: string;
+}
+
 export interface MeterReading {
   id: string;
   assetId: string;
@@ -233,6 +257,14 @@ export interface DeclineBody {
 
 export interface SuspendBody {
   reason: string;
+}
+
+export interface CreateWalletBody {
+  businessId: string;
+  nin: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
 }
 
 export interface PayBody {

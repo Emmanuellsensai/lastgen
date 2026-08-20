@@ -19,6 +19,7 @@ import type {
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
+  CreateWalletBody,
   CreditFile,
   CreditFileDetail,
   CreditFileStatus,
@@ -37,6 +38,8 @@ import type {
   Quote,
   SolarSystem,
   SystemsQuery,
+  Wallet,
+  WalletTransaction,
 } from '../types/api.js';
 import type { AssetStatusHistoryEntry } from './seed.js';
 
@@ -51,6 +54,12 @@ export interface PaySettlement {
   payment: Payment;
   loan: Loan;
   asset: Asset;
+}
+
+export interface WalletStatementQuery {
+  limit?: number;
+  /** Exclusive ts cursor: return only rows older than this ISO timestamp. */
+  before?: string;
 }
 
 export interface Repository {
@@ -133,6 +142,24 @@ export interface Repository {
 
   /* Webhook -------------------------------------------------------- */
   settleAlatWebhook(reference: string, amountKobo: number, narration: string): void;
+
+  /* Wallets -------------------------------------------------------- */
+  /** Create the business wallet (KYC'd virtual account). Idempotent per business. */
+  createWallet(businessId: string, input: CreateWalletBody): Wallet;
+  walletForBusiness(businessId: string): Wallet | undefined;
+  walletStatement(walletId: string, query: WalletStatementQuery): WalletTransaction[];
+  /** Credit a wallet and record an IN transaction. Returns the updated wallet. */
+  creditWallet(
+    walletId: string,
+    amountKobo: number,
+    description: string,
+    reference: string,
+    category: string,
+  ): Wallet;
+  /** Direct wallet debit: 402 if insufficient, then settle loan + asset atomically. */
+  payFromWallet(loanId: string, amountKobo: number): PaySettlement;
+  /** Resolve the business owned by a user (Supabase owner_id; demo maps demo-user). */
+  businessForOwner(ownerId: string): Business | undefined;
 
   /* Impact --------------------------------------------------------- */
   impactFor(businessId: string, period: ImpactPeriod): ImpactSummary;

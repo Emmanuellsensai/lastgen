@@ -25,6 +25,8 @@ import type {
   Payment,
   Quote,
   SolarSystem,
+  Wallet,
+  WalletTransaction,
 } from '../types/api.js';
 
 /* ------------------------------------------------------------------ */
@@ -607,6 +609,10 @@ export interface DemoDb {
   seenReferences: Set<string>;
   /** Audit trail written by the repository on every status transition. */
   assetStatusHistory: AssetStatusHistoryEntry[];
+  wallets: Wallet[];
+  walletTransactions: WalletTransaction[];
+  /** KYC captured at wallet creation, kept off the public Wallet type. */
+  walletKyc: Record<string, { nin: string; firstName: string; lastName: string; phone: string }>;
 }
 
 export function buildSeed(): DemoDb {
@@ -707,5 +713,8 @@ export function buildSeed(): DemoDb {
     assetBusinessName,
     seenReferences: new Set<string>(),
     assetStatusHistory: [],
+    wallets: [],
+    walletTransactions: [],
+    walletKyc: {},
   };
 }

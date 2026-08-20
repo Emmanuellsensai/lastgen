@@ -14,6 +14,7 @@ import { createPaymentRouter } from './paymentRoutes.js';
 import { createPortfolioRouter } from './portfolioRoutes.js';
 import { createQuoteRouter } from './quoteRoutes.js';
 import { createSystemRouter } from './systemRoutes.js';
+import { createWalletRouter } from './walletRoutes.js';
 import { createWebhookRouter } from './webhookRoutes.js';
 
 // Assembles the /api surface from the domain routers. Mounted by createApp;
@@ -47,6 +48,7 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(createAssetRouter(repo));
   router.use(createLoanRouter(repo));
   router.use(createPaymentRouter(repo, adapter));
+  router.use(createWalletRouter(repo, env));
   router.use(createPortfolioRouter(repo));
   router.use(createImpactRouter(repo));
 

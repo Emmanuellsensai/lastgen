@@ -41,9 +41,16 @@ export function createPaymentRouter(repo: Repository, adapter: PaymentAdapter): 
       const amountKobo = body.amountKobo ?? suggestedAmount(repo, req.params.id);
 
       if (body.source === 'wallet') {
-        // Wallet direct debit lands with the wallet milestone; keep the route
-        // honest until then instead of silently settling without a debit.
-        throw new ApiError('NOT_IMPLEMENTED', 'Wallet payments are not available yet', 501);
+        // Direct debit: repo checks the 402 guard and settles loan + asset in
+        // the same transaction as the wallet debit.
+        const result = repo.payFromWallet(req.params.id, amountKobo);
+        const walletResult: PayResult = {
+          paymentId: result.payment.id,
+          platformTransactionReference: null,
+          status: result.payment.status,
+        };
+        res.json(ok(walletResult));
+        return;
       }
 
       const reference = adapter.makeReference();

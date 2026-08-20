@@ -19,6 +19,8 @@ import {
   DEFAULT_DEPOSIT_RATIO,
   MIN_TENOR_MONTHS,
   PETROL_PRICE_PER_LITRE_KOBO,
+  WALLET_BANK_CODE,
+  WALLET_CURRENCY,
 } from '../config/constants.js';
 import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
@@ -30,6 +32,7 @@ import type {
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
+  CreateWalletBody,
   CreditFile,
   CreditFileDetail,
   CreditFileStatus,
@@ -48,9 +51,16 @@ import type {
   Quote,
   SolarSystem,
   SystemsQuery,
+  Wallet,
+  WalletTransaction,
 } from '../types/api.js';
-import { buildSeed, type AssetStatusHistoryEntry, type DemoDb } from './seed.js';
-import type { PaySettlement, ReceiptExtraction, Repository } from './repository.js';
+import { buildSeed, DEMO_BUSINESS_ID, type AssetStatusHistoryEntry, type DemoDb } from './seed.js';
+import type {
+  PaySettlement,
+  ReceiptExtraction,
+  Repository,
+  WalletStatementQuery,
+} from './repository.js';
 
 const PAGE_SIZE = 25;
 const DAY_MS = 86_400_000;
@@ -61,6 +71,7 @@ export class InMemoryRepository implements Repository {
   private state: DemoDb;
   private seq = 0;
   private serialSeqValue = 10_000;
+  private walletSeqValue = 2_010_000_000;
 
   constructor() {
     this.state = buildSeed();
@@ -102,6 +113,7 @@ export class InMemoryRepository implements Repository {
     this.state = buildSeed();
     this.seq = 0;
     this.serialSeqValue = 10_000;
+    this.walletSeqValue = 2_010_000_000;
   }
 
   /* ------------------------------------------------------------------ */
@@ -603,6 +615,113 @@ export class InMemoryRepository implements Repository {
   }
 
   /* ------------------------------------------------------------------ */
+  /* Wallets                                                             */
+  /* ------------------------------------------------------------------ */
+
+  createWallet(businessId: string, input: CreateWalletBody): Wallet {
+    this.findBusinessOrThrow(businessId);
+    if (!input?.nin || !input?.firstName || !input?.lastName || !input?.phone) {
+      throw new ApiError('VALIDATION', 'nin, firstName, lastName and phone are required', 400);
+    }
+
+    // Idempotent per business: onboarding may retry and should observe the
+    // same virtual account rather than a conflict.
+    const existing = this.walletForBusiness(businessId);
+    if (existing) return existing;
+
+    const wallet: Wallet = {
+      id: this.nextId('wlt'),
+      businessId,
+      accountNumber: this.nextWalletAccount(),
+      bankCode: WALLET_BANK_CODE,
+      balanceKobo: 0,
+      currency: WALLET_CURRENCY,
+      createdAt: this.state.now.toISOString(),
+    };
+    this.state.wallets.push(wallet);
+    this.state.walletKyc[wallet.id] = {
+      nin: input.nin,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phone: input.phone,
+    };
+    return wallet;
+  }
+
+  walletForBusiness(businessId: string): Wallet | undefined {
+    return this.state.wallets.find((w) => w.businessId === businessId);
+  }
+
+  walletStatement(walletId: string, query: WalletStatementQuery): WalletTransaction[] {
+    const txs = this.state.walletTransactions
+      .filter((t) => t.walletId === walletId && (!query.before || t.ts < query.before))
+      // Newest first; the id tie-break keeps same-instant rows (demo clock)
+      // in insertion order — the most recent transaction wins.
+      .sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id))
+      .slice(0, query.limit ?? 20);
+    return txs;
+  }
+
+  creditWallet(
+    walletId: string,
+    amountKobo: number,
+    description: string,
+    reference: string,
+    category: string,
+  ): Wallet {
+    if (!Number.isInteger(amountKobo) || amountKobo <= 0) {
+      throw new ApiError('VALIDATION', 'amountKobo must be a positive integer', 400);
+    }
+    const wallet = this.findWalletOrThrow(walletId);
+    wallet.balanceKobo += amountKobo;
+    this.pushWalletTx(wallet.id, 'IN', amountKobo, description, reference, category);
+    return wallet;
+  }
+
+  payFromWallet(loanId: string, amountKobo: number): PaySettlement {
+    if (!Number.isInteger(amountKobo) || amountKobo <= 0) {
+      throw new ApiError('VALIDATION', 'amountKobo must be a positive integer', 400);
+    }
+    const loan = this.findLoanOrThrow(loanId);
+    if (loan.status === 'CLOSED') {
+      throw new ApiError('INVALID_TRANSITION', 'This loan is already closed', 409);
+    }
+    const asset = this.findAssetOrThrow(loan.assetId);
+    const wallet = this.walletForBusiness(asset.businessId);
+    if (!wallet) {
+      throw new ApiError('NOT_FOUND', 'Wallet not found', 404);
+    }
+    if (wallet.balanceKobo < amountKobo) {
+      throw new ApiError('PAYMENT_REQUIRED', 'Insufficient wallet balance', 402);
+    }
+
+    const reference = `WLT-${Date.now()}`;
+    wallet.balanceKobo -= amountKobo;
+    this.pushWalletTx(wallet.id, 'OUT', amountKobo, 'Loan repayment', reference, 'loan_payment');
+
+    // Settlement applies the exact same PAY transition as every other path,
+    // after the wallet debit — the invariant is one transaction per entry path.
+    const applied = this.applySettlement(loan, asset, amountKobo, 'WALLET');
+    const payment: Payment = {
+      id: this.nextId('pay'),
+      loanId,
+      amountKobo,
+      paidAt: this.state.now.toISOString(),
+      source: 'WALLET',
+      reference,
+      status: 'SUCCESS',
+    };
+    this.state.payments.push(payment);
+    return { payment, loan: applied.loan, asset: applied.asset };
+  }
+
+  businessForOwner(ownerId: string): Business | undefined {
+    // Demo auth attaches the fixed demo-user; it owns the seeded demo business.
+    if (ownerId === 'demo-user') return this.getBusiness(DEMO_BUSINESS_ID);
+    return undefined;
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Impact                                                              */
   /* ------------------------------------------------------------------ */
 
@@ -649,6 +768,7 @@ export class InMemoryRepository implements Repository {
   /* ------------------------------------------------------------------ */
 
   private nextId(prefix: string): string {
+    this.seq += 1;
     return `${prefix}_${String(this.seq).padStart(5, '0')}`;
   }
 
@@ -680,6 +800,38 @@ export class InMemoryRepository implements Repository {
     const loan = this.getLoan(id);
     if (!loan) throw new ApiError('NOT_FOUND', 'Loan not found', 404);
     return loan;
+  }
+
+  /** Monotonic 10-digit virtual account number, restarting on reset. */
+  private nextWalletAccount(): string {
+    this.walletSeqValue += 1;
+    return String(this.walletSeqValue);
+  }
+
+  private findWalletOrThrow(id: string): Wallet {
+    const wallet = this.state.wallets.find((w) => w.id === id);
+    if (!wallet) throw new ApiError('NOT_FOUND', 'Wallet not found', 404);
+    return wallet;
+  }
+
+  private pushWalletTx(
+    walletId: string,
+    direction: 'IN' | 'OUT',
+    amountKobo: number,
+    description: string,
+    reference: string,
+    category: string,
+  ): void {
+    this.state.walletTransactions.push({
+      id: this.nextId('wtx'),
+      walletId,
+      ts: this.state.now.toISOString(),
+      direction,
+      amountKobo,
+      description,
+      reference,
+      category,
+    });
   }
 
   /** Portfolio assets have no business row; the medical flag defaults to false. */

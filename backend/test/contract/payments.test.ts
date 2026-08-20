@@ -136,12 +136,12 @@ describe('payments contract', () => {
     });
   });
 
-  it('keeps wallet payments honest until the wallet milestone', async () => {
+  it('requires a wallet before a wallet payment can settle', async () => {
     const res = await request(app)
       .post('/api/loans/loan_biz_adaeze_frozen/pay')
       .send({ source: 'wallet', amountKobo: 1000 });
 
-    expect(res.status).toBe(501);
-    expect(res.body.error.code).toBe('NOT_IMPLEMENTED');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toEqual({ code: 'NOT_FOUND', message: 'Wallet not found' });
   });
 });

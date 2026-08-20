@@ -23,3 +23,9 @@ export const DEFAULT_DEPOSIT_RATIO = 0.1;
 
 /* Fuel economics (matches the deterministic seed). */
 export const PETROL_PRICE_PER_LITRE_KOBO = 115_000;
+
+/* Wallet virtual accounts (Wema/ALAT bank code). */
+export const WALLET_BANK_CODE = '035';
+export const WALLET_CURRENCY = 'NGN';
+/** Demo-only funding applied when POST /wallets/create runs in demo mode. */
+export const DEMO_WALLET_FUNDING_KOBO = 5_000_000;
