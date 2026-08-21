@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { buildSeed } from '../../src/data/seed.js';
 import type { TestApp } from '../helpers.js';
 import { createTestApp } from '../helpers.js';
 
@@ -67,7 +68,10 @@ describe('demo contract', () => {
   });
 
   it('rejects missing a closed loan', async () => {
-    const res = await request(app).post('/api/demo/miss-payment').send({ loanId: 'loan_p000' });
+    const seed = buildSeed();
+    const closed = seed.loans.find((l) => l.status === 'CLOSED');
+    expect(closed).toBeDefined();
+    const res = await request(app).post('/api/demo/miss-payment').send({ loanId: closed!.id });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('INVALID_TRANSITION');
   });

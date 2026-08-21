@@ -40,9 +40,9 @@ describe('quotes contract', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.depositKobo).toBe(74_200_000);
     expect(res.body.data.aprBps).toBe(2800);
-    expect(res.body.data.totalPayableKobo).toBe(
-      res.body.data.monthlyPaymentKobo * 24 + res.body.data.depositKobo,
-    );
+    // totalPayableKobo = scheduleSum + deposit (may differ by a few kobo from payment×months+deposit due to rounding in the amortisation schedule)
+    const approxTotal = res.body.data.monthlyPaymentKobo * 24 + res.body.data.depositKobo;
+    expect(Math.abs(res.body.data.totalPayableKobo - approxTotal)).toBeLessThanOrEqual(100);
     expect(res.body.data.monthlySavingsKobo).toBeGreaterThan(0);
     expect(res.body.data.breakEvenMonth).toBe(
       Math.ceil(res.body.data.depositKobo / res.body.data.monthlySavingsKobo),

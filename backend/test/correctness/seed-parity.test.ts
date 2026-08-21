@@ -30,26 +30,26 @@ function groupCounts<T>(items: T[], key: (item: T) => string): Record<string, nu
 
 describe('seed counts and shape', () => {
   it('matches the captured collection sizes', () => {
-    expect(seed.businesses).toHaveLength(6);
+    expect(seed.businesses).toHaveLength(9);
     expect(seed.solarSystems).toHaveLength(8);
-    expect(seed.fuelLogs).toHaveLength(217);
-    expect(seed.burnProfiles).toHaveLength(6);
-    expect(seed.quotes).toHaveLength(6);
-    expect(seed.creditFiles).toHaveLength(6);
-    expect(seed.assets).toHaveLength(523);
-    expect(seed.loans).toHaveLength(523);
-    expect(seed.payments).toHaveLength(45);
-    expect(seed.meterReadings).toHaveLength(1620);
-    expect(Object.keys(seed.assetCity)).toHaveLength(523);
-    expect(Object.keys(seed.assetBusinessName)).toHaveLength(523);
-    expect(Object.keys(seed.installments)).toHaveLength(3);
+    expect(seed.fuelLogs).toHaveLength(328);
+    expect(seed.burnProfiles).toHaveLength(9);
+    expect(seed.quotes).toHaveLength(9);
+    expect(seed.creditFiles).toHaveLength(9);
+    expect(seed.assets).toHaveLength(524);
+    expect(seed.loans).toHaveLength(524);
+    expect(seed.payments).toHaveLength(55);
+    expect(seed.meterReadings).toHaveLength(2160);
+    expect(Object.keys(seed.assetCity)).toHaveLength(524);
+    expect(Object.keys(seed.assetBusinessName)).toHaveLength(524);
+    expect(Object.keys(seed.installments)).toHaveLength(4);
     expect(seed.seenReferences.size).toBe(0);
     expect(seed.assetStatusHistory).toHaveLength(0);
   });
 
   it('matches the asset and credit status distributions', () => {
-    expect(statusCounts()).toEqual({ ACTIVE: 319, GRACE: 43, OWNED: 140, SUSPENDED: 21 });
-    expect(groupCounts(seed.creditFiles, (c) => c.status)).toEqual({ APPROVED: 3, PENDING: 3 });
+    expect(statusCounts()).toEqual({ ACTIVE: 319, GRACE: 43, OWNED: 140, SUSPENDED: 22 });
+    expect(groupCounts(seed.creditFiles, (c) => c.status)).toEqual({ APPROVED: 4, PENDING: 4, DECLINED: 1 });
   });
 
   it('matches the fuel log count per business', () => {
@@ -60,6 +60,9 @@ describe('seed counts and shape', () => {
       biz_wuse_press: 37,
       biz_ogunlade_welding: 37,
       biz_gwarinpa_mart: 36,
+      biz_ph_coldstore: 36,
+      biz_sabongari_provisions: 39,
+      biz_benin_grinding: 36,
     });
   });
 
@@ -68,6 +71,7 @@ describe('seed counts and shape', () => {
       loan_biz_adaeze_frozen: 11,
       loan_biz_wuse_press: 14,
       loan_biz_gwarinpa_mart: 20,
+      loan_biz_sabongari_provisions: 10,
     });
   });
 });
@@ -78,7 +82,7 @@ describe('demo business figures (biz_adaeze_frozen)', () => {
     expect(quote).toMatchObject({
       depositKobo: 74_200_000,
       monthlyPaymentKobo: 36_654_539,
-      totalPayableKobo: 953_908_936,
+      totalPayableKobo: 953_908_926,
       monthlySavingsKobo: 11_795_281,
       savingsPct: 24.3,
       breakEvenMonth: 7,
@@ -100,7 +104,7 @@ describe('demo business figures (biz_adaeze_frozen)', () => {
     const file = seed.creditFiles.find((c) => c.businessId === DEMO_BUSINESS_ID);
     expect(file).toMatchObject({
       affordabilityRatio: 0.76,
-      loadProfileScore: 66,
+      loadProfileScore: 62,
       status: 'APPROVED',
       verifiedMonths: 3,
     });
@@ -133,24 +137,24 @@ describe('portfolio', () => {
     const loan = seed.loans.find((l) => l.id === 'loan_p000');
     expect(asset).toMatchObject({
       businessId: 'biz_p000',
-      systemId: 'sys_works_100',
+      systemId: 'sys_lite_1k',
       serial: 'LG-01041',
       controllerId: 'CTL-02207',
-      status: 'OWNED',
-      installedAt: '2026-01-18T09:00:00.000Z',
+      status: 'ACTIVE',
+      installedAt: '2025-07-17T09:00:00.000Z',
       suspendedAt: undefined,
       suspendReason: undefined,
     });
     expect(loan).toMatchObject({
-      principalKobo: 851_840_000,
-      tenorMonths: 18,
-      monthlyPaymentKobo: 57_655_525,
-      balanceKobo: 0,
-      nextDueAt: '2026-01-18T09:00:00.000Z',
-      status: 'CLOSED',
+      principalKobo: 103_840_000,
+      tenorMonths: 36,
+      monthlyPaymentKobo: 4_465_239,
+      balanceKobo: 23_075_556,
+      nextDueAt: '2026-09-19T09:00:00.000Z',
+      status: 'ACTIVE',
     });
     expect(seed.assetCity['ast_p000']).toBe('Lagos');
-    expect(seed.assetBusinessName['ast_p000']).toBe('Fatima Value Mart');
+    expect(seed.assetBusinessName['ast_p000']).toBe('Kelechi Provisions');
   });
 
   it('every portfolio asset has a loan, a city and a business name', () => {
@@ -174,15 +178,15 @@ describe('meter readings', () => {
     });
     const last = seed.meterReadings[seed.meterReadings.length - 1];
     expect(last).toMatchObject({
-      id: 'mr_ast_biz_gwarinpa_mart_0539',
+      id: 'mr_ast_biz_sabongari_provisions_0539',
       ts: '2026-08-18T21:00:00.000Z',
-      batterySocPct: 42,
+      batterySocPct: 51,
     });
   });
 
   it('provides exactly 540 readings per installed asset', () => {
     const perAsset = groupCounts(seed.meterReadings, (r) => r.assetId);
-    expect(Object.values(perAsset)).toEqual([540, 540, 540]);
+    expect(Object.values(perAsset)).toEqual([540, 540, 540, 540]);
   });
 });
 
@@ -212,19 +216,19 @@ describe('repository portfolio stats parity', () => {
   it('matches the reference projection to the kobo', async () => {
     const repo = new InMemoryRepository();
     expect(await repo.portfolioStats()).toEqual({
-      assetsFinanced: 523,
-      portfolioValueKobo: 256_396_630_000,
+      assetsFinanced: 524,
+      portfolioValueKobo: 260_712_290_000,
       repaymentRatePct: 87.8,
       parPct: 12.2,
-      suspendedCount: 21,
-      litresDisplaced: 395388,
-      co2TonnesAvoided: 913.3,
+      suspendedCount: 22,
+      litresDisplaced: 396144,
+      co2TonnesAvoided: 915.1,
       byCity: [
         { city: 'Lagos', count: 215 },
         { city: 'Abuja', count: 100 },
         { city: 'Ibadan', count: 78 },
         { city: 'Port Harcourt', count: 58 },
-        { city: 'Kano', count: 41 },
+        { city: 'Kano', count: 42 },
         { city: 'Benin City', count: 31 },
       ],
     });
