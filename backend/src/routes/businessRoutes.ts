@@ -60,6 +60,18 @@ export function createBusinessRouter(repo: Repository, env: Env): Router {
     })().catch(next);
   });
 
+  router.get('/businesses/:id/fuel-logs', (req, res, next) => {
+    void (async () => {
+      const businessId = req.params.id;
+      if (!(await repo.getBusiness(businessId))) {
+        throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      }
+      const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+      const logs = await repo.fuelLogsFor(businessId, limit);
+      res.json(ok({ items: logs, total: logs.length }));
+    })().catch(next);
+  });
+
   router.get('/businesses/:id/burn', (req, res, next) => {
     void (async () => {
       const profile = await repo.burnProfileFor(req.params.id);
