@@ -72,6 +72,8 @@ export class InMemoryRepository implements Repository {
   private seq = 0;
   private serialSeqValue = 10_000;
   private walletSeqValue = 2_010_000_000;
+  /** Maps ownerId → businessId for the in-memory demo. */
+  private ownerBusinessMap = new Map<string, string>();
 
   constructor() {
     this.state = buildSeed();
@@ -120,7 +122,7 @@ export class InMemoryRepository implements Repository {
   /* Businesses                                                          */
   /* ------------------------------------------------------------------ */
 
-  async createBusiness(input: CreateBusinessBody, _ownerId?: string | null): Promise<Business> {
+  async createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business> {
     if (!input?.name || !input?.type || !input?.city) {
       throw new ApiError('VALIDATION', 'name, type and city are required', 400);
     }
@@ -145,6 +147,8 @@ export class InMemoryRepository implements Repository {
       verified: false,
       computedAt: this.state.now.toISOString(),
     });
+    // Track owner → business mapping for session resolution.
+    if (ownerId) this.ownerBusinessMap.set(ownerId, business.id);
     return business;
   }
 
@@ -276,12 +280,37 @@ export class InMemoryRepository implements Repository {
       depositKobo,
       monthlyPaymentKobo: payment,
       aprBps: DEFAULT_APR_BPS,
-      totalPayableKobo: payment * input.tenorMonths + depositKobo,
+      totalPayableKobo: depositKobo + buildSchedule(principal, DEFAULT_APR_BPS, input.tenorMonths, new Date()).reduce((s, row) => s + row.principalKobo + row.interestKobo, 0),
       monthlySavingsKobo,
       savingsPct: Math.round((monthlySavingsKobo / burn.monthlyKobo) * 1000) / 10,
       breakEvenMonth: breakEvenMonth(depositKobo, monthlySavingsKobo),
     };
     this.state.quotes.push(quote);
+
+    // Auto-create a credit file for underwriting (matches MSW reference behaviour).
+    const business = this.state.businesses.find((b) => b.id === businessId);
+    const creditFile: CreditFile = {
+      id: this.nextId('cf'),
+      businessId,
+      business: business ?? {
+        id: businessId,
+        name: businessId,
+        type: '',
+        city: 'Lagos',
+        generatorKva: 0,
+        hoursPerDay: 0,
+        createdAt: '',
+      },
+      burn,
+      quote,
+      affordabilityRatio: Math.round((payment / burn.monthlyKobo) * 100) / 100,
+      loadProfileScore: 74,
+      verifiedMonths: burn.daysObserved >= 30 ? Math.floor(burn.daysObserved / 30) : 0,
+      status: 'PENDING',
+      createdAt: this.state.now.toISOString(),
+    };
+    this.state.creditFiles.push(creditFile);
+
     return quote;
   }
 
@@ -361,6 +390,10 @@ export class InMemoryRepository implements Repository {
     );
     this.state.assetCity[asset.id] = file.business.city;
     this.state.assetBusinessName[asset.id] = file.business.name;
+    // Store the created resource IDs on the credit file so the frontend can
+    // discover them when resolving a session (quote → asset → loan).
+    file.loanId = loan.id;
+    file.assetId = asset.id;
     return { loan, asset };
   }
 
@@ -745,6 +778,9 @@ export class InMemoryRepository implements Repository {
   }
 
   async businessForOwner(ownerId: string): Promise<Business | undefined> {
+    // Check the owner→business map first (populated by createBusiness).
+    const mappedId = this.ownerBusinessMap.get(ownerId);
+    if (mappedId) return this.getBusiness(mappedId);
     // Demo auth attaches the fixed demo-user; it owns the seeded demo business.
     if (ownerId === 'demo-user') return this.getBusiness(DEMO_BUSINESS_ID);
     return undefined;

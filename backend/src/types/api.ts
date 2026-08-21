@@ -108,6 +108,9 @@ export interface CreditFile {
   verifiedMonths: number;
   status: CreditFileStatus;
   createdAt: string;
+  /** Set when the credit file is approved — links to the created loan and asset. */
+  loanId?: string;
+  assetId?: string;
 }
 
 export interface Asset {

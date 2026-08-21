@@ -4,6 +4,7 @@ import type { Env } from '../config/env.js';
 import type { Repository } from '../data/repository.js';
 import { makeRequireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { createAuthRouter } from './authRoutes.js';
 import { createAssetRouter } from './assetRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
 import { createCreditRouter } from './creditRoutes.js';
@@ -41,6 +42,7 @@ export function apiRouter(repo: Repository, env: Env): Router {
   }
 
   router.use(makeRequireAuth(env));
+  router.use(createAuthRouter(repo, env));
   router.use(createBusinessRouter(repo, env));
   router.use(createSystemRouter(repo));
   router.use(createQuoteRouter(repo));
