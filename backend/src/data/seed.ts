@@ -260,6 +260,51 @@ const BUSINESS_SPECS: BusinessSpec[] = [
     aprBps: 2900,
     depositPct: 0.12,
   },
+  {
+    id: 'biz_ph_coldstore',
+    name: 'Diobu Cold Store',
+    type: 'Cold store',
+    city: 'Port Harcourt',
+    generatorKva: 7.5,
+    hoursPerDay: 10,
+    createdAt: daysAgo(34).toISOString(),
+    medicalFlag: false,
+    litresPerDay: 16.2,
+    systemId: 'sys_cold_75',
+    tenorMonths: 24,
+    aprBps: 2800,
+    depositPct: 0.1,
+  },
+  {
+    id: 'biz_sabongari_provisions',
+    name: 'Musa Provisions',
+    type: 'Provisions seller',
+    city: 'Kano',
+    generatorKva: 3.5,
+    hoursPerDay: 10,
+    createdAt: daysAgo(28).toISOString(),
+    medicalFlag: false,
+    litresPerDay: 8.6,
+    systemId: 'sys_trade_35',
+    tenorMonths: 24,
+    aprBps: 2800,
+    depositPct: 0.12,
+  },
+  {
+    id: 'biz_benin_grinding',
+    name: 'Iyobosa Grinding Mill',
+    type: 'Mini-supermarket',
+    city: 'Benin City',
+    generatorKva: 5.0,
+    hoursPerDay: 8,
+    createdAt: daysAgo(19).toISOString(),
+    medicalFlag: false,
+    litresPerDay: 10.5,
+    systemId: 'sys_trade_50',
+    tenorMonths: 30,
+    aprBps: 2900,
+    depositPct: 0.1,
+  },
 ];
 
 const BUSINESSES: Business[] = BUSINESS_SPECS.map((spec) => ({
@@ -344,7 +389,7 @@ function buildQuote(spec: BusinessSpec, burn: BurnProfile): Quote {
     depositKobo,
     monthlyPaymentKobo: payment,
     aprBps: spec.aprBps,
-    totalPayableKobo: payment * spec.tenorMonths + depositKobo,
+    totalPayableKobo: depositKobo + buildSchedule(principal, spec.aprBps, spec.tenorMonths, new Date()).reduce((s, row) => s + row.principalKobo + row.interestKobo, 0),
     monthlySavingsKobo: savings,
     savingsPct: Number(((savings / burn.monthlyKobo) * 100).toFixed(1)),
     breakEvenMonth: breakEvenMonth(depositKobo, savings),
@@ -362,12 +407,16 @@ const CREDIT_STATUS_BY_BUSINESS: Record<string, CreditFile['status']> = {
   biz_wuse_press: 'APPROVED',
   biz_ogunlade_welding: 'PENDING',
   biz_gwarinpa_mart: 'APPROVED',
+  biz_ph_coldstore: 'DECLINED',
+  biz_sabongari_provisions: 'APPROVED',
+  biz_benin_grinding: 'PENDING',
 };
 
 const ASSET_STATUS_BY_BUSINESS: Record<string, AssetStatus> = {
   biz_adaeze_frozen: 'ACTIVE',
   biz_wuse_press: 'GRACE',
   biz_gwarinpa_mart: 'ACTIVE',
+  biz_sabongari_provisions: 'SUSPENDED',
 };
 
 function buildCreditFile(
@@ -377,6 +426,9 @@ function buildCreditFile(
   rand: Random,
 ): CreditFile {
   const affordabilityRatio = Number((quote.monthlyPaymentKobo / burn.monthlyKobo).toFixed(2));
+  // Older businesses have more verified months of fuel data.
+  const businessAgeDays = Math.round((ANCHOR.getTime() - new Date(spec.createdAt).getTime()) / 86_400_000);
+  const verifiedMonths = Math.min(12, Math.max(1, Math.floor(businessAgeDays / 30)));
   return {
     id: `cf_${spec.id}`,
     businessId: spec.id,
@@ -384,8 +436,8 @@ function buildCreditFile(
     burn,
     quote,
     affordabilityRatio,
-    loadProfileScore: Number(between(rand, 62, 91).toFixed(0)),
-    verifiedMonths: 3,
+    loadProfileScore: intBetween(rand, 58, 92),
+    verifiedMonths,
     status: CREDIT_STATUS_BY_BUSINESS[spec.id],
     createdAt: daysAgo(intBetween(rand, 4, 26)).toISOString(),
   };
