@@ -7,8 +7,6 @@ import {
   Flame,
   Receipt,
   SignOut,
-  Sparkle,
-  SunHorizon,
 } from '@phosphor-icons/react';
 import { GlassCard, GlassNav, GlassSheet } from '@/components/ui/glass';
 import { cn } from '@/lib/cn';
@@ -191,9 +189,9 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Quick actions */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
-            <GlassCard hoverable padding="md" className={cn('h-full', hasLogs === null && 'opacity-50')}>
+            <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
               {hasLogs === false ? (
                 <>
                   <Flame size={28} weight="bold" className="text-burn" />
@@ -210,24 +208,10 @@ export default function Dashboard() {
             </GlassCard>
           </Link>
           <Link to={`/quote/${demoQuoteId}`}>
-            <GlassCard hoverable padding="md" className="h-full">
+            <GlassCard hoverable padding="lg" className="h-full">
               <Receipt size={28} weight="bold" className="text-navy" />
               <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
               <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
-            </GlassCard>
-          </Link>
-          <Link to={`/asset/${demoAssetId}`}>
-            <GlassCard hoverable padding="md" className="h-full">
-              <SunHorizon size={28} weight="bold" className="text-navy" />
-              <h3 className="mt-3 font-display text-base text-ink">Your system</h3>
-              <p className="mt-1 text-sm text-ink-soft">Check installation status</p>
-            </GlassCard>
-          </Link>
-          <Link to={`/wrapped/${demoBusinessId}`}>
-            <GlassCard hoverable padding="md" className="h-full">
-              <Sparkle size={28} weight="bold" className="text-navy" />
-              <h3 className="mt-3 font-display text-base text-ink">Your year</h3>
-              <p className="mt-1 text-sm text-ink-soft">See your annual impact</p>
             </GlassCard>
           </Link>
         </div>
