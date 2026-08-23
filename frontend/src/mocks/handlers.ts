@@ -16,6 +16,8 @@ import {
   type CreditFileDetail,
   type FuelLog,
   type Installment,
+  type KycRecord,
+  type KycStatus,
   type Loan,
   type MeterReading,
   type Payment,
@@ -839,6 +841,69 @@ const walletHandlers: HttpHandler[] = [
   }),
 ];
 
+const kycHandlers: HttpHandler[] = [
+  http.get(`${BASE}/businesses/:id/kyc`, async ({ params }) => {
+    await lag();
+    const businessId = String(params.id);
+    return ok<KycRecord>({
+      id: `kyc_${businessId}`,
+      businessId,
+      userId: 'usr_demo',
+      status: 'unverified',
+      submittedAt: null,
+      reviewedAt: null,
+      rejectionReason: null,
+      selfieUrl: null,
+      ninVerified: false,
+    });
+  }),
+
+  http.post(`${BASE}/businesses/:id/kyc/submit`, async ({ params }) => {
+    await new Promise((r) => setTimeout(r, 2000));
+    const businessId = String(params.id);
+    return ok<KycRecord>({
+      id: `kyc_${businessId}`,
+      businessId,
+      userId: 'usr_demo',
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      reviewedAt: null,
+      rejectionReason: null,
+      selfieUrl: 'data:image/png;base64,demo',
+      ninVerified: true,
+    });
+  }),
+
+  http.get(`${BASE}/admin/kyc`, async () => {
+    await lag();
+    return ok({
+      items: db.businesses.map((b) => ({
+        id: `kyc_${b.id}`,
+        businessId: b.id,
+        businessName: b.name,
+        userId: 'usr_demo',
+        status: 'pending' as KycStatus,
+        submittedAt: new Date(Date.now() - 86_400_000).toISOString(),
+        reviewedAt: null,
+        rejectionReason: null,
+        selfieUrl: null,
+        ninVerified: true,
+      })),
+    });
+  }),
+
+  http.post(`${BASE}/admin/kyc/:id/approve`, async ({ params }) => {
+    await lag();
+    return ok({ id: String(params.id), status: 'approved' as KycStatus, reviewedAt: new Date().toISOString() });
+  }),
+
+  http.post(`${BASE}/admin/kyc/:id/reject`, async ({ request, params }) => {
+    await lag();
+    const body = (await request.json()) as { reason: string };
+    return ok({ id: String(params.id), status: 'rejected' as KycStatus, rejectionReason: body.reason, reviewedAt: new Date().toISOString() });
+  }),
+];
+
 export const handlers: HttpHandler[] = [
   ...businessHandlers,
   ...quoteHandlers,
@@ -850,6 +915,7 @@ export const handlers: HttpHandler[] = [
   ...demoHandlers,
   ...webhookHandlers,
   ...walletHandlers,
+  ...kycHandlers,
 ];
 
 export { DEMO_BUSINESS_ID };

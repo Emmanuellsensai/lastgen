@@ -4,6 +4,7 @@ import {
   Flame,
   House,
   Receipt,
+  ShieldCheck,
   SlidersHorizontal,
   SquaresFour,
   Sun,
@@ -87,6 +88,7 @@ export const OWNER_PRIMARY_NAV: NavItem[] = [
   { to: '/app', label: 'Home', icon: House },
   { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
   { to: `/asset/${DEMO_IDS.assetId}`, label: 'Systems', icon: Sun, matchPrefix: '/asset' },
+  { to: '/kyc', label: 'Verify', icon: ShieldCheck, matchPrefix: '/kyc' },
   { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
 ];
 
@@ -114,6 +116,12 @@ export const OWNER_NAV_GROUPS: NavGroup[] = [
         label: 'Wrapped',
         icon: Trophy,
         matchPrefix: '/wrapped',
+      },
+      {
+        to: '/kyc',
+        label: 'Identity check',
+        icon: ShieldCheck,
+        matchPrefix: '/kyc',
       },
     ],
   },
