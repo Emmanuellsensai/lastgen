@@ -841,6 +841,68 @@ const walletHandlers: HttpHandler[] = [
   }),
 ];
 
+const adminHandlers: HttpHandler[] = [
+  http.get(`${BASE}/admin/users`, async () => {
+    await lag();
+    return ok({
+      items: db.businesses.map((b) => {
+        const asset = db.assets.find((a) => a.businessId === b.id);
+        const loan = db.loans.find((l) => asset && l.assetId === asset.id);
+        return {
+          id: b.id,
+          name: b.name,
+          city: b.city,
+          type: b.type,
+          createdAt: db.now.toISOString(),
+          kycStatus: 'pending' as KycStatus,
+          assetStatus: asset?.status ?? null,
+          assetId: asset?.id ?? null,
+          loanId: loan?.id ?? null,
+          loanBalanceKobo: loan?.balanceKobo ?? null,
+        };
+      }),
+    });
+  }),
+
+  http.post(`${BASE}/admin/assets/:id/toggle-power`, async ({ params }) => {
+    await lag();
+    const asset = db.assets.find((a) => a.id === String(params.id));
+    if (!asset) return notFound('Asset');
+    asset.status = asset.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    return ok({ id: asset.id, status: asset.status });
+  }),
+
+  http.get(`${BASE}/admin/orders`, async () => {
+    await lag();
+    const pendingLoans = db.loans.filter((l) => l.status !== 'CLOSED');
+    return ok({
+      items: pendingLoans.map((loan) => {
+        const asset = db.assets.find((a) => a.id === loan.assetId);
+        const business = asset ? db.businesses.find((b) => b.id === asset.businessId) : null;
+        return {
+          loanId: loan.id,
+          businessName: business?.name ?? 'Unknown',
+          businessId: business?.id ?? '',
+          assetId: asset?.id ?? '',
+          assetStatus: asset?.status ?? 'ACTIVE',
+          balanceKobo: loan.balanceKobo,
+          monthlyPaymentKobo: loan.monthlyPaymentKobo,
+          nextDueAt: loan.nextDueAt,
+          status: loan.status,
+        };
+      }),
+    });
+  }),
+
+  http.post(`${BASE}/admin/loans/:id/approve-payment`, async ({ params }) => {
+    await lag();
+    const loan = db.loans.find((l) => l.id === String(params.id));
+    if (!loan) return notFound('Loan');
+    const { payment } = settlePayment(loan, loan.monthlyPaymentKobo, 'SIMULATED', `ADMIN-${Date.now()}`);
+    return ok({ paymentId: payment.id, status: 'SUCCESS' });
+  }),
+];
+
 const kycHandlers: HttpHandler[] = [
   http.get(`${BASE}/businesses/:id/kyc`, async ({ params }) => {
     await lag();
@@ -915,6 +977,7 @@ export const handlers: HttpHandler[] = [
   ...demoHandlers,
   ...webhookHandlers,
   ...walletHandlers,
+  ...adminHandlers,
   ...kycHandlers,
 ];
 

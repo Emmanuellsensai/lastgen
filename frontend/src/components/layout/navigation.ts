@@ -2,6 +2,7 @@ import {
   Bank,
   DotsThreeCircle,
   Flame,
+  Gauge,
   House,
   Receipt,
   ShieldCheck,
@@ -93,6 +94,7 @@ export const OWNER_PRIMARY_NAV: NavItem[] = [
 ];
 
 export const BANK_PRIMARY_NAV: NavItem[] = [
+  { to: '/admin', label: 'Admin', icon: Gauge, matchPrefix: '/admin' },
   { to: '/bank', label: 'Applications', icon: Bank, matchPrefix: '/bank' },
   { to: '/bank/portfolio', label: 'Portfolio', icon: SquaresFour },
   { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
@@ -128,6 +130,12 @@ export const OWNER_NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BANK_NAV_GROUPS: NavGroup[] = [
+  {
+    heading: 'Admin',
+    items: [
+      { to: '/admin', label: 'Dashboard', icon: Gauge, matchPrefix: '/admin' },
+    ],
+  },
   {
     heading: 'Credit desk',
     items: [
