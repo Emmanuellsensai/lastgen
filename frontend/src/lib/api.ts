@@ -137,8 +137,10 @@ export const api = {
     burn: (id: string) => request<BurnProfile>(`/businesses/${id}/burn`),
     impact: (id: string, period: ImpactPeriod = 'month') =>
       request<ImpactSummary>(`/businesses/${id}/impact`, { query: { period } }),
-    wrapped: (id: string, year?: number) =>
-      request<WrappedPayload>(`/businesses/${id}/wrapped`, { query: { year } }),
+    wrapped: (id: string, options?: { year?: number; days?: number }) =>
+      request<WrappedPayload>(`/businesses/${id}/wrapped`, {
+        query: { year: options?.year, days: options?.days },
+      }),
     quote: (id: string, body: CreateQuoteBody) => post<Quote>(`/businesses/${id}/quote`, body),
   },
 

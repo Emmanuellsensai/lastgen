@@ -138,10 +138,15 @@ function creditFileDetail(file: CreditFile): CreditFileDetail {
   };
 }
 
-function impactFor(businessId: string, period: 'month' | 'year' | 'all') {
+function impactFor(businessId: string, period: 'month' | 'year' | 'all' | number) {
   const burn = db.burnProfiles.find((p) => p.businessId === businessId);
   const asset = assetByBusiness(businessId);
-  const days = period === 'month' ? 30 : period === 'year' ? 365 : 730;
+  const days =
+    typeof period === 'number'
+      ? period
+      : period === 'month' ? 30
+      : period === 'year' ? 365
+      : 730;
   const litresPerDay = burn?.litresPerDay ?? 0;
   const readings = asset ? db.meterReadings.filter((r) => r.assetId === asset.id) : [];
   const windowStart = db.now.getTime() - days * 86_400_000;
@@ -629,8 +634,10 @@ const impactHandlers: HttpHandler[] = [
     await lag();
     const businessId = String(params.id);
     if (!businessById(businessId)) return notFound('Business');
-    const year = Number(new URL(request.url).searchParams.get('year') ?? db.now.getUTCFullYear());
-    const impact = impactFor(businessId, 'year');
+    const url = new URL(request.url);
+    const year = Number(url.searchParams.get('year') ?? db.now.getUTCFullYear());
+    const days = url.searchParams.get('days') ? Number(url.searchParams.get('days')) : 365;
+    const impact = impactFor(businessId, days);
     return ok({
       year,
       nairaSavedKobo: impact.nairaSavedKobo,

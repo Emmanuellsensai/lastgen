@@ -4,20 +4,12 @@ import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-mot
 import { Lightning, X } from '@phosphor-icons/react';
 import { DeviceFrame } from '@/components/layout';
 import { CountUp } from '@/components/lastgen/CountUp';
+import { Toast, ToastTitle } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { NAIRA } from '@/lib/format';
-
-/* Figures mirror the seeded demo business. The finished screen reads these
-   from the wrapped endpoint. */
-const WRAPPED = {
-  business: 'Adaeze Frozen Foods',
-  year: 2026,
-  nairaSaved: 5_796_000,
-  litresNotBurned: 5037,
-  co2Kg: 11_635,
-  monthsToOwnership: 14,
-  tenorMonths: 24,
-};
+import { api } from '@/lib/api';
+import { useSession } from '@/store/session';
+import type { WrappedPayload } from '@/types/api';
 
 /** How long each panel holds before it advances on its own. */
 const PANEL_MS = 5000;
@@ -43,6 +35,33 @@ const CHROME: Record<PanelTone, string> = {
   navy: 'text-paper',
   deep: 'text-paper',
 };
+
+/* ------------------------------------------------------------------ */
+/* Duration picker options                                             */
+/* ------------------------------------------------------------------ */
+
+interface DurationOption {
+  label: string;
+  subLabel: string;
+  days: number;
+}
+
+const DURATION_OPTIONS: DurationOption[] = [
+  { label: 'Last 2 weeks', subLabel: 'Your most recent fuel runs', days: 14 },
+  { label: 'Last month', subLabel: 'A typical billing cycle', days: 30 },
+  { label: 'Last 3 months', subLabel: 'A quarter of your year', days: 90 },
+  { label: 'Last 6 months', subLabel: 'Half the year', days: 180 },
+  { label: 'Last year', subLabel: 'Your full annual picture', days: 365 },
+  { label: 'Last 2 years', subLabel: 'Two years of fuel savings', days: 730 },
+  { label: 'Last 3 years', subLabel: 'Three years of real impact', days: 1095 },
+];
+
+function labelForDays(days: number): string {
+  const opt = DURATION_OPTIONS.find((o) => o.days === days);
+  if (!opt) return `${days} days`;
+  // Strip "Last " prefix for in-sentence use
+  return opt.label.replace(/^Last /, '');
+}
 
 /** Ring that draws itself from zero once it is on screen. */
 function StoryRing({ progress }: { progress: number }) {
@@ -99,125 +118,26 @@ function StoryRing({ progress }: { progress: number }) {
   );
 }
 
-const paidProgress = 1 - WRAPPED.monthsToOwnership / WRAPPED.tenorMonths;
-
 interface PanelDef {
   tone: PanelTone;
   content: ReactNode;
 }
 
-const PANELS: PanelDef[] = [
-  {
-    tone: 'paper',
-    content: (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 3, ease: [0.4, 0, 0.2, 1] }}
-      >
-        <h1 className="font-display text-[2.5rem] leading-[1.05] text-ink">{WRAPPED.business}</h1>
-        <p className="mt-5 text-lg text-ink-soft">Your year with Lastgen</p>
-      </motion.div>
-    ),
-  },
-  {
-    tone: 'burn',
-    content: (
-      <>
-        <p className="font-display tabular text-[2.5rem] leading-none">
-          {NAIRA}
-          <CountUp to={WRAPPED.nairaSaved} />
-        </p>
-        <p className="mt-6 text-base leading-relaxed opacity-90">You did not burn this.</p>
-      </>
-    ),
-  },
-  {
-    tone: 'blue',
-    content: (
-      <>
-        <Lightning size={44} weight="regular" className="mb-8 animate-drift" aria-hidden />
-        <p className="font-display tabular text-[2.5rem] leading-none">
-          <CountUp to={WRAPPED.litresNotBurned} />
-        </p>
-        <p className="mt-6 text-base leading-relaxed opacity-90">
-          Litres of petrol that stayed in the ground.
-        </p>
-      </>
-    ),
-  },
-  {
-    tone: 'success',
-    content: (
-      <>
-        <svg width="72" height="72" viewBox="0 0 72 72" className="mb-8 animate-drift" aria-hidden>
-          <path
-            d="M36 60V40M36 40l-11-11M36 40l11-14"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <circle cx="36" cy="22" r="13" fill="currentColor" fillOpacity="0.25" />
-          <circle cx="22" cy="32" r="9" fill="currentColor" fillOpacity="0.18" />
-          <circle cx="50" cy="32" r="9" fill="currentColor" fillOpacity="0.18" />
-        </svg>
-        <p className="font-display tabular text-[2.5rem] leading-none">
-          <CountUp to={WRAPPED.co2Kg} />
-        </p>
-        <p className="mt-6 text-base leading-relaxed opacity-90">
-          Kilograms of carbon you never put in the air.
-        </p>
-      </>
-    ),
-  },
-  {
-    tone: 'navy',
-    content: (
-      <>
-        <StoryRing progress={paidProgress} />
-        <p className="font-display tabular mt-8 text-[2.5rem] leading-none">
-          <CountUp to={WRAPPED.monthsToOwnership} />
-        </p>
-        <p className="mt-6 text-base leading-relaxed opacity-90">
-          Months until the system is yours outright.
-        </p>
-      </>
-    ),
-  },
-  {
-    tone: 'deep',
-    content: (
-      <>
-        <div className="w-full max-w-sm rounded-lg bg-paper/10 p-8 ring-1 ring-inset ring-white/20">
-          <p className="font-display text-2xl leading-tight">{WRAPPED.business}</p>
-          <p className="mt-1 text-sm opacity-70">{WRAPPED.year}</p>
-
-          <p className="font-display tabular mt-10 text-3xl leading-none">
-            {NAIRA}
-            {WRAPPED.nairaSaved.toLocaleString('en-NG')}
-          </p>
-          <p className="mt-2 text-sm opacity-80">not burned this year</p>
-
-          <p className="mt-10 font-display text-[13px] opacity-70">Made with Lastgen</p>
-        </div>
-        <p className="mt-8 text-base opacity-80">Screenshot this and send it to someone.</p>
-      </>
-    ),
-  },
-];
-
 const PANEL_BODY = 'flex h-full w-full flex-col items-start justify-center px-8 py-16 pt-24';
 
+/* ------------------------------------------------------------------ */
+/* Chrome (progress bars + close button)                               */
 /* ------------------------------------------------------------------ */
 
 function Chrome({
   index,
+  panelCount,
   tone,
   animate,
   onClose,
 }: {
   index: number;
+  panelCount: number;
   tone: PanelTone;
   animate: boolean;
   onClose: () => void;
@@ -225,7 +145,7 @@ function Chrome({
   return (
     <div className={cn('absolute inset-x-0 top-0 z-10 flex items-start gap-3 p-4', CHROME[tone])}>
       <div className="flex flex-1 gap-1.5 pt-2">
-        {PANELS.map((_, i) => (
+        {Array.from({ length: panelCount }, (_, i) => (
           <div
             key={i}
             className="h-[3px] flex-1 overflow-hidden rounded-full bg-current/25"
@@ -262,25 +182,27 @@ function Chrome({
   );
 }
 
-function Story() {
+/* ------------------------------------------------------------------ */
+/* Story (animated panels)                                             */
+/* ------------------------------------------------------------------ */
+
+function Story({
+  panels,
+  onClose,
+}: {
+  panels: PanelDef[];
+  onClose: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const reduceMotion = useReducedMotion();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // No history to pop when the story was opened directly by URL.
-  const close = useCallback(() => {
-    if (location.key === 'default') navigate('/burn');
-    else navigate(-1);
-  }, [navigate, location.key]);
 
   const goNext = useCallback(() => {
-    if (index >= PANELS.length - 1) {
-      close();
+    if (index >= panels.length - 1) {
+      onClose();
       return;
     }
     setIndex(index + 1);
-  }, [index, close]);
+  }, [index, panels.length, onClose]);
 
   const goBack = useCallback(() => {
     setIndex((current) => Math.max(0, current - 1));
@@ -302,7 +224,7 @@ function Story() {
     [goBack, goNext],
   );
 
-  const active = PANELS[index];
+  const active = panels[index];
 
   /* Reduced motion: nothing advances on its own. The panels stack and snap on
      scroll, which is the calmer behaviour, and tapping still steps forward. */
@@ -310,7 +232,7 @@ function Story() {
     return (
       <div className="relative h-full w-full">
         <div className="snap-story no-scrollbar h-full w-full" onClick={onTap}>
-          {PANELS.map((panel, i) => (
+          {panels.map((panel, i) => (
             <section
               key={i}
               className={cn('snap-panel h-full w-full shrink-0', TONES[panel.tone], PANEL_BODY)}
@@ -323,7 +245,7 @@ function Story() {
           <button
             type="button"
             aria-label="Close"
-            onClick={close}
+            onClick={onClose}
             className="lg-glass lg-glass-3 rounded-full p-1.5"
           >
             <X size={22} weight="regular" />
@@ -351,18 +273,21 @@ function Story() {
         </motion.div>
       </AnimatePresence>
 
-      <Chrome index={index} tone={active.tone} animate onClose={close} />
+      <Chrome index={index} panelCount={panels.length} tone={active.tone} animate onClose={onClose} />
     </div>
   );
 }
 
-/**
- * Exactly one Story is mounted at a time. Rendering a mobile and a desktop
- * copy and hiding one with CSS would leave two auto-advance timers running,
- * and both would fire the closing navigation.
- */
+/* ------------------------------------------------------------------ */
+/* Main Wrapped component                                              */
+/* ------------------------------------------------------------------ */
+
 export default function Wrapped() {
   useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { demoBusinessId, demoQuoteId } = useSession();
+
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
   );
@@ -374,21 +299,249 @@ export default function Wrapped() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
+  /* Phase management */
+  const [phase, setPhase] = useState<'pick' | 'story'>('pick');
+  const [selectedDays, setSelectedDays] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [wrappedData, setWrappedData] = useState<WrappedPayload | null>(null);
+  const [businessName, setBusinessName] = useState<string>('Your business');
+  const [tenorMonths, setTenorMonths] = useState(24);
+
+  /* Toast */
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+
+  const selectedLabel = selectedDays ? labelForDays(selectedDays) : '';
+
+  const handleShowImpact = useCallback(async () => {
+    if (!selectedDays || !demoBusinessId) return;
+    setLoading(true);
+
+    try {
+      const [wrapped, quote, business] = await Promise.all([
+        api.businesses.wrapped(demoBusinessId, { days: selectedDays }),
+        demoQuoteId ? api.quotes.get(demoQuoteId).catch(() => null) : Promise.resolve(null),
+        api.businesses.get(demoBusinessId).catch(() => null),
+      ]);
+      setWrappedData(wrapped);
+      if (quote) setTenorMonths(quote.tenorMonths);
+      if (business) setBusinessName(business.name);
+      setPhase('story');
+    } catch {
+      setToastMsg('Could not load your data. Try again.');
+      setToastOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDays, demoBusinessId, demoQuoteId]);
+
+  const handleClose = useCallback(() => {
+    if (location.key === 'default') navigate('/burn');
+    else navigate(-1);
+  }, [navigate, location.key]);
+
+  const handleStoryClose = useCallback(() => {
+    setPhase('pick');
+  }, []);
+
+  /* Build panels from fetched data */
+  const panels: PanelDef[] = wrappedData
+    ? (() => {
+        const paidProgress = 1 - wrappedData.monthsToOwnership / tenorMonths;
+        return [
+          {
+            tone: 'paper' as PanelTone,
+            content: (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h1 className="font-display text-[2.5rem] leading-[1.05] text-ink">{businessName}</h1>
+                <p className="mt-5 text-lg text-ink-soft">Your last {selectedLabel} with Lastgen</p>
+              </motion.div>
+            ),
+          },
+          {
+            tone: 'burn' as PanelTone,
+            content: (
+              <>
+                <p className="font-display tabular text-[2.5rem] leading-none">
+                  {NAIRA}
+                  <CountUp to={wrappedData.nairaSavedKobo / 100} />
+                </p>
+                <p className="mt-6 text-base leading-relaxed opacity-90">You did not burn this.</p>
+              </>
+            ),
+          },
+          {
+            tone: 'blue' as PanelTone,
+            content: (
+              <>
+                <Lightning size={44} weight="regular" className="mb-8 animate-drift" aria-hidden />
+                <p className="font-display tabular text-[2.5rem] leading-none">
+                  <CountUp to={wrappedData.litresNotBurned} />
+                </p>
+                <p className="mt-6 text-base leading-relaxed opacity-90">
+                  Litres of petrol that stayed in the ground.
+                </p>
+              </>
+            ),
+          },
+          {
+            tone: 'success' as PanelTone,
+            content: (
+              <>
+                <svg width="72" height="72" viewBox="0 0 72 72" className="mb-8 animate-drift" aria-hidden>
+                  <path
+                    d="M36 60V40M36 40l-11-11M36 40l11-14"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <circle cx="36" cy="22" r="13" fill="currentColor" fillOpacity="0.25" />
+                  <circle cx="22" cy="32" r="9" fill="currentColor" fillOpacity="0.18" />
+                  <circle cx="50" cy="32" r="9" fill="currentColor" fillOpacity="0.18" />
+                </svg>
+                <p className="font-display tabular text-[2.5rem] leading-none">
+                  <CountUp to={wrappedData.co2KgAvoided} />
+                </p>
+                <p className="mt-6 text-base leading-relaxed opacity-90">
+                  Kilograms of carbon you never put in the air.
+                </p>
+              </>
+            ),
+          },
+          {
+            tone: 'navy' as PanelTone,
+            content: (
+              <>
+                <StoryRing progress={paidProgress} />
+                <p className="font-display tabular mt-8 text-[2.5rem] leading-none">
+                  <CountUp to={wrappedData.monthsToOwnership} />
+                </p>
+                <p className="mt-6 text-base leading-relaxed opacity-90">
+                  Months until the system is yours outright.
+                </p>
+              </>
+            ),
+          },
+          {
+            tone: 'deep' as PanelTone,
+            content: (
+              <>
+                <div className="w-full max-w-sm rounded-lg bg-paper/10 p-8 ring-1 ring-inset ring-white/20">
+                  <p className="font-display text-2xl leading-tight">{businessName}</p>
+                  <p className="mt-1 text-sm opacity-70">Last {selectedLabel}</p>
+
+                  <p className="font-display tabular mt-10 text-3xl leading-none">
+                    {NAIRA}
+                    {(wrappedData.nairaSavedKobo / 100).toLocaleString('en-NG')}
+                  </p>
+                  <p className="mt-2 text-sm opacity-80">not burned</p>
+
+                  <p className="mt-10 font-display text-[13px] opacity-70">Made with Lastgen</p>
+                </div>
+                <p className="mt-8 text-base opacity-80">Screenshot this and send it to someone.</p>
+              </>
+            ),
+          },
+        ];
+      })()
+    : [];
+
+
+  /* ------------------------------------------------------------------ */
+  /* Duration picker screen                                             */
+  /* ------------------------------------------------------------------ */
+
+  const picker = (
+    <div className="flex h-full w-full flex-col items-center justify-center px-6 py-16">
+      <h1 className="font-display text-[1.75rem] leading-tight text-ink">How far back?</h1>
+      <p className="mt-2 text-center text-ink-soft">
+        Pick a window and we will show you your impact for that time.
+      </p>
+
+      <div className="mt-6 flex w-full max-w-xs flex-col gap-2">
+        {DURATION_OPTIONS.map((opt) => (
+          <button
+            key={opt.days}
+            type="button"
+            onClick={() => setSelectedDays(opt.days)}
+            className={cn(
+              'flex flex-col items-start gap-0.5 rounded-lg px-4 py-3 text-left transition-all duration-200 ease-lg',
+              selectedDays === opt.days
+                ? 'ring-2 ring-navy bg-paper-2'
+                : 'hover:bg-paper-2/60',
+            )}
+          >
+            <span className="font-display text-sm text-ink">{opt.label}</span>
+            <span className="text-xs text-ink-mute">{opt.subLabel}</span>
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleShowImpact}
+        disabled={!selectedDays || loading}
+        className="mt-6 w-full max-w-xs rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
+      >
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-paper/30 border-t-paper" />
+            Loading your impact...
+          </span>
+        ) : (
+          'Show my impact'
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={handleClose}
+        className="mt-4 text-xs text-ink-mute transition-colors duration-200 ease-lg hover:text-ink-soft"
+      >
+        Skip to demo
+      </button>
+    </div>
+  );
+
+  /* ------------------------------------------------------------------ */
+  /* Render                                                              */
+  /* ------------------------------------------------------------------ */
+
+  const storyContent = wrappedData ? (
+    <Story panels={panels} onClose={handleStoryClose} />
+  ) : null;
+
   // Desktop: framed as a phone, because that is how it gets shared.
   if (isDesktop) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper-2 py-16">
-        <DeviceFrame width={393} alt={`${WRAPPED.business} wrapped for ${WRAPPED.year}`}>
-          <Story />
+        <DeviceFrame
+          width={393}
+          alt={wrappedData ? `${businessName} impact for last ${selectedLabel}` : 'Pick a duration'}
+        >
+          {phase === 'pick' ? picker : storyContent}
         </DeviceFrame>
+
+        <Toast open={toastOpen} onOpenChange={setToastOpen} tone="danger">
+          <ToastTitle>{toastMsg}</ToastTitle>
+        </Toast>
       </div>
     );
   }
 
-  // Mobile: the story owns the whole screen.
+  // Mobile: the content owns the whole screen.
   return (
     <div className="h-[100dvh] w-full">
-      <Story />
+      {phase === 'pick' ? picker : storyContent}
+
+      <Toast open={toastOpen} onOpenChange={setToastOpen} tone="danger">
+        <ToastTitle>{toastMsg}</ToastTitle>
+      </Toast>
     </div>
   );
 }
