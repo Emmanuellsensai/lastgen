@@ -11,6 +11,7 @@ import Burn from '@/routes/owner/Burn';
 import Quote from '@/routes/owner/Quote';
 import Asset from '@/routes/owner/Asset';
 import Wrapped from '@/routes/owner/Wrapped';
+import LogFuel from '@/routes/owner/LogFuel';
 import Applications from '@/routes/bank/Applications';
 import CreditFile from '@/routes/bank/CreditFile';
 import Portfolio from '@/routes/bank/Portfolio';
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/quote/:id" element={<RequireRole role="owner"><Quote /></RequireRole>} />
             <Route path="/asset/:id" element={<RequireRole role="owner"><Asset /></RequireRole>} />
             <Route path="/wrapped/:id" element={<RequireRole role="owner"><Wrapped /></RequireRole>} />
+            <Route path="/log-fuel" element={<RequireRole role="owner"><LogFuel /></RequireRole>} />
 
             {/* Bank routes */}
             <Route path="/bank" element={<RequireRole role="bank"><Applications /></RequireRole>} />
