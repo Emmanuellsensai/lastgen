@@ -327,7 +327,7 @@ export default function Landing() {
             </h2>
             <p className="mt-5 text-lg leading-relaxed text-ink-soft">{BANK.body}</p>
             <Button asChild size="lg" variant="outline" className="mt-10">
-              <Link to="/register">
+              <Link to="/register-bank">
                 Sign up as a bank
                 <ArrowRight size={20} weight="regular" />
               </Link>
@@ -397,13 +397,18 @@ export default function Landing() {
                       Sign in
                     </Link>
                   </li>
+                  <li>
+                    <Link to="/login-bank" className="hover:text-ink">
+                      Sign in as a bank
+                    </Link>
+                  </li>
                 </ul>
               </div>
               <div>
                 <p className="mb-4 font-medium text-ink">Partners</p>
                 <ul className="flex flex-col gap-3 text-ink-mute">
                   <li>
-                    <Link to="/register" className="hover:text-ink">
+                    <Link to="/register-bank" className="hover:text-ink">
                       Credit desk
                     </Link>
                   </li>
@@ -413,8 +418,8 @@ export default function Landing() {
                     </Link>
                   </li>
                   <li>
-                    <Link to="/register" className="hover:text-ink">
-                      Sign in as a bank
+                    <Link to="/register-bank" className="hover:text-ink">
+                      Sign up as a bank
                     </Link>
                   </li>
                 </ul>

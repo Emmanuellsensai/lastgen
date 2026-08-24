@@ -42,6 +42,11 @@ import type {
   Wallet,
   WalletTransaction,
     WrappedPayload,
+  KycRecord,
+  KycStatus,
+  AdminUser,
+  AdminOrder,
+  AssetStatus,
 } from '@/types/api';
 
 export const API_MODE: ApiMode = (import.meta.env.VITE_API_MODE as ApiMode) ?? 'mock';
@@ -207,6 +212,39 @@ export const api = {
       request<PagedEnvelope<FuelLog>>(`/businesses/${businessId}/fuel-logs`, {
         query: { limit, offset },
       }),
+  },
+
+  kyc: {
+    get: (businessId: string) => request<KycRecord>(`/businesses/${businessId}/kyc`),
+    submit: (businessId: string, formData: FormData) =>
+      request<KycRecord>(`/businesses/${businessId}/kyc/submit`, { method: 'POST', body: formData }),
+  },
+
+  bankAuth: {
+    register: (body: { bankName: string; bankId: string; password: string; confirmPassword: string }) =>
+      request<{ user: { id: string; bankId: string; bankName: string }; role: 'bank'; accessToken: string }>('/auth/bank/register', { method: 'POST', body: JSON.stringify(body) }),
+    login: (body: { bankId: string; password: string }) =>
+      request<{ user: { id: string; bankId: string; bankName: string }; role: 'bank'; accessToken: string }>('/auth/bank/login', { method: 'POST', body: JSON.stringify(body) }),
+  },
+
+  admin: {
+    kyc: {
+      list: () => request<ListEnvelope<KycRecord & { businessName: string }>>('/admin/kyc'),
+      approve: (kycId: string) => post<{ id: string; status: KycStatus; reviewedAt: string }>(`/admin/kyc/${kycId}/approve`),
+      reject: (kycId: string, reason: string) => post<{ id: string; status: KycStatus; rejectionReason: string; reviewedAt: string }>(`/admin/kyc/${kycId}/reject`, { reason }),
+    },
+    users: {
+      list: () => request<ListEnvelope<AdminUser>>('/admin/users'),
+    },
+    assets: {
+      togglePower: (assetId: string) =>
+        post<{ id: string; status: AssetStatus }>(`/admin/assets/${assetId}/toggle-power`),
+    },
+    orders: {
+      list: () => request<ListEnvelope<AdminOrder>>('/admin/orders'),
+      approvePayment: (loanId: string) =>
+        post<{ paymentId: string; status: string }>(`/admin/loans/${loanId}/approve-payment`),
+    },
   },
   auth: {
     login: (body: { email: string; password: string }) =>
