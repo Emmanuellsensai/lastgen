@@ -182,9 +182,17 @@ export default function Landing() {
             </Link>
           }
           right={
-            <Button asChild size="sm">
-              <Link to="/login">Open the demo</Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to="/login">Sign in</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/register">
+                  Sign up
+                  <ArrowRight size={16} weight="regular" />
+                </Link>
+              </Button>
+            </div>
           }
         />
       }
@@ -199,13 +207,17 @@ export default function Landing() {
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Button asChild size="lg">
-              <Link to="/login">
+              <Link to="/register">
                 {HERO.ctaPrimary}
                 <ArrowRight size={20} weight="regular" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/bank/portfolio">{HERO.ctaSecondary}</Link>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              {HERO.ctaSecondary}
             </Button>
           </div>
 
@@ -278,7 +290,7 @@ export default function Landing() {
       </section>
 
       {/* How it works, four steps, each fading up as it enters */}
-      <section className="mx-auto w-full max-w-6xl px-5 py-section">
+      <section id="how-it-works" className="mx-auto w-full max-w-6xl px-5 py-section">
         <h2 className="max-w-xl font-display text-3xl leading-tight text-ink md:text-4xl">
           How it works
         </h2>
@@ -315,8 +327,8 @@ export default function Landing() {
             </h2>
             <p className="mt-5 text-lg leading-relaxed text-ink-soft">{BANK.body}</p>
             <Button asChild size="lg" variant="outline" className="mt-10">
-              <Link to="/login">
-                See the credit desk
+              <Link to="/register-bank">
+                Sign up as a bank
                 <ArrowRight size={20} weight="regular" />
               </Link>
             </Button>
@@ -381,8 +393,13 @@ export default function Landing() {
                     </Link>
                   </li>
                   <li>
-                    <Link to={`/wrapped/${DEMO_IDS.businessId}`} className="hover:text-ink">
-                      Wrapped
+                    <Link to="/login" className="hover:text-ink">
+                      Sign in
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/login-bank" className="hover:text-ink">
+                      Sign in as a bank
                     </Link>
                   </li>
                 </ul>
@@ -391,18 +408,18 @@ export default function Landing() {
                 <p className="mb-4 font-medium text-ink">Partners</p>
                 <ul className="flex flex-col gap-3 text-ink-mute">
                   <li>
-                    <Link to="/login" className="hover:text-ink">
+                    <Link to="/register-bank" className="hover:text-ink">
                       Credit desk
                     </Link>
                   </li>
                   <li>
-                    <Link to="/login" className="hover:text-ink">
-                      Portfolio
+                    <Link to="/demo" className="hover:text-ink">
+                      Open the demo
                     </Link>
                   </li>
                   <li>
-                    <Link to="/login" className="hover:text-ink">
-                      Demo control
+                    <Link to="/register-bank" className="hover:text-ink">
+                      Sign up as a bank
                     </Link>
                   </li>
                 </ul>
