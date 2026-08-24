@@ -53,12 +53,12 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(makeRequireAuth(env));
   router.use(createAuthRouter(repo, env));
   router.use(createBusinessRouter(repo, env));
-  // KYC needs the NIN provider and document storage seams; live mode resolves
-  // the Supabase client eagerly so an unconfigured deployment fails at boot.
+  // KYC needs the NIN provider and document storage seams; the Supabase
+  // client resolves lazily per upload so composition stays credential-free.
   router.use(
     createKycRouter(repo, env, {
       ninProvider: ninProviderFor(env.ninProvider),
-      kycStorage: kycStorageFor(env, env.demoMode ? undefined : getSupabase()),
+      kycStorage: kycStorageFor(env, () => getSupabase()),
     }),
   );
   router.use(createSystemRouter(repo));

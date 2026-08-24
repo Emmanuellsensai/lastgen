@@ -28,21 +28,27 @@ class DataUrlKycStorage implements KycStorage {
 }
 
 class SupabaseKycStorage implements KycStorage {
+  /**
+   * The client resolves lazily per upload so composition stays credential-
+   * free — matching requireAuth's posture where an unconfigured live
+   * deployment fails closed on first real use, not at boot.
+   */
   constructor(
-    private readonly db: SupabaseClient,
+    private readonly getClient: () => SupabaseClient,
     private readonly bucket: string,
   ) {}
 
   async store(businessId: string, document: KycDocument): Promise<string> {
+    const db = this.getClient();
     const path = `${businessId}/${Date.now()}-${document.field}`;
-    const { error } = await this.db.storage
-      .from(this.bucket)
-      .upload(path, document.buffer, { contentType: document.mimetype });
+    const { error } = await db.storage.from(this.bucket).upload(path, document.buffer, {
+      contentType: document.mimetype,
+    });
     if (error) {
       throw new ApiError('DATABASE_ERROR', error.message, 500);
     }
     // One hour is plenty for an admin review session; re-request regenerates.
-    const signed = await this.db.storage.from(this.bucket).createSignedUrl(path, 3600);
+    const signed = await db.storage.from(this.bucket).createSignedUrl(path, 3600);
     if (signed.error || !signed.data) {
       throw new ApiError('DATABASE_ERROR', signed.error?.message ?? 'Could not sign KYC url', 500);
     }
@@ -52,10 +58,10 @@ class SupabaseKycStorage implements KycStorage {
 
 export function kycStorageFor(
   env: { demoMode: boolean; kycBucket: string },
-  db?: SupabaseClient,
+  getClient?: () => SupabaseClient,
 ): KycStorage {
-  if (!env.demoMode && db) {
-    return new SupabaseKycStorage(db, env.kycBucket);
+  if (!env.demoMode && getClient) {
+    return new SupabaseKycStorage(getClient, env.kycBucket);
   }
   return new DataUrlKycStorage();
 }
