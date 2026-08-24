@@ -47,6 +47,8 @@ export interface KycRecord {
   reviewedAt: string | null;
   rejectionReason: string | null;
   selfieUrl: string | null;
+  bankSlipUrl: string | null;
+  ninNumber: string | null;
   ninVerified: boolean;
 }
 
@@ -365,4 +367,22 @@ export interface AdminOrder {
   monthlyPaymentKobo: number;
   nextDueAt: string;
   status: string;
+}
+
+export interface BankRegisterBody {
+  bankName: string;
+  bankId: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface BankLoginBody {
+  bankId: string;
+  password: string;
+}
+
+export interface BankAuthResult {
+  user: { id: string; bankId: string; bankName: string };
+  role: 'bank';
+  accessToken: string;
 }

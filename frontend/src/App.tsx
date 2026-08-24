@@ -6,6 +6,8 @@ import RequireAdmin from '@/components/layout/RequireAdmin';
 import Landing from '@/routes/marketing/Landing';
 import Login from '@/routes/auth/Login';
 import Register from '@/routes/auth/Register';
+import BankRegister from '@/routes/auth/BankRegister';
+import BankLogin from '@/routes/auth/BankLogin';
 import Dashboard from '@/routes/owner/Dashboard';
 import Burn from '@/routes/owner/Burn';
 import Quote from '@/routes/owner/Quote';
@@ -31,6 +33,8 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/register-bank" element={<BankRegister />} />
+            <Route path="/login-bank" element={<BankLogin />} />
             <Route path="/legal/terms" element={<Terms />} />
 
             {/* Owner routes */}

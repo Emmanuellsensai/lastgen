@@ -220,6 +220,13 @@ export const api = {
       request<KycRecord>(`/businesses/${businessId}/kyc/submit`, { method: 'POST', body: formData }),
   },
 
+  bankAuth: {
+    register: (body: { bankName: string; bankId: string; password: string; confirmPassword: string }) =>
+      request<{ user: { id: string; bankId: string; bankName: string }; role: 'bank'; accessToken: string }>('/auth/bank/register', { method: 'POST', body: JSON.stringify(body) }),
+    login: (body: { bankId: string; password: string }) =>
+      request<{ user: { id: string; bankId: string; bankName: string }; role: 'bank'; accessToken: string }>('/auth/bank/login', { method: 'POST', body: JSON.stringify(body) }),
+  },
+
   admin: {
     kyc: {
       list: () => request<ListEnvelope<KycRecord & { businessName: string }>>('/admin/kyc'),

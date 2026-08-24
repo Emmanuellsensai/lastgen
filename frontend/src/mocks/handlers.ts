@@ -916,6 +916,8 @@ const kycHandlers: HttpHandler[] = [
       reviewedAt: null,
       rejectionReason: null,
       selfieUrl: null,
+      bankSlipUrl: null,
+      ninNumber: null,
       ninVerified: false,
     });
   }),
@@ -932,6 +934,8 @@ const kycHandlers: HttpHandler[] = [
       reviewedAt: null,
       rejectionReason: null,
       selfieUrl: 'data:image/png;base64,demo',
+      bankSlipUrl: '/img/receipts/demo-slip.jpg',
+      ninNumber: '12345678901',
       ninVerified: true,
     });
   }),
@@ -949,6 +953,8 @@ const kycHandlers: HttpHandler[] = [
         reviewedAt: null,
         rejectionReason: null,
         selfieUrl: null,
+        bankSlipUrl: null,
+        ninNumber: '12345678901',
         ninVerified: true,
       })),
     });
@@ -966,6 +972,37 @@ const kycHandlers: HttpHandler[] = [
   }),
 ];
 
+const bankAuthHandlers: HttpHandler[] = [
+  http.post(`${BASE}/auth/bank/register`, async ({ request }) => {
+    await lag();
+    const body = (await request.json()) as { bankName: string; bankId: string; password: string; confirmPassword: string };
+    if (!body?.bankName || !body?.bankId || !body?.password) {
+      return fail('VALIDATION', 'Bank name, bank ID and password are required');
+    }
+    if (body.password !== body.confirmPassword) {
+      return fail('VALIDATION', 'Passwords do not match');
+    }
+    return ok({
+      user: { id: `bank_${body.bankId}`, bankId: body.bankId, bankName: body.bankName },
+      role: 'bank' as const,
+      accessToken: `tok_bank_${body.bankId}`,
+    });
+  }),
+
+  http.post(`${BASE}/auth/bank/login`, async ({ request }) => {
+    await lag();
+    const body = (await request.json()) as { bankId: string; password: string };
+    if (!body?.bankId || !body?.password) {
+      return fail('VALIDATION', 'Bank ID and password are required');
+    }
+    return ok({
+      user: { id: `bank_${body.bankId}`, bankId: body.bankId, bankName: 'Demo Bank' },
+      role: 'bank' as const,
+      accessToken: `tok_bank_${body.bankId}`,
+    });
+  }),
+];
+
 export const handlers: HttpHandler[] = [
   ...businessHandlers,
   ...quoteHandlers,
@@ -979,6 +1016,7 @@ export const handlers: HttpHandler[] = [
   ...walletHandlers,
   ...adminHandlers,
   ...kycHandlers,
+  ...bankAuthHandlers,
 ];
 
 export { DEMO_BUSINESS_ID };
