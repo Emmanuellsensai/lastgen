@@ -6,6 +6,7 @@ import { makeRequireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { createAuthRouter } from './authRoutes.js';
 import { createAssetRouter } from './assetRoutes.js';
+import { createBankAuthRouter } from './bankAuthRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
 import { createCreditRouter } from './creditRoutes.js';
 import { createDemoRouter } from './demoRoutes.js';
@@ -34,6 +35,10 @@ export function apiRouter(repo: Repository, env: Env): Router {
   // Provider callbacks run BEFORE the auth boundary: ALAT signs its own
   // notifications and is never asked for a Lastgen bearer token.
   router.use(createWebhookRouter(repo, adapter));
+
+  // Bank registration and login also run BEFORE the auth boundary: a caller
+  // cannot present a bearer token it does not have yet.
+  router.use(createBankAuthRouter(repo, env));
 
   // Demo controls are unauthenticated (per the contract) but only exist in
   // demo mode; live deployments simply never mount this router.
