@@ -36,6 +36,13 @@ export type PaymentStatus =
   'pending_authorisation' | 'authorised' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
 export type ImpactPeriod = 'month' | 'year' | 'all';
 
+/**
+ * API roles. `owner` is the default for business users; `bank` and `admin`
+ * belong to credit-desk identities and gate the /admin/* surface. The claim
+ * lives in Supabase app_metadata (server-only) so clients cannot escalate.
+ */
+export type UserRole = 'owner' | 'bank' | 'admin';
+
 /* Entities */
 export interface Business {
   id: string;
@@ -231,6 +238,35 @@ export interface WrappedPayload {
 export interface CreditFileDetail extends CreditFile {
   fuelLogs: FuelLog[];
   schedulePreview: Installment[];
+}
+
+/* Bank identity ------------------------------------------------------ */
+
+/** A credit-desk identity (bank user) as stored by the repository. */
+export interface BankUser {
+  id: string;
+  bankId: string;
+  bankName: string;
+  createdAt: string;
+}
+
+export interface BankRegisterBody {
+  bankName: string;
+  bankId: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface BankLoginBody {
+  bankId: string;
+  password: string;
+}
+
+/** Response payload for POST /auth/bank/register and POST /auth/bank/login. */
+export interface BankAuthResult {
+  user: { id: string; bankId: string; bankName: string };
+  role: 'bank';
+  accessToken: string;
 }
 
 /* Request bodies */
