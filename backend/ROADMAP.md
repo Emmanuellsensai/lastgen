@@ -88,7 +88,7 @@ Supabase or a live payment provider.
 | 5 | Portfolio + impact parity | ✅ complete (2 commits) |
 | 6 | Demo routes + README + Supabase/deploy | ⬜ pending |
 | 7 | Integration + final docs + PR prep | ⬜ pending |
-| 8 | RBAC + bank identity | ⬜ pending |
+| 8 | RBAC + bank identity | ✅ complete (6 commits) |
 | 9 | KYC lifecycle | ⬜ pending |
 | 10 | Admin surface | ⬜ pending |
 | 11 | Docs + env polish for the admin sprint | ⬜ pending |
@@ -112,48 +112,17 @@ looser than production must be:
 2. **Role checks are real.** The mock cannot express authorization; the
    backend gates `/admin/*` behind `role ∈ {bank, admin}`.
 
-### Phase 8 — RBAC + bank identity
-
-**Goal.** A role model and bank identities so `/admin/*` can be gated.
-
-**Design decisions.**
-- **Roles.** `owner` (default) · `bank` · `admin`. Gate =
-  `makeRequireRole(env, ...allowed)` in `middleware/auth.ts`: demo mode is
-  permissive (consistent with the unauthenticated-demo philosophy); live mode
-  reads `req.user.app_metadata.role`. `app_metadata` is server-only, so a
-  client cannot self-escalate by editing its own user metadata.
-- **New error code `FORBIDDEN` (403).** Additive extension of the contract's
-  error table for authenticated callers lacking the role. `UNAUTHORIZED` (401)
-  would be semantically wrong (the caller *is* authenticated). Flagged to the
-  docs owner for a CONTRACT.md amendment; until then this roadmap and
-  `BACKEND_PROGRESS.md` §7 record the decision.
-- **Bank users are Supabase auth.users.** Email synthesized as
-  `<bankId>@banks.lastgen.local`, `app_metadata.role = 'bank'`, descriptive
-  fields mirrored into a new `bank_users` table. Register = `auth.admin.createUser`
-  then `signInWithPassword` to mint the access token; login = `signInWithPassword`.
-  Demo mode keeps an in-memory map and deterministic `tok_bank_<bankId>` tokens
-  (MSW parity).
-- **Public routes.** `/auth/bank/register` + `/auth/bank/login` mount BEFORE
-  `makeRequireAuth` — a caller cannot present a token it does not have yet
-  (same rationale as webhooks).
-- **Error semantics.** Missing fields / password mismatch / duplicate bankId →
-  `400 VALIDATION` (stays inside the frozen code table); unknown id or wrong
-  password → `401 UNAUTHORIZED`.
-
-**Files.** `src/types/api.ts` (UserRole, BankUser, BankRegisterBody,
-BankLoginBody, BankAuthResult), `src/middleware/auth.ts` (makeRequireRole),
-`src/data/repository.ts` (+registerBank/authenticateBank/BankSession),
-`src/data/inMemoryRepository.ts`, `src/data/supabaseRepository.ts`,
-`src/routes/bankAuthRoutes.ts` (new), `src/routes/index.ts` (mount),
-`migrations/rbac-kyc.sql` (new: bank_users mirror, kyc_records table +
-RLS + private `kyc-docs` storage bucket — the KYC columns land with Phase 9's
-code so the migration is applied once).
-
-**Tests.** `backend/test/contract/bank-auth.test.ts`: register happy path
-(201), missing fields (400), password mismatch (400), duplicate bankId (400),
-login after register (200), unknown/wrong credentials (401), and live-mode
-mounting proof (register reachable without a bearer while boundary-protected
-routes fail closed with 401).
+### Phase 8 — RBAC + bank identity (complete)
+- **Delivered:** `UserRole` model + `makeRequireRole` gate (demo permissive,
+  live reads server-only `app_metadata.role`, FORBIDDEN 403 for role denials);
+  bank identities via `Repository.registerBank/authenticateBank` (in-memory
+  map with deterministic tokens; Supabase auth.users + `bank_users` mirror +
+  synthesized emails); public `/auth/bank/register` (201) and
+  `/auth/bank/login` mounted before the auth boundary; additive
+  `migrations/rbac-kyc.sql`.
+- **Tests:** `backend/test/contract/bank-auth.test.ts` (10).
+- **Verification:** typecheck ✅, lint ✅, full suite 199/199 ✅, boot smoke
+  (health, register 201 envelope, fail-closed 401 login) ✅.
 
 ### Phase 9 — KYC lifecycle
 

@@ -92,6 +92,9 @@ reproduce their externally observable behaviour without importing any code from
 | Correctness tests                 | ✅     | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter (incl. ALAT HTTPS client), impact-parity, supabase-repository stub live |
 | Supabase repository               | ✅     | Full `Repository` implementation on an async seam + `repositoryFor(env)` (Phase 6)                                                                 |
 | Payment/wallet handoff            | ✅     | `docs/PAYMENT_EXTENSION.md` — spec verbatim + demo fallbacks (Phase 6)                                                                             |
+| Role model (`makeRequireRole`)    | ✅     | `middleware/auth.ts`; live reads `app_metadata.role`, FORBIDDEN 403 (Phase 8)                                                                      |
+| Bank identities                   | ✅     | `/auth/bank/register`+`/login`, Supabase Auth-backed; `bank_users` mirror (Phase 8)                                                                |
+| RBAC/KYC migration                | ✅     | `migrations/rbac-kyc.sql`: bank_users, kyc_records, kyc-docs bucket (Phase 8)                                                                      |
 | Render deployment verification    | ⬜     | Needs live Supabase + ALAT credentials                                                                                                             |
 
 ## 5. Implemented foundation (Phase 0)
@@ -302,6 +305,39 @@ confidence }`.
 - `GET /businesses/:id/wrapped?year=` — the yearly report projection with a
   fixed `bestMonth`/`rank` (MSW parity).
 
+### 6.13 RBAC + bank identity (Phase 8)
+
+Driver: the frontend build sprint (`frontend/buildSummary.md`) ships bank
+auth pages and an admin dashboard that are fully mocked in
+`handlers.ts bankAuthHandlers/adminHandlers/kycHandlers`. Phase 8 introduces
+the role model and credit-desk identities they require.
+
+- **Roles.** `UserRole = owner | bank | admin` in `types/api.ts`;
+  `makeRequireRole(env, ...allowed)` in `middleware/auth.ts` gates role-scoped
+  routers. Demo mode is permissive (consistent with the unauthenticated demo
+  surface); live mode reads `app_metadata.role`, which only the server can
+  write, so clients cannot self-escalate.
+- **New error code.** `FORBIDDEN` (403) for authenticated callers lacking the
+  role — additive to the contract error table, flagged for a CONTRACT.md
+  amendment (docs owner).
+- **Bank identities.** `Repository.registerBank/authenticateBank` behind a
+  `BankSession { user, accessToken }` result. Live mode: auth.users with
+  synthesized `<bankId>@banks.lastgen.local` email, `app_metadata.role='bank'`,
+  descriptive mirror in `bank_users`; tokens minted via `signInWithPassword`.
+  Login failures always return one UNAUTHORIZED shape so responses never
+  reveal whether bankId or password was wrong.
+- **Public routes.** `/auth/bank/register` (201) + `/auth/bank/login` (200)
+  mounted before `makeRequireAuth` in `routes/index.ts`, same rationale as
+  webhooks; validation messages byte-match the MSW reference.
+- **Migration.** `migrations/rbac-kyc.sql`: `bank_users` mirror,
+  `kyc_records` table + unique per-business index + owner-select RLS, private
+  `kyc-docs` storage bucket. Additive and idempotent; applied after
+  schema.sql.
+- **Tests.** `backend/test/contract/bank-auth.test.ts` (10): happy paths,
+  validation, duplicate/fail-closed credentials, reset hygiene, and a
+  mounting-order proof (register answers without a bearer while
+  boundary-protected routes fail closed 401 in live mode).
+
 ## 7. Decision register
 
 | Decision                    | Choice                                                                           | Rationale                                                                                     |
@@ -322,6 +358,12 @@ confidence }`.
 | Impact source               | One `computeImpact` engine behind `/impact` and `/wrapped`                       | Guarantees the parity gate: the two endpoints share the same numbers                          |
 | Impact windows              | 30 / 365 / 730 days                                                              | Mirrors the MSW `impactFor` `days` switch exactly                                             |
 | Payment response            | Slim `{ paymentId, platformTransactionReference, status }`                       | Frontend renders the consent sheet without loan internals (handoff spec)                      |
+| Role claim location         | Supabase `app_metadata.role`, read by `makeRequireRole`                          | Server-only metadata; clients cannot self-escalate by editing user_metadata                   |
+| Forbidden vs Unauthorized   | New `FORBIDDEN` 403 for role denials                                             | 401 would misstate an authenticated caller; additive code flagged for CONTRACT.md amendment   |
+| Bank login identifier       | `bankId` mapped to `<bankId>@banks.lastgen.local` for GoTrue                     | GoTrue authenticates by email; the mapping keeps bankId as the only public credential         |
+| Bank login failure shape    | One `UNAUTHORIZED` message for unknown id and wrong password                     | Never reveal which half of the credential pair was wrong                                      |
+| Duplicate bankId status     | `VALIDATION` 400 (not a new 409 code)                                            | Stays inside the frozen contract error table; registration is input validation                |
+| Bank auth placement         | Mounted before `makeRequireAuth`, like webhooks                                  | A caller cannot present a bearer token it does not have yet                                   |
 | Payment lifecycle           | Book `pending_authorisation`, settle via webhook/poll/wallet in one transaction  | Same atomic `applySettlement` primitive for every entry path                                  |
 | Wallet source of truth      | Business cash wallet (`035`/`NGN`), demo pre-funded NGN 50k on create            | Demo needs a funded wallet; live starts at 0, funded externally, no top-up endpoint           |
 | Wallet ownership            | `/wallets/*` resolves business from `req.user` via `businessForOwner`            | Authz invariant: no cross-user access, never trust the body                                   |
