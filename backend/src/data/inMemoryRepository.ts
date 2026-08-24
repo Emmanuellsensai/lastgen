@@ -27,6 +27,7 @@ import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
   Asset,
+  BankUser,
   Business,
   BurnProfile,
   CreateBusinessBody,
@@ -56,8 +57,10 @@ import type {
 } from '../types/api.js';
 import { buildSeed, DEMO_BUSINESS_ID, type AssetStatusHistoryEntry, type DemoDb } from './seed.js';
 import type {
+  BankSession,
   PaySettlement,
   ReceiptExtraction,
+  RegisterBankInput,
   Repository,
   WalletStatementQuery,
 } from './repository.js';
@@ -74,6 +77,8 @@ export class InMemoryRepository implements Repository {
   private walletSeqValue = 2_010_000_000;
   /** Maps ownerId → businessId for the in-memory demo. */
   private ownerBusinessMap = new Map<string, string>();
+  /** Demo credit-desk identities, keyed by bankId. Cleared on reset like all state. */
+  private banks = new Map<string, { user: BankUser; password: string }>();
 
   constructor() {
     this.state = buildSeed();
@@ -116,6 +121,7 @@ export class InMemoryRepository implements Repository {
     this.seq = 0;
     this.serialSeqValue = 10_000;
     this.walletSeqValue = 2_010_000_000;
+    this.banks.clear();
   }
 
   /* ------------------------------------------------------------------ */
@@ -784,6 +790,38 @@ export class InMemoryRepository implements Repository {
     // Demo auth attaches the fixed demo-user; it owns the seeded demo business.
     if (ownerId === 'demo-user') return this.getBusiness(DEMO_BUSINESS_ID);
     return undefined;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Banks                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async registerBank(input: RegisterBankInput): Promise<BankSession> {
+    const bankId = input.bankId.trim();
+    if (!bankId) {
+      throw new ApiError('VALIDATION', 'Bank name, bank ID and password are required', 400);
+    }
+    if (this.banks.has(bankId)) {
+      throw new ApiError('VALIDATION', 'Bank ID already registered', 400);
+    }
+    const user: BankUser = {
+      id: `bank_${bankId}`,
+      bankId,
+      bankName: input.bankName.trim(),
+      createdAt: this.state.now.toISOString(),
+    };
+    // Demo only: credentials live in process memory and never leave it.
+    // Live mode delegates hashing and storage to Supabase Auth.
+    this.banks.set(bankId, { user, password: input.password });
+    return { user, accessToken: `tok_bank_${bankId}` };
+  }
+
+  async authenticateBank(bankId: string, password: string): Promise<BankSession> {
+    const entry = this.banks.get(bankId.trim());
+    if (!entry || entry.password !== password) {
+      throw new ApiError('UNAUTHORIZED', 'Invalid bank ID or password', 401);
+    }
+    return { user: entry.user, accessToken: `tok_bank_${entry.user.bankId}` };
   }
 
   /* ------------------------------------------------------------------ */

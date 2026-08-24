@@ -14,6 +14,7 @@
 import type {
   Asset,
   AssetStatus,
+  BankUser,
   Business,
   BurnProfile,
   CreateBusinessBody,
@@ -49,6 +50,19 @@ export interface ReceiptExtraction {
   confidence?: number;
 }
 
+/** Registration payload for a credit-desk identity (password handled by the store). */
+export interface RegisterBankInput {
+  bankName: string;
+  bankId: string;
+  password: string;
+}
+
+/** Result of a successful bank register/login: identity plus a fresh token. */
+export interface BankSession {
+  user: BankUser;
+  accessToken: string;
+}
+
 /** Internal full settlement result; the HTTP layer maps it to the slim PayResult. */
 export interface PaySettlement {
   payment: Payment;
@@ -73,6 +87,16 @@ export interface Repository {
   /* Businesses ----------------------------------------------------- */
   createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business>;
   getBusiness(id: string): Promise<Business | undefined>;
+
+  /* Banks ---------------------------------------------------------- */
+  /**
+   * Register a credit-desk identity. Duplicate bankId throws VALIDATION;
+   * credential storage is delegated to the identity store (Supabase Auth in
+   * live mode, in-memory map in demo).
+   */
+  registerBank(input: RegisterBankInput): Promise<BankSession>;
+  /** Verify bankId + password. Unknown id or wrong password throws UNAUTHORIZED. */
+  authenticateBank(bankId: string, password: string): Promise<BankSession>;
 
   /* Fuel logs and burn --------------------------------------------- */
   addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog>;
