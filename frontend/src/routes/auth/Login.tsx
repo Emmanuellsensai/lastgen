@@ -26,7 +26,7 @@ export default function Login() {
     try {
       await useSession.getState().signInWithEmail(email, password);
       const role = useSession.getState().role;
-      navigate(role === 'bank' ? '/bank' : '/app');
+      navigate(role === 'bank' ? '/admin' : '/app');
     } catch {
       setError('Invalid email or password');
     } finally {

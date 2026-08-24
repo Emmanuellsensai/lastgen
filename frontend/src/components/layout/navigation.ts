@@ -2,8 +2,10 @@ import {
   Bank,
   DotsThreeCircle,
   Flame,
+  Gauge,
   House,
   Receipt,
+  ShieldCheck,
   SlidersHorizontal,
   SquaresFour,
   Sun,
@@ -87,10 +89,12 @@ export const OWNER_PRIMARY_NAV: NavItem[] = [
   { to: '/app', label: 'Home', icon: House },
   { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
   { to: `/asset/${DEMO_IDS.assetId}`, label: 'Systems', icon: Sun, matchPrefix: '/asset' },
+  { to: '/kyc', label: 'Verify', icon: ShieldCheck, matchPrefix: '/kyc' },
   { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
 ];
 
 export const BANK_PRIMARY_NAV: NavItem[] = [
+  { to: '/admin', label: 'Admin', icon: Gauge, matchPrefix: '/admin' },
   { to: '/bank', label: 'Applications', icon: Bank, matchPrefix: '/bank' },
   { to: '/bank/portfolio', label: 'Portfolio', icon: SquaresFour },
   { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
@@ -115,11 +119,23 @@ export const OWNER_NAV_GROUPS: NavGroup[] = [
         icon: Trophy,
         matchPrefix: '/wrapped',
       },
+      {
+        to: '/kyc',
+        label: 'Identity check',
+        icon: ShieldCheck,
+        matchPrefix: '/kyc',
+      },
     ],
   },
 ];
 
 export const BANK_NAV_GROUPS: NavGroup[] = [
+  {
+    heading: 'Admin',
+    items: [
+      { to: '/admin', label: 'Dashboard', icon: Gauge, matchPrefix: '/admin' },
+    ],
+  },
   {
     heading: 'Credit desk',
     items: [

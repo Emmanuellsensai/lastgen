@@ -4,12 +4,12 @@ import {
   ArrowRight,
   Camera,
   ChatCircle,
+  Flame,
   Receipt,
   SignOut,
-  Sparkle,
-  SunHorizon,
 } from '@phosphor-icons/react';
 import { GlassCard, GlassNav, GlassSheet } from '@/components/ui/glass';
+import { cn } from '@/lib/cn';
 import { StatusPill, Money, BurnCounter } from '@/components/lastgen';
 import { Toast, ToastTitle } from '@/components/ui/toast';
 import { AppShell } from '@/components/layout';
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [burn, setBurn] = useState<BurnProfile | null>(null);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [hasLogs, setHasLogs] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [payOpen, setPayOpen] = useState(false);
@@ -59,6 +60,7 @@ export default function Dashboard() {
           setLoan(l);
           setQuote(q);
           setFuelLogs(fl.items);
+          setHasLogs(fl.items.length > 0);
           try {
             const br = await api.businesses.burn(demoBusinessId!);
             if (!cancelled) setBurn(br);
@@ -187,33 +189,29 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Quick actions */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <Link to="/burn">
-            <GlassCard hoverable padding="md" className="h-full">
-              <Camera size={28} weight="bold" className="text-navy" />
-              <h3 className="mt-3 font-display text-base text-ink">Log fuel</h3>
-              <p className="mt-1 text-sm text-ink-soft">Record what you spent</p>
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
+            <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
+              {hasLogs === false ? (
+                <>
+                  <Flame size={28} weight="bold" className="text-burn" />
+                  <h3 className="mt-3 font-display text-base text-ink">Tell us your fuel history</h3>
+                  <p className="mt-1 text-sm text-ink-soft">Takes about 2 minutes</p>
+                </>
+              ) : (
+                <>
+                  <Camera size={28} weight="bold" className="text-navy" />
+                  <h3 className="mt-3 font-display text-base text-ink">Log fuel</h3>
+                  <p className="mt-1 text-sm text-ink-soft">Record what you spent</p>
+                </>
+              )}
             </GlassCard>
           </Link>
           <Link to={`/quote/${demoQuoteId}`}>
-            <GlassCard hoverable padding="md" className="h-full">
+            <GlassCard hoverable padding="lg" className="h-full">
               <Receipt size={28} weight="bold" className="text-navy" />
               <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
               <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
-            </GlassCard>
-          </Link>
-          <Link to={`/asset/${demoAssetId}`}>
-            <GlassCard hoverable padding="md" className="h-full">
-              <SunHorizon size={28} weight="bold" className="text-navy" />
-              <h3 className="mt-3 font-display text-base text-ink">Your system</h3>
-              <p className="mt-1 text-sm text-ink-soft">Check installation status</p>
-            </GlassCard>
-          </Link>
-          <Link to={`/wrapped/${demoBusinessId}`}>
-            <GlassCard hoverable padding="md" className="h-full">
-              <Sparkle size={28} weight="bold" className="text-navy" />
-              <h3 className="mt-3 font-display text-base text-ink">Your year</h3>
-              <p className="mt-1 text-sm text-ink-soft">See your annual impact</p>
             </GlassCard>
           </Link>
         </div>

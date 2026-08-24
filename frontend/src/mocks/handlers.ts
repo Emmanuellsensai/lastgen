@@ -16,6 +16,8 @@ import {
   type CreditFileDetail,
   type FuelLog,
   type Installment,
+  type KycRecord,
+  type KycStatus,
   type Loan,
   type MeterReading,
   type Payment,
@@ -138,10 +140,15 @@ function creditFileDetail(file: CreditFile): CreditFileDetail {
   };
 }
 
-function impactFor(businessId: string, period: 'month' | 'year' | 'all') {
+function impactFor(businessId: string, period: 'month' | 'year' | 'all' | number) {
   const burn = db.burnProfiles.find((p) => p.businessId === businessId);
   const asset = assetByBusiness(businessId);
-  const days = period === 'month' ? 30 : period === 'year' ? 365 : 730;
+  const days =
+    typeof period === 'number'
+      ? period
+      : period === 'month' ? 30
+      : period === 'year' ? 365
+      : 730;
   const litresPerDay = burn?.litresPerDay ?? 0;
   const readings = asset ? db.meterReadings.filter((r) => r.assetId === asset.id) : [];
   const windowStart = db.now.getTime() - days * 86_400_000;
@@ -629,8 +636,10 @@ const impactHandlers: HttpHandler[] = [
     await lag();
     const businessId = String(params.id);
     if (!businessById(businessId)) return notFound('Business');
-    const year = Number(new URL(request.url).searchParams.get('year') ?? db.now.getUTCFullYear());
-    const impact = impactFor(businessId, 'year');
+    const url = new URL(request.url);
+    const year = Number(url.searchParams.get('year') ?? db.now.getUTCFullYear());
+    const days = url.searchParams.get('days') ? Number(url.searchParams.get('days')) : 365;
+    const impact = impactFor(businessId, days);
     return ok({
       year,
       nairaSavedKobo: impact.nairaSavedKobo,
@@ -832,6 +841,168 @@ const walletHandlers: HttpHandler[] = [
   }),
 ];
 
+const adminHandlers: HttpHandler[] = [
+  http.get(`${BASE}/admin/users`, async () => {
+    await lag();
+    return ok({
+      items: db.businesses.map((b) => {
+        const asset = db.assets.find((a) => a.businessId === b.id);
+        const loan = db.loans.find((l) => asset && l.assetId === asset.id);
+        return {
+          id: b.id,
+          name: b.name,
+          city: b.city,
+          type: b.type,
+          createdAt: db.now.toISOString(),
+          kycStatus: 'pending' as KycStatus,
+          assetStatus: asset?.status ?? null,
+          assetId: asset?.id ?? null,
+          loanId: loan?.id ?? null,
+          loanBalanceKobo: loan?.balanceKobo ?? null,
+        };
+      }),
+    });
+  }),
+
+  http.post(`${BASE}/admin/assets/:id/toggle-power`, async ({ params }) => {
+    await lag();
+    const asset = db.assets.find((a) => a.id === String(params.id));
+    if (!asset) return notFound('Asset');
+    asset.status = asset.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    return ok({ id: asset.id, status: asset.status });
+  }),
+
+  http.get(`${BASE}/admin/orders`, async () => {
+    await lag();
+    const pendingLoans = db.loans.filter((l) => l.status !== 'CLOSED');
+    return ok({
+      items: pendingLoans.map((loan) => {
+        const asset = db.assets.find((a) => a.id === loan.assetId);
+        const business = asset ? db.businesses.find((b) => b.id === asset.businessId) : null;
+        return {
+          loanId: loan.id,
+          businessName: business?.name ?? 'Unknown',
+          businessId: business?.id ?? '',
+          assetId: asset?.id ?? '',
+          assetStatus: asset?.status ?? 'ACTIVE',
+          balanceKobo: loan.balanceKobo,
+          monthlyPaymentKobo: loan.monthlyPaymentKobo,
+          nextDueAt: loan.nextDueAt,
+          status: loan.status,
+        };
+      }),
+    });
+  }),
+
+  http.post(`${BASE}/admin/loans/:id/approve-payment`, async ({ params }) => {
+    await lag();
+    const loan = db.loans.find((l) => l.id === String(params.id));
+    if (!loan) return notFound('Loan');
+    const { payment } = settlePayment(loan, loan.monthlyPaymentKobo, 'SIMULATED', `ADMIN-${Date.now()}`);
+    return ok({ paymentId: payment.id, status: 'SUCCESS' });
+  }),
+];
+
+const kycHandlers: HttpHandler[] = [
+  http.get(`${BASE}/businesses/:id/kyc`, async ({ params }) => {
+    await lag();
+    const businessId = String(params.id);
+    return ok<KycRecord>({
+      id: `kyc_${businessId}`,
+      businessId,
+      userId: 'usr_demo',
+      status: 'unverified',
+      submittedAt: null,
+      reviewedAt: null,
+      rejectionReason: null,
+      selfieUrl: null,
+      bankSlipUrl: null,
+      ninNumber: null,
+      ninVerified: false,
+    });
+  }),
+
+  http.post(`${BASE}/businesses/:id/kyc/submit`, async ({ params }) => {
+    await new Promise((r) => setTimeout(r, 2000));
+    const businessId = String(params.id);
+    return ok<KycRecord>({
+      id: `kyc_${businessId}`,
+      businessId,
+      userId: 'usr_demo',
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      reviewedAt: null,
+      rejectionReason: null,
+      selfieUrl: 'data:image/png;base64,demo',
+      bankSlipUrl: '/img/receipts/demo-slip.jpg',
+      ninNumber: '12345678901',
+      ninVerified: true,
+    });
+  }),
+
+  http.get(`${BASE}/admin/kyc`, async () => {
+    await lag();
+    return ok({
+      items: db.businesses.map((b) => ({
+        id: `kyc_${b.id}`,
+        businessId: b.id,
+        businessName: b.name,
+        userId: 'usr_demo',
+        status: 'pending' as KycStatus,
+        submittedAt: new Date(Date.now() - 86_400_000).toISOString(),
+        reviewedAt: null,
+        rejectionReason: null,
+        selfieUrl: null,
+        bankSlipUrl: null,
+        ninNumber: '12345678901',
+        ninVerified: true,
+      })),
+    });
+  }),
+
+  http.post(`${BASE}/admin/kyc/:id/approve`, async ({ params }) => {
+    await lag();
+    return ok({ id: String(params.id), status: 'approved' as KycStatus, reviewedAt: new Date().toISOString() });
+  }),
+
+  http.post(`${BASE}/admin/kyc/:id/reject`, async ({ request, params }) => {
+    await lag();
+    const body = (await request.json()) as { reason: string };
+    return ok({ id: String(params.id), status: 'rejected' as KycStatus, rejectionReason: body.reason, reviewedAt: new Date().toISOString() });
+  }),
+];
+
+const bankAuthHandlers: HttpHandler[] = [
+  http.post(`${BASE}/auth/bank/register`, async ({ request }) => {
+    await lag();
+    const body = (await request.json()) as { bankName: string; bankId: string; password: string; confirmPassword: string };
+    if (!body?.bankName || !body?.bankId || !body?.password) {
+      return fail('VALIDATION', 'Bank name, bank ID and password are required');
+    }
+    if (body.password !== body.confirmPassword) {
+      return fail('VALIDATION', 'Passwords do not match');
+    }
+    return ok({
+      user: { id: `bank_${body.bankId}`, bankId: body.bankId, bankName: body.bankName },
+      role: 'bank' as const,
+      accessToken: `tok_bank_${body.bankId}`,
+    });
+  }),
+
+  http.post(`${BASE}/auth/bank/login`, async ({ request }) => {
+    await lag();
+    const body = (await request.json()) as { bankId: string; password: string };
+    if (!body?.bankId || !body?.password) {
+      return fail('VALIDATION', 'Bank ID and password are required');
+    }
+    return ok({
+      user: { id: `bank_${body.bankId}`, bankId: body.bankId, bankName: 'Demo Bank' },
+      role: 'bank' as const,
+      accessToken: `tok_bank_${body.bankId}`,
+    });
+  }),
+];
+
 export const handlers: HttpHandler[] = [
   ...businessHandlers,
   ...quoteHandlers,
@@ -843,6 +1014,9 @@ export const handlers: HttpHandler[] = [
   ...demoHandlers,
   ...webhookHandlers,
   ...walletHandlers,
+  ...adminHandlers,
+  ...kycHandlers,
+  ...bankAuthHandlers,
 ];
 
 export { DEMO_BUSINESS_ID };

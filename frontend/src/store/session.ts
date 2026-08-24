@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEMO_IDS } from '@/components/layout/navigation';
+import type { KycStatus } from '@/types/api';
 
 export type SessionRole = 'owner' | 'bank' | 'guest';
 
@@ -17,6 +18,7 @@ export interface SessionState {
   authProvider: 'google' | 'apple' | 'email' | null;
   isSignedIn: boolean;
   isAdmin: boolean;
+  kycStatus: KycStatus;
   signIn: (role: 'owner' | 'bank') => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -26,6 +28,7 @@ export interface SessionState {
   setRole: (role: SessionRole) => void;
   setAccessToken: (token: string | null) => void;
   setBusinessId: (id: string | null) => void;
+  setKycStatus: (status: KycStatus) => void;
   signOut: () => void;
 }
 
@@ -44,6 +47,7 @@ export const useSession = create<SessionState>()(
       authProvider: null,
       isSignedIn: false,
       isAdmin: false,
+      kycStatus: 'unverified',
 
       signIn: (role) =>
         set({
@@ -165,6 +169,7 @@ export const useSession = create<SessionState>()(
         }
       },
 
+      setKycStatus: (kycStatus) => set({ kycStatus }),
       setIsAdmin: (isAdmin) => set({ isAdmin }),
       setRole: (role) => set({ role }),
       setAccessToken: (accessToken) => set({ accessToken }),
@@ -184,6 +189,7 @@ export const useSession = create<SessionState>()(
           authProvider: null,
           isSignedIn: false,
           isAdmin: false,
+          kycStatus: 'unverified',
         }),
     }),
     { name: 'lastgen.session' },

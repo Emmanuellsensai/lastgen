@@ -67,7 +67,7 @@ export function PhotoStrip({ images = PLACEHOLDER_PHOTOS, className }: PhotoStri
         >
           {images.map((src) => (
             <div key={src} className="h-full w-full shrink-0">
-              <img src={src} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
+              <img src={src} alt="" className="h-full w-full object-contain object-center" loading="lazy" />
             </div>
           ))}
         </motion.div>

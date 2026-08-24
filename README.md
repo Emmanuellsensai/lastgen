@@ -41,7 +41,7 @@ cp backend/.env.example backend/.env
 pnpm dev
 ```
 
-`pnpm dev` runs both workspaces concurrently. Frontend on `http://localhost:5173`,
+`pnpm dev (clearify)` runs both workspaces concurrently. Frontend on `http://localhost:5173`,
 backend on `http://localhost:8080`.
 
 ## Scripts

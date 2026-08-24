@@ -36,6 +36,22 @@ export type PaymentStatus =
   | 'EXPIRED';
 export type ImpactPeriod = 'month' | 'year' | 'all';
 
+export type KycStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
+
+export interface KycRecord {
+  id: string;
+  businessId: string;
+  userId: string;
+  status: KycStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  selfieUrl: string | null;
+  bankSlipUrl: string | null;
+  ninNumber: string | null;
+  ninVerified: boolean;
+}
+
 /* Entities */
 export interface Business {
   id: string;
@@ -326,4 +342,47 @@ export interface PortfolioAssetsQuery {
   status?: AssetStatus;
   city?: string;
   page?: number;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  city: string;
+  type: string;
+  createdAt: string;
+  kycStatus: KycStatus;
+  assetStatus: AssetStatus | null;
+  assetId: string | null;
+  loanId: string | null;
+  loanBalanceKobo: number | null;
+}
+
+export interface AdminOrder {
+  loanId: string;
+  businessName: string;
+  businessId: string;
+  assetId: string;
+  assetStatus: AssetStatus;
+  balanceKobo: number;
+  monthlyPaymentKobo: number;
+  nextDueAt: string;
+  status: string;
+}
+
+export interface BankRegisterBody {
+  bankName: string;
+  bankId: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface BankLoginBody {
+  bankId: string;
+  password: string;
+}
+
+export interface BankAuthResult {
+  user: { id: string; bankId: string; bankName: string };
+  role: 'bank';
+  accessToken: string;
 }
