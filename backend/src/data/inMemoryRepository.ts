@@ -42,6 +42,7 @@ import type {
   ImpactPeriod,
   ImpactSummary,
   Installment,
+  KycRecord,
   Loan,
   MeterReading,
   PagedEnvelope,
@@ -62,6 +63,7 @@ import type {
   ReceiptExtraction,
   RegisterBankInput,
   Repository,
+  SubmitKycInput,
   WalletStatementQuery,
 } from './repository.js';
 
@@ -822,6 +824,38 @@ export class InMemoryRepository implements Repository {
       throw new ApiError('UNAUTHORIZED', 'Invalid bank ID or password', 401);
     }
     return { user: entry.user, accessToken: `tok_bank_${entry.user.bankId}` };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* KYC                                                                 */
+  /* ------------------------------------------------------------------ */
+
+  async kycRecordFor(businessId: string): Promise<KycRecord | undefined> {
+    await this.findBusinessOrThrow(businessId);
+    return this.state.kycRecords[businessId];
+  }
+
+  async submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord> {
+    await this.findBusinessOrThrow(businessId);
+    const existing = this.state.kycRecords[businessId];
+    if (existing?.status === 'approved') {
+      throw new ApiError('INVALID_TRANSITION', 'KYC is already approved', 409);
+    }
+    const record: KycRecord = {
+      id: existing?.id ?? `kyc_${businessId}`,
+      businessId,
+      userId: input.userId ?? existing?.userId ?? '',
+      status: 'pending',
+      submittedAt: this.state.now.toISOString(),
+      reviewedAt: null,
+      rejectionReason: null,
+      selfieUrl: input.selfieUrl,
+      bankSlipUrl: input.bankSlipUrl,
+      ninNumber: input.ninNumber,
+      ninVerified: input.ninVerified,
+    };
+    this.state.kycRecords[businessId] = record;
+    return record;
   }
 
   /* ------------------------------------------------------------------ */

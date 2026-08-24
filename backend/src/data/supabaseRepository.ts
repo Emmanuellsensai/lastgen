@@ -66,6 +66,7 @@ import type {
   ImpactPeriod,
   ImpactSummary,
   Installment,
+  KycRecord,
   Loan,
   MeterReading,
   PagedEnvelope,
@@ -86,6 +87,7 @@ import type {
   ReceiptExtraction,
   RegisterBankInput,
   Repository,
+  SubmitKycInput,
   WalletStatementQuery,
 } from './repository.js';
 
@@ -108,6 +110,21 @@ interface BankUserRow {
   bank_id: string;
   bank_name: string;
   created_at: string;
+}
+
+/** kyc_records row (snake_case, as PostgREST returns it). */
+interface KycRecordRow {
+  id: string;
+  business_id: string;
+  user_id: string | null;
+  status: 'unverified' | 'pending' | 'approved' | 'rejected';
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  selfie_url: string | null;
+  bank_slip_url: string | null;
+  nin_number: string | null;
+  nin_verified: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -367,6 +384,72 @@ export class SupabaseRepository implements Repository {
       throw new ApiError('UNAUTHORIZED', 'Invalid bank ID or password', 401);
     }
     return this.signInBank(trimmed, password, record);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* KYC                                                                 */
+  /* ------------------------------------------------------------------ */
+
+  private mapKycRecord(row: KycRecordRow): KycRecord {
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      userId: row.user_id ?? '',
+      status: row.status,
+      submittedAt: row.submitted_at,
+      reviewedAt: row.reviewed_at,
+      rejectionReason: row.rejection_reason,
+      selfieUrl: row.selfie_url,
+      bankSlipUrl: row.bank_slip_url,
+      ninNumber: row.nin_number,
+      ninVerified: row.nin_verified,
+    };
+  }
+
+  async kycRecordFor(businessId: string): Promise<KycRecord | undefined> {
+    await this.findBusinessOrThrow(businessId);
+    const row = await this.run(
+      this.db.from('kyc_records').select('*').eq('business_id', businessId).maybeSingle(),
+    );
+    return row ? this.mapKycRecord(row as KycRecordRow) : undefined;
+  }
+
+  async submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord> {
+    const business = await this.loadBusiness(businessId);
+    if (!business) throw new ApiError('NOT_FOUND', 'Business not found', 404);
+
+    // An approved record is immutable — resubmission would silently reopen a
+    // reviewed identity, so it is an invalid transition like any other.
+    const existingRow = await this.run(
+      this.db.from('kyc_records').select('status').eq('business_id', businessId).maybeSingle(),
+    );
+    if ((existingRow as { status: string } | null)?.status === 'approved') {
+      throw new ApiError('INVALID_TRANSITION', 'KYC is already approved', 409);
+    }
+
+    const nowIso = new Date().toISOString();
+    const values = {
+      id: `kyc_${businessId}`,
+      business_id: businessId,
+      user_id: input.userId ?? null,
+      status: 'pending' as const,
+      submitted_at: nowIso,
+      reviewed_at: null,
+      rejection_reason: null,
+      selfie_url: input.selfieUrl,
+      bank_slip_url: input.bankSlipUrl,
+      nin_number: input.ninNumber,
+      nin_verified: input.ninVerified,
+      updated_at: nowIso,
+    };
+    const row = await this.run(
+      this.db
+        .from('kyc_records')
+        .upsert(values, { onConflict: 'business_id' })
+        .select('*')
+        .single(),
+    );
+    return this.mapKycRecord(row as KycRecordRow);
   }
 
   /* ------------------------------------------------------------------ */

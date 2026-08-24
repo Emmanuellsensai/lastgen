@@ -29,6 +29,7 @@ import type {
   ImpactPeriod,
   ImpactSummary,
   Installment,
+  KycRecord,
   Loan,
   MeterReading,
   PagedEnvelope,
@@ -61,6 +62,15 @@ export interface RegisterBankInput {
 export interface BankSession {
   user: BankUser;
   accessToken: string;
+}
+
+/** Verified KYC submission payload; URLs come from the storage service. */
+export interface SubmitKycInput {
+  userId?: string | null;
+  ninNumber: string;
+  ninVerified: boolean;
+  selfieUrl: string;
+  bankSlipUrl: string;
 }
 
 /** Internal full settlement result; the HTTP layer maps it to the slim PayResult. */
@@ -97,6 +107,16 @@ export interface Repository {
   registerBank(input: RegisterBankInput): Promise<BankSession>;
   /** Verify bankId + password. Unknown id or wrong password throws UNAUTHORIZED. */
   authenticateBank(bankId: string, password: string): Promise<BankSession>;
+
+  /* KYC ------------------------------------------------------------ */
+  /** The business's KYC record, or undefined before the first submission. */
+  kycRecordFor(businessId: string): Promise<KycRecord | undefined>;
+  /**
+   * Record a verified submission: status becomes pending with fresh document
+   * URLs and timestamps. Unknown business throws NOT_FOUND; an approved
+   * record is immutable and throws INVALID_TRANSITION.
+   */
+  submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord>;
 
   /* Fuel logs and burn --------------------------------------------- */
   addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog>;

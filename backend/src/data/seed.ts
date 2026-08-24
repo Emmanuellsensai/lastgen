@@ -20,6 +20,7 @@ import type {
   CreditFile,
   FuelLog,
   Installment,
+  KycRecord,
   Loan,
   MeterReading,
   Payment,
@@ -665,6 +666,8 @@ export interface DemoDb {
   walletTransactions: WalletTransaction[];
   /** KYC captured at wallet creation, kept off the public Wallet type. */
   walletKyc: Record<string, { nin: string; firstName: string; lastName: string; phone: string }>;
+  /** Identity verification records, keyed by businessId. Empty until submissions arrive. */
+  kycRecords: Record<string, KycRecord>;
 }
 
 export function buildSeed(): DemoDb {
@@ -768,5 +771,6 @@ export function buildSeed(): DemoDb {
     wallets: [],
     walletTransactions: [],
     walletKyc: {},
+    kycRecords: {},
   };
 }
