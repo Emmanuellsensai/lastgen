@@ -89,7 +89,7 @@ Supabase or a live payment provider.
 | 6 | Demo routes + README + Supabase/deploy | ⬜ pending |
 | 7 | Integration + final docs + PR prep | ⬜ pending |
 | 8 | RBAC + bank identity | ✅ complete (6 commits) |
-| 9 | KYC lifecycle | ⬜ pending |
+| 9 | KYC lifecycle | ✅ complete (6 commits) |
 | 10 | Admin surface | ⬜ pending |
 | 11 | Docs + env polish for the admin sprint | ⬜ pending |
 
@@ -124,24 +124,21 @@ looser than production must be:
 - **Verification:** typecheck ✅, lint ✅, full suite 199/199 ✅, boot smoke
   (health, register 201 envelope, fail-closed 401 login) ✅.
 
-### Phase 9 — KYC lifecycle
-
-**Goal.** Business identity verification: NIN + bank slip + selfie submission
-and review.
-
-**Design.**
-- Multipart handling via a multer `.fields()` helper (`bankSlip`, `selfie`),
-  extending the existing single-file pattern in `routes/helpers.ts`.
-- `services/ninVerification.ts`: provider seam with a `simulated` provider
-  (11-digit format check → `ninVerified: true`), ready to swap a real NIMC
-  adapter without touching routes.
-- `services/kycStorage.ts`: demo mode returns data URLs (MSW parity); live
-  mode uploads to the private `kyc-docs` bucket and returns signed URLs.
-- Repository: `kycRecordFor(businessId)` (synthesizes an `unverified` record
-  when none exists) and `submitKyc(...)` → status `pending`.
-- Lifecycle: `unverified → pending → approved | rejected`; approve/reject only
-  from `pending` (else `409 INVALID_TRANSITION`). GET/POST under
-  `/businesses/:id/kyc(/submit)`.
+### Phase 9 — KYC lifecycle (complete)
+- **Delivered:** `fileFields` multer helper (bankSlip + selfie, 5 MB each);
+  `services/ninVerification.ts` provider seam (`NIN_PROVIDER=simulated`
+  validates 11 digits and passes; `nimc` fails closed with UNAVAILABLE until
+  the real adapter lands); `services/kycStorage.ts` (demo data URLs / live
+  private-bucket signed URLs, Supabase client resolved lazily per upload);
+  `Repository.kycRecordFor/submitKyc` on both implementations (Supabase
+  upserts on the per-business unique index); `GET /businesses/:id/kyc`
+  synthesizing an unverified projection and multipart submit parking the
+  record in `pending`; live-mode ownership enforced like the wallet router.
+- **Invariant:** approved records are immutable — resubmission throws
+  `409 INVALID_TRANSITION` because it would silently reopen a reviewed
+  identity.
+- **Tests:** `backend/test/contract/kyc.test.ts` (9).
+- **Verification:** typecheck ✅, lint ✅, full suite 208/208 ✅.
 
 ### Phase 10 — Admin surface
 

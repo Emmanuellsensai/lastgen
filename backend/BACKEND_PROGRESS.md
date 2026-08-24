@@ -95,7 +95,8 @@ reproduce their externally observable behaviour without importing any code from
 | Role model (`makeRequireRole`)    | ✅     | `middleware/auth.ts`; live reads `app_metadata.role`, FORBIDDEN 403 (Phase 8)                                                                      |
 | Bank identities                   | ✅     | `/auth/bank/register`+`/login`, Supabase Auth-backed; `bank_users` mirror (Phase 8)                                                                |
 | RBAC/KYC migration                | ✅     | `migrations/rbac-kyc.sql`: bank_users, kyc_records, kyc-docs bucket (Phase 8)                                                                      |
-| Render deployment verification    | ⬜     | Needs live Supabase + ALAT credentials                                                                                                             |
+| KYC lifecycle                     | ✅     | Business get/submit + NIN provider seam + document storage (Phase 9)                                                                              |
+| Render deployment verification    | ⬜     | Needs live Supabase + ALAT credentials                                                                                                            |
 
 ## 5. Implemented foundation (Phase 0)
 
@@ -338,6 +339,34 @@ the role model and credit-desk identities they require.
   mounting-order proof (register answers without a bearer while
   boundary-protected routes fail closed 401 in live mode).
 
+### 6.14 KYC lifecycle (Phase 9)
+
+Driver: the frontend KYC page submits NIN + bank slip + selfie
+(multipart) and reads the record back; admin review lands in Phase 10.
+
+- **Endpoints.** `GET /businesses/:id/kyc` returns the stored record or a
+  synthesized `unverified` projection (MSW parity); `POST .../kyc/submit`
+  accepts multipart `ninNumber` + `bankSlip` + `selfie`, validates document
+  types (selfie image, slip image/PDF), verifies the NIN through the provider
+  seam, stores documents and parks the record in `pending` (201).
+- **Seams.** `NinProvider` (`services/ninVerification.ts`) — simulated
+  provider validates the 11-digit format and passes; selecting `nimc` fails
+  closed with UNAVAILABLE so a misconfiguration cannot silently approve.
+  `KycStorage` (`services/kycStorage.ts`) — demo data URLs, live private-
+  bucket signed URLs with the Supabase client resolved lazily per upload
+  (composition stays credential-free, matching requireAuth's posture).
+- **Repository.** `kycRecordFor/submitKyc`: in-memory keyed off the seed's
+  `kycRecords` map; Supabase upserts on the per-business unique index from
+  rbac-kyc.sql. Approved records are immutable — resubmission throws
+  INVALID_TRANSITION rather than reopening a reviewed identity.
+- **Authz.** Live mode requires ownership of the target business (403),
+  mirroring the wallet router; demo trusts the demo owner.
+- **Env.** `NIN_PROVIDER=simulated|nimc`, `KYC_BUCKET=kyc-docs` parsed in
+  config/env.ts (.env.example documented in Phase 11).
+- **Tests.** `backend/test/contract/kyc.test.ts` (9): projection parity,
+  validation matrix (documents/mime/NIN), resubmission semantics,
+  read-after-write consistency.
+
 ## 7. Decision register
 
 | Decision                    | Choice                                                                           | Rationale                                                                                     |
@@ -364,6 +393,9 @@ the role model and credit-desk identities they require.
 | Bank login failure shape    | One `UNAUTHORIZED` message for unknown id and wrong password                     | Never reveal which half of the credential pair was wrong                                      |
 | Duplicate bankId status     | `VALIDATION` 400 (not a new 409 code)                                            | Stays inside the frozen contract error table; registration is input validation                |
 | Bank auth placement         | Mounted before `makeRequireAuth`, like webhooks                                  | A caller cannot present a bearer token it does not have yet                                   |
+| NIN verification posture    | Simulated provider passes on format; `nimc` selection fails closed (503)         | A misconfigured deployment must never silently approve identities                             |
+| KYC resubmission            | Allowed while pending/rejected; blocked once approved (409)                      | Resubmitting a reviewed identity would silently reopen it                                     |
+| KYC storage resolution      | Supabase client resolved lazily per upload                                       | Composition stays credential-free so live-mode test apps boot and fail closed per request     |
 | Payment lifecycle           | Book `pending_authorisation`, settle via webhook/poll/wallet in one transaction  | Same atomic `applySettlement` primitive for every entry path                                  |
 | Wallet source of truth      | Business cash wallet (`035`/`NGN`), demo pre-funded NGN 50k on create            | Demo needs a funded wallet; live starts at 0, funded externally, no top-up endpoint           |
 | Wallet ownership            | `/wallets/*` resolves business from `req.user` via `businessForOwner`            | Authz invariant: no cross-user access, never trust the body                                   |
