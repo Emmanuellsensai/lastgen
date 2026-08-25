@@ -1,10 +1,25 @@
 # Lastgen
 
-> Hackaholics submission. Fill in every section below before the deadline.
+> Hackaholics submission.
 
 ## 1. Project description
 
-_Placeholder. One paragraph on the problem, who it is for, and how Lastgen solves it._
+Nigerian small businesses run on petrol generators, and the fuel is a
+recurring cost nobody tracks precisely — it leaves as cash, a few thousand
+naira at a time, and never shows up as a number anyone can act on. Solar would
+be cheaper, but it needs money upfront that a frozen-foods shop or a print
+studio does not have, and no lender will underwrite an asset for a business
+whose real running costs are undocumented.
+
+Lastgen turns the fuel spend itself into the credit file. An owner logs what
+they paid at the pump — by photographing the receipt, or typing the amount —
+and the burn profile that accumulates becomes evidence: a verified monthly
+cost, observed over time. Against that number Lastgen sizes a solar system and
+quotes a lease that must, by rule, cost less every month than the fuel it
+replaces. The owner accepts, a credit desk underwrites the file, and on
+approval the system is installed with a metered loan behind it: repayments
+tracked, generation measured, and the asset remotely suspendable if the loan
+falls delinquent. What the business saves is what pays for the system.
 
 ## 2. Live frontend URL
 
@@ -18,7 +33,7 @@ Health check: https://lastgen.onrender.com/health
 
 ## 4. Demo video link
 
-_Placeholder. Public link to the demo video._
+_To add before submission._
 
 ---
 

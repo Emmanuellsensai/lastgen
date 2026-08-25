@@ -676,11 +676,13 @@ const portfolioHandlers: HttpHandler[] = [
     const url = new URL(request.url);
     const status = url.searchParams.get('status') as AssetStatus | null;
     const city = url.searchParams.get('city');
+    const businessId = url.searchParams.get('businessId');
     const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
 
     let items = db.assets;
     if (status) items = items.filter((a) => a.status === status);
     if (city) items = items.filter((a) => db.assetCity[a.id] === city);
+    if (businessId) items = items.filter((a) => a.businessId === businessId);
     const total = items.length;
     const start = (page - 1) * PAGE_SIZE;
     return ok({ items: items.slice(start, start + PAGE_SIZE), total });

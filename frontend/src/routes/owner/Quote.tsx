@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { buildSchedule } from '@/lib/lease';
 import { useSession } from '@/store/session';
 import type { Quote as QuoteType, Installment, BurnProfile } from '@/types/api';
 
@@ -35,6 +36,7 @@ export default function Quote() {
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [acceptError, setAcceptError] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -75,35 +77,33 @@ export default function Quote() {
   async function handleAccept() {
     if (!id) return;
     setAccepting(true);
+    setAcceptError('');
     try {
-      // TODO(BE): needs POST /quotes/:id/accept
-      // Expected request: { quoteId }
-      // Expected response: { creditFileId, status: 'PENDING' }
-      // Until available: show success state
+      // Idempotent server-side: re-accepting resolves to the same credit file.
+      await api.quotes.accept(id);
       setAccepted(true);
     } catch {
-      // ignore
+      setAcceptError('We could not submit your application. Try again.');
     } finally {
       setAccepting(false);
     }
   }
 
-  /* If no real schedule, show estimated rows */
-  const estimatedSchedule: Installment[] = schedule.length > 0
-    ? schedule
-    : quote
-      ? Array.from({ length: 3 }, (_, i) => {
-          const interest = Math.round(quote.monthlyPaymentKobo * (quote.aprBps / 10000));
-          const principal = quote.monthlyPaymentKobo - interest;
-          return {
-            n: i + 1,
-            dueAt: new Date(Date.now() + (i + 1) * 30 * 86_400_000).toISOString(),
-            principalKobo: principal,
-            interestKobo: interest,
-            balanceKobo: quote.totalPayableKobo - quote.monthlyPaymentKobo * (i + 1),
-          };
-        })
-      : [];
+  /* Before approval there is no loan, so the schedule is projected from the
+     quote with the same amortisation the backend uses. The previous estimate
+     applied the full APR as one month's interest and straight-lined the
+     balance, which overstated interest by roughly twelve times. */
+  const estimatedSchedule: Installment[] =
+    schedule.length > 0
+      ? schedule
+      : quote
+        ? buildSchedule(
+            quote.system.priceKobo - quote.depositKobo,
+            quote.aprBps,
+            quote.tenorMonths,
+            new Date(),
+          )
+        : [];
 
   const totalPages = Math.ceil(estimatedSchedule.length / PAGE_SIZE);
   const pageItems = estimatedSchedule.slice(
@@ -308,6 +308,9 @@ export default function Quote() {
           </div>
         ) : (
           <div>
+            {acceptError && (
+              <p className="mb-4 text-sm text-burn">{acceptError}</p>
+            )}
             <Money kobo={quote?.monthlyPaymentKobo ?? 0} size="xl" className="mt-2" />
             <p className="mt-6 text-sm leading-relaxed text-ink-soft">
               By accepting, you agree to make {quote?.tenorMonths} monthly payments of{' '}

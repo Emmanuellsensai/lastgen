@@ -1,14 +1,22 @@
 import { Router } from 'express';
+import type { Env } from '../config/env.js';
 import type { Repository } from '../data/repository.js';
 import { ok } from '../lib/envelope.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { makeRequireRole } from '../middleware/auth.js';
 import type { CreditFileStatus, DeclineBody } from '../types/api.js';
 
 // Credit applications: list, detail (with recent fuel logs and schedule
 // preview), approve, decline.
+//
+// The whole surface is the credit desk's: it reads and decides on every
+// business's file. An owner asking after their own application uses
+// GET /businesses/:id/application instead, which is scoped to one business.
 
-export function createCreditRouter(repo: Repository): Router {
+export function createCreditRouter(repo: Repository, env: Env): Router {
   const router = Router();
+
+  router.use(makeRequireRole(env, 'bank', 'admin'));
 
   router.get('/credit/applications', (req, res, next) => {
     void (async () => {

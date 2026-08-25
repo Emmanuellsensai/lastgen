@@ -12,7 +12,7 @@ import { Toast, ToastTitle } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import { API_MODE } from '@/lib/api';
-import type { FuelLog } from '@/types/api';
+import type { Asset, Business, BurnProfile, FuelLog, Quote } from '@/types/api';
 import FuelIntakeModal from './FuelIntakeModal';
 
 const PAGE_SIZE = 30;
@@ -67,6 +67,15 @@ export default function Burn() {
   const { businessId, demoBusinessId } = useSession();
   const effectiveBusinessId = API_MODE === 'live' ? businessId : demoBusinessId;
 
+  /* Live business context — replaces the hardcoded demo figures below. */
+  const [business, setBusiness] = useState<Business | null>(null);
+  const [burn, setBurn] = useState<BurnProfile | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [asset, setAsset] = useState<Asset | null>(null);
+  const [quoteId, setQuoteId] = useState<string | null>(null);
+  /** Bumped whenever a log is added, edited or deleted, to refresh the burn. */
+  const [contextTick, setContextTick] = useState(0);
+
   const loadLogs = useCallback(async (offset: number, replace: boolean) => {
     if (!effectiveBusinessId) return;
     if (offset === 0) setLogsLoading(true);
@@ -87,6 +96,33 @@ export default function Burn() {
   useEffect(() => {
     loadLogs(0, true);
   }, [loadLogs]);
+
+  useEffect(() => {
+    if (!effectiveBusinessId) return;
+    let cancelled = false;
+    async function loadContext() {
+      const id = effectiveBusinessId!;
+      const [b, br, summary] = await Promise.all([
+        api.businesses.get(id).catch(() => null),
+        api.businesses.burn(id).catch(() => null),
+        api.businesses.summary(id).catch(() => null),
+      ]);
+      if (cancelled) return;
+      setBusiness(b);
+      setBurn(br);
+      setQuoteId(summary?.quoteId ?? null);
+      // The quote and asset are optional: neither exists before underwriting.
+      const [q, a] = await Promise.all([
+        summary?.quoteId ? api.quotes.get(summary.quoteId).catch(() => null) : null,
+        summary?.assetId ? api.assets.get(summary.assetId).catch(() => null) : null,
+      ]);
+      if (cancelled) return;
+      setQuote(q);
+      setAsset(a);
+    }
+    loadContext();
+    return () => { cancelled = true; };
+  }, [effectiveBusinessId, contextTick]);
 
   /* Re-load after adding a log */
   const prevTypeOpen = useRef(typeOpen);
@@ -121,6 +157,10 @@ export default function Burn() {
     if (!l || l <= 0 || !amt || amt <= 0 || !ppl || ppl <= 0) return;
     setSubmitting(true);
     try {
+      // There is no update endpoint: an edit is a delete plus a re-add at the
+      // original timestamp. Adding alone left the old row in place, so every
+      // edit used to double-count against the burn profile.
+      await api.fuelLogs.remove(effectiveBusinessId, editLog.id);
       await api.businesses.addFuelLog(effectiveBusinessId, {
         litres: l,
         amountKobo: Math.round(amt * 100),
@@ -128,6 +168,7 @@ export default function Burn() {
         loggedAt: editLog.loggedAt,
       });
       setEditLog(null);
+      setContextTick((t) => t + 1);
       setToastMsg('Fuel log updated.');
       setToastTone('success');
       setToastOpen(true);
@@ -141,12 +182,24 @@ export default function Burn() {
     }
   }
 
-  function handleDelete(_log: FuelLog) {
-    // TODO(BE): needs DELETE /businesses/:id/fuel-logs/:logId
-    // Expected response: { ok: true }
-    setToastMsg('Deletion coming soon.');
-    setToastTone('neutral');
-    setToastOpen(true);
+  async function handleDelete(log: FuelLog) {
+    if (!effectiveBusinessId) return;
+    setSubmitting(true);
+    try {
+      await api.fuelLogs.remove(effectiveBusinessId, log.id);
+      setContextTick((t) => t + 1);
+      setToastMsg('Fuel log deleted.');
+      setToastTone('success');
+      setToastOpen(true);
+      // The backend recomputes the burn profile on delete; reload both.
+      loadLogs(0, true);
+    } catch {
+      setToastMsg('Could not delete the fuel log. Try again.');
+      setToastTone('neutral');
+      setToastOpen(true);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const typeValid = parseFloat(litres) > 0 && parseFloat(amountNaira) > 0 && parseFloat(pricePerLitre) > 0;
@@ -181,6 +234,7 @@ export default function Burn() {
       setLitres('');
       setAmountNaira('');
       setPricePerLitre('');
+      setContextTick((t) => t + 1);
       setToastMsg('Fuel log added.');
       setToastTone('success');
       setToastOpen(true);
@@ -196,51 +250,57 @@ export default function Burn() {
   return (
     <AppShell
       subNav={{
-        title: 'Adaeze Frozen Foods',
+        title: business?.name ?? 'Your business',
         backTo: '/',
-        action: <StatusPill status="ACTIVE" size="sm" />,
+        action: asset ? <StatusPill status={asset.status} size="sm" /> : undefined,
       }}
     >
       {/* The counter stands alone. */}
       <GlassPanel elevation={2} tint="burn" className="rounded-lg p-7 md:p-10">
         <BurnCounter
-          ratePerSecondKobo={187}
+          ratePerSecondKobo={burn ? Math.round(burn.dailyKobo / 86_400) : 0}
           startTimestamp={new Date(new Date().setHours(0, 0, 0, 0)).toISOString()}
           size="xl"
           label="Burned since midnight"
         />
       </GlassPanel>
 
-      <p className="mt-8 max-w-lg text-lg leading-relaxed text-ink-soft">
-        A solar system sized for this shop would cost{' '}
-        <Money kobo={36_654_539} size="md" className="text-success" /> a month.
-      </p>
+      {quote && (
+        <>
+          <p className="mt-8 max-w-lg text-lg leading-relaxed text-ink-soft">
+            A solar system sized for this shop would cost{' '}
+            <Money kobo={quote.monthlyPaymentKobo} size="md" className="text-success" /> a month.
+          </p>
 
-      <p className="mt-4 max-w-lg leading-relaxed text-ink-mute">
-        That is less than you spend on petrol, every month, starting the month it is installed.
-      </p>
+          <p className="mt-4 max-w-lg leading-relaxed text-ink-mute">
+            That is less than you spend on petrol, every month, starting the month it is installed.
+          </p>
+        </>
+      )}
 
-      <div className="mt-10">
-        <Button asChild size="lg">
-          <Link to={`/quote/${DEMO_IDS.quoteId}`}>See the full quote</Link>
-        </Button>
-      </div>
+      {quoteId && (
+        <div className="mt-10">
+          <Button asChild size="lg">
+            <Link to={`/quote/${quoteId}`}>See the full quote</Link>
+          </Button>
+        </div>
+      )}
 
       {/* One dominant figure, the other two deliberately smaller and apart. */}
       <section className="mt-16">
         <GlassCard elevation={1} padding="lg">
-          <p className="text-sm text-ink-mute">Spent on fuel this year</p>
-          <Money kobo={589_472_810} size="xl" className="mt-3 block text-burn" />
+          <p className="text-sm text-ink-mute">Fuel spend a year, at this rate</p>
+          <Money kobo={burn?.annualKobo ?? 0} size="xl" className="mt-3 block text-burn" />
         </GlassCard>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <GlassCard elevation={1} padding="lg">
-            <p className="text-sm text-ink-mute">This month</p>
-            <Money kobo={48_449_820} size="lg" className="mt-2 block" />
+            <p className="text-sm text-ink-mute">A month</p>
+            <Money kobo={burn?.monthlyKobo ?? 0} size="lg" className="mt-2 block" />
           </GlassCard>
           <GlassCard elevation={1} padding="lg">
-            <p className="text-sm text-ink-mute">Today</p>
-            <Money kobo={1_614_994} size="lg" className="mt-2 block" />
+            <p className="text-sm text-ink-mute">A day</p>
+            <Money kobo={burn?.dailyKobo ?? 0} size="lg" className="mt-2 block" />
           </GlassCard>
         </div>
       </section>

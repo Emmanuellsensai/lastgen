@@ -62,6 +62,30 @@ describe('portfolio contract', () => {
     expect(res.body.data.total).toBe(215);
   });
 
+  it('filters by business', async () => {
+    const res = await request(app).get('/api/portfolio/assets?businessId=biz_adaeze_frozen');
+    expect(res.status).toBe(200);
+    expect(res.body.data.total).toBe(1);
+    expect(res.body.data.items[0].id).toBe('ast_biz_adaeze_frozen');
+  });
+
+  it('returns an empty page for a business with no assets', async () => {
+    const res = await request(app).get('/api/portfolio/assets?businessId=biz_nope');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ items: [], total: 0 });
+  });
+
+  it('sits behind the auth boundary in live mode', async () => {
+    // The bank's whole book is role-scoped; without a bearer token live mode
+    // fails closed before the role gate is ever consulted.
+    const { app: liveApp } = createTestApp({ demoMode: false });
+    for (const path of ['/api/portfolio/stats', '/api/portfolio/assets']) {
+      const res = await request(liveApp).get(path);
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHORIZED');
+    }
+  });
+
   it('returns the export envelope', async () => {
     const res = await request(app).post('/api/portfolio/export');
     expect(res.status).toBe(200);
