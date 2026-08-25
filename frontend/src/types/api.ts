@@ -124,6 +124,11 @@ export interface CreditFile {
   verifiedMonths: number;
   status: CreditFileStatus;
   createdAt: string;
+  /** Set when the owner accepts the quote and submits the file for underwriting. */
+  submittedAt?: string;
+  /** Set when the credit file is approved — links to the created loan and asset. */
+  loanId?: string;
+  assetId?: string;
 }
 
 export interface Asset {
@@ -306,6 +311,22 @@ export interface PagedEnvelope<T> {
 export interface ApproveResult {
   loan: Loan;
   asset: Asset;
+}
+
+/**
+ * The live ids the owner dashboard needs after login. Any of them is null
+ * until the corresponding record exists (no quote yet, not yet approved).
+ */
+export interface BusinessSummary {
+  assetId: string | null;
+  loanId: string | null;
+  quoteId: string | null;
+}
+
+/** Result of submitting a quote for underwriting. */
+export interface AcceptQuoteResult {
+  creditFileId: string;
+  status: CreditFileStatus;
 }
 
 export interface PayResult {
