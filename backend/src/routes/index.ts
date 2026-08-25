@@ -8,6 +8,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { kycStorageFor } from '../services/kycStorage.js';
 import { ninProviderFor } from '../services/ninVerification.js';
 import { createAuthRouter } from './authRoutes.js';
+import { createAdminRouter } from './adminRoutes.js';
 import { createAssetRouter } from './assetRoutes.js';
 import { createBankAuthRouter } from './bankAuthRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
@@ -70,6 +71,8 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(createWalletRouter(repo, env));
   router.use(createPortfolioRouter(repo));
   router.use(createImpactRouter(repo));
+  // The credit desk: every route inside enforces the bank/admin role.
+  router.use(createAdminRouter(repo, env));
 
   // Contract JSON 404 instead of Express's HTML fallback.
   router.use((_req, _res, next) => next(new ApiError('NOT_FOUND', 'Route not found', 404)));
