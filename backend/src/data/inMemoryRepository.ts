@@ -171,8 +171,35 @@ export class InMemoryRepository implements Repository {
   }
 
   /* ------------------------------------------------------------------ */
+  /* Business summary                                                   */
+  /* ------------------------------------------------------------------ */
+
+  async businessSummary(
+    businessId: string,
+  ): Promise<{ assetId: string | null; loanId: string | null; quoteId: string | null }> {
+    const asset = await this.assetByBusiness(businessId);
+    const loan = asset ? await this.loanByAsset(asset.id) : undefined;
+    const cf = this.state.creditFiles.find((f) => f.businessId === businessId);
+    return {
+      assetId: asset?.id ?? null,
+      loanId: loan?.id ?? null,
+      quoteId: cf?.quote?.id ?? null,
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Fuel logs and burn                                                  */
   /* ------------------------------------------------------------------ */
+
+  async deleteFuelLog(businessId: string, logId: string): Promise<void> {
+    await this.findBusinessOrThrow(businessId);
+    const idx = this.state.fuelLogs.findIndex(
+      (l) => l.id === logId && l.businessId === businessId,
+    );
+    if (idx === -1) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
+    this.state.fuelLogs.splice(idx, 1);
+    await this.recomputeBurn(businessId);
+  }
 
   async addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog> {
     await this.findBusinessOrThrow(businessId);
@@ -261,6 +288,16 @@ export class InMemoryRepository implements Repository {
   /* Quotes                                                              */
   /* ------------------------------------------------------------------ */
 
+  async acceptQuote(
+    quoteId: string,
+  ): Promise<{ creditFileId: string; status: string }> {
+    const quote = this.state.quotes.find((q) => q.id === quoteId);
+    if (!quote) throw new ApiError('NOT_FOUND', 'Quote not found', 404);
+    const cf = this.state.creditFiles.find((f) => f.quote.id === quoteId);
+    if (!cf) throw new ApiError('NOT_FOUND', 'Credit file not found for this quote', 404);
+    return { creditFileId: cf.id, status: cf.status };
+  }
+
   async createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote> {
     await this.findBusinessOrThrow(businessId);
     const burn = await this.burnProfileFor(businessId);
@@ -340,6 +377,11 @@ export class InMemoryRepository implements Repository {
   /* ------------------------------------------------------------------ */
   /* Credit                                                              */
   /* ------------------------------------------------------------------ */
+
+  async creditFileForBusiness(businessId: string): Promise<CreditFile | null> {
+    const cf = this.state.creditFiles.find((f) => f.businessId === businessId);
+    return cf ?? null;
+  }
 
   async listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]> {
     return status
@@ -479,6 +521,12 @@ export class InMemoryRepository implements Repository {
 
   async getLoan(id: string): Promise<Loan | undefined> {
     return this.state.loans.find((l) => l.id === id);
+  }
+
+  async paymentsForLoan(loanId: string): Promise<Payment[]> {
+    return this.state.payments
+      .filter((p) => p.loanId === loanId)
+      .sort((a, b) => b.paidAt.localeCompare(a.paidAt));
   }
 
   async loanByAsset(assetId: string): Promise<Loan | undefined> {
