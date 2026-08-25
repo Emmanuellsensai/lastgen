@@ -88,7 +88,7 @@ reproduce their externally observable behaviour without importing any code from
 | Backend README endpoint docs      | ✅     | Full surface incl. payments/wallets + env (Phase 6)                                                                                                |
 | Portfolio endpoints               | ✅     | `/portfolio/stats`, `/portfolio/assets`, `/portfolio/export` (Phase 5)                                                                             |
 | Impact endpoints                  | ✅     | `/businesses/:id/impact`, `/businesses/:id/wrapped` (Phase 5)                                                                                      |
-| Contract tests                    | ✅     | 20 files / 156 assertions (Phase 6)                                                                                                                |
+| Contract tests                    | ✅     | 25 suites / 223 tests incl. bank-auth (10), kyc (9), admin (15) (Phases 6, 8–10)                                                                   |
 | Correctness tests                 | ✅     | Shared: 3 live. Backend: seed-parity, webhook-idempotency, payment-adapter (incl. ALAT HTTPS client), impact-parity, supabase-repository stub live |
 | Supabase repository               | ✅     | Full `Repository` implementation on an async seam + `repositoryFor(env)` (Phase 6)                                                                 |
 | Payment/wallet handoff            | ✅     | `docs/PAYMENT_EXTENSION.md` — spec verbatim + demo fallbacks (Phase 6)                                                                             |
@@ -97,6 +97,7 @@ reproduce their externally observable behaviour without importing any code from
 | RBAC/KYC migration                | ✅     | `migrations/rbac-kyc.sql`: bank_users, kyc_records, kyc-docs bucket (Phase 8)                                                                      |
 | KYC lifecycle                     | ✅     | Business get/submit + NIN provider seam + document storage (Phase 9)                                                                              |
 | Admin surface                     | ✅     | Guarded `/admin/*` router: users, KYC review, power control, orders + atomic approve-payment (Phase 10)                                            |
+| Env docs (`NIN_PROVIDER`, `KYC_BUCKET`) | ✅ | `.env.example` + README configuration table (Phase 11)                                                                                            |
 | Render deployment verification    | ⬜     | Needs live Supabase + ALAT credentials                                                                                                            |
 
 ## 5. Implemented foundation (Phase 0)

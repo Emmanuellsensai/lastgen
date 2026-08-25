@@ -91,7 +91,7 @@ Supabase or a live payment provider.
 | 8 | RBAC + bank identity | ✅ complete (6 commits) |
 | 9 | KYC lifecycle | ✅ complete (6 commits) |
 | 10 | Admin surface | ✅ complete (3 commits) |
-| 11 | Docs + env polish for the admin sprint | ⬜ pending |
+| 11 | Docs + env polish for the admin sprint | ✅ complete (2 commits) |
 
 ---
 
@@ -168,12 +168,21 @@ and the in-memory orders projection falls back to the seed's denormalised
 the medical-flag guard and closure-by-repeated-approval. Gate: typecheck ✓,
 lint 0 errors ✓, 223/223 tests across 25 suites ✓.
 
-### Phase 11 — Docs + env polish
+### Phase 11 — Docs + env polish (complete)
 
 `backend/.env.example` gains documented `NIN_PROVIDER=simulated` and
-`KYC_BUCKET=kyc-docs` (parsing lands in `config/env.ts` with Phases 9–10);
-`BACKEND_PROGRESS.md`, `AUDIT.md` and the backend README record what shipped;
-ROADMAP dashboard rows flip when each gate passes.
+`KYC_BUCKET=kyc-docs` (parsing landed in `config/env.ts` with Phase 9);
+the README configuration table and endpoint reference now list the bank
+identity, KYC and admin desk routes; `AUDIT.md` §22 records Phases 8–10
+(closing the reference gap in earlier commit messages); BACKEND_PROGRESS
+status matrix reflects the new deliverables and test counts. ROADMAP
+dashboard rows flip as each gate passes.
+
+**Shipped (commits 7c41c0f, <docs-close>).** All eleven phases complete:
+the backend implements every route the frontend sprint consumes, with
+RBAC enforced server-side, KYC documents in a private bucket, atomic
+settlement on every payment entry path and 223 green tests pinning the
+contract.
 
 **Commit plan (phases 8–11).**
 
