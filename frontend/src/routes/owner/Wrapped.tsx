@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
-import { Lightning, X } from '@phosphor-icons/react';
+import { Lightning, ShareNetwork, X } from '@phosphor-icons/react';
 import { DeviceFrame } from '@/components/layout';
 import { CountUp } from '@/components/lastgen/CountUp';
 import { Toast, ToastTitle } from '@/components/ui/toast';
@@ -313,6 +313,18 @@ export default function Wrapped() {
 
   const selectedLabel = selectedDays ? labelForDays(selectedDays) : '';
 
+    async function handleShare() {
+    if (navigator.share) {
+      await navigator.share({
+        title: businessName + " — Lastgen",
+        text: "We saved " + NAIRA + (wrappedData?.nairaSavedKobo ? (wrappedData.nairaSavedKobo / 100).toLocaleString("en-NG") : "") + " on fuel in the last " + selectedLabel + " by switching to solar with Lastgen.",
+        url: window.location.href,
+      });
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+    }
+  }
+
   const handleShowImpact = useCallback(async () => {
     if (!selectedDays || !demoBusinessId) return;
     setLoading(true);
@@ -443,7 +455,7 @@ export default function Wrapped() {
 
                   <p className="mt-10 font-display text-[13px] opacity-70">Made with Lastgen</p>
                 </div>
-                <p className="mt-8 text-base opacity-80">Screenshot this and send it to someone.</p>
+                <button type="button" onClick={handleShare} className="mt-8 flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-medium opacity-80 transition-opacity hover:opacity-100"><ShareNetwork size={18} weight="regular" /> Share</button>
               </>
             ),
           },
