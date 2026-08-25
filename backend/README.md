@@ -2,7 +2,7 @@
 
 > **Wema Hackaholics 7.0 · Hackathon Track · Team Ryzen**  
 > **Architecture:** Express + TypeScript · Strict Envelope API · Dual-Seam Persistence (In-Memory Seed & Supabase) · Wema ALAT Rails  
-> **Status:** 166/166 Tests Passing (21 test files) · 0 Type Errors · 0 Lint Warnings  
+> **Status:** 223/223 Tests Passing (25 suites) · 0 Type Errors · 0 Lint Errors  
 
 ---
 
@@ -22,6 +22,7 @@ For quick navigation across the Lastgen documentation suite, use the directory b
 
 | Document | Location | Purpose & Audience |
 | :--- | :--- | :--- |
+| **Admin Sprint Handoff** | [`backend/HANDOFF.md`](HANDOFF.md) | **Start here if wiring the admin/KYC/bank-auth UI.** Endpoint contract for the 11 sprint endpoints, RBAC model, `FORBIDDEN` 403 note, realtime events, and a map of every doc. |
 | **Frontend Integration Masterplan** | [`docs/FRONTEND_INTEGRATION_MASTERPLAN.md`](../docs/FRONTEND_INTEGRATION_MASTERPLAN.md) | **Essential for Frontend Devs & AI Agents.** Screen-by-screen linking blueprint, UI data bindings, and copy-paste AI agent prompt. |
 | **Base API Contract** | [`docs/CONTRACT.md`](../docs/CONTRACT.md) | The frozen baseline specification: standard constants, base REST routes, and entity data shapes. |
 | **Payment & Wallet Extension** | [`docs/PAYMENT_EXTENSION.md`](../docs/PAYMENT_EXTENSION.md) | The authoritative specification for 035 Wema virtual cash wallets, two-channel repayment lifecycle, and ALAT consent polling. |
@@ -29,7 +30,7 @@ For quick navigation across the Lastgen documentation suite, use the directory b
 | **Backend Implementation Audit** | [`backend/AUDIT.md`](AUDIT.md) | Exhaustive test coverage audit, security analysis, domain invariant checks, and architectural review. |
 | **Backend Progression Log** | [`backend/BACKEND_PROGRESS.md`](BACKEND_PROGRESS.md) | Complete engineering journal detailing Phases 0 through 5, refactorings, and milestone deliverables. |
 | **Backend Roadmap** | [`backend/ROADMAP.md`](ROADMAP.md) | Post-hackathon production hardening, real webhook retries, and high-frequency IoT streaming. |
-| **SQL Migrations** | [`backend/migrations/`](migrations/) | Idempotent PostgreSQL migrations: `audit.sql`, `payments-v2.sql`, and `payments-v3-atomic.sql`. |
+| **SQL Migrations** | [`backend/migrations/`](migrations/) | Idempotent PostgreSQL migrations: `audit.sql`, `payments-v2.sql`, `payments-v3-atomic.sql`, `rbac-kyc.sql`. |
 
 ---
 
