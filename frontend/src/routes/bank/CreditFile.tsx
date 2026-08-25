@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppShell } from '@/components/layout';
 import { GlassCard, GlassSheet } from '@/components/ui/glass';
 import { Money, StatusPill } from '@/components/lastgen';
@@ -12,6 +13,16 @@ import type { PillStatus } from '@/components/lastgen/StatusPill';
 import type { Asset } from '@/types/api';
 import { api } from '@/lib/api';
 import type { CreditFileDetail } from '@/types/api';
+
+function getRecommendation(file: CreditFileDetail): { label: string; tone: 'success' | 'warning' | 'burn' } {
+  if (file.affordabilityRatio >= 1.4 && file.verifiedMonths >= 3) {
+    return { label: `Based on ${file.verifiedMonths} months of verified fuel spend, this business qualifies.`, tone: 'success' };
+  }
+  if (file.affordabilityRatio >= 1.1) {
+    return { label: `Affordable but marginal. ${file.verifiedMonths} months of data. Recommend approval with monitoring.`, tone: 'warning' };
+  }
+  return { label: `Affordability ratio is below threshold. Recommend additional data before approval.`, tone: 'burn' };
+}
 
 export default function CreditFile() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +57,18 @@ export default function CreditFile() {
     return () => { cancelled = true; };
   }, [id]);
 
+  const burnSparklineData = useMemo(() => {
+    if (!file?.fuelLogs || file.fuelLogs.length < 2) return [];
+    const byMonth = new Map<string, number>();
+    for (const log of file.fuelLogs) {
+      const month = log.loggedAt.slice(0, 7); // YYYY-MM
+      byMonth.set(month, (byMonth.get(month) ?? 0) + log.amountKobo);
+    }
+    return Array.from(byMonth.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, amountKobo]) => ({ month, amountKobo }));
+  }, [file]);
+
   async function handleApprove() {
     if (!id || !file) return;
     setActionBusy(true);
@@ -69,7 +92,6 @@ export default function CreditFile() {
       await api.assets.suspend(linkedAsset.id, { reason: 'Missed payment' });
       const updated = await api.credit.application(id!);
       setFile(updated);
-      // Refresh linked asset
       const freshAsset = await api.assets.get(linkedAsset.id);
       setLinkedAsset(freshAsset);
       setSuspendConfirmOpen(false);
@@ -120,6 +142,14 @@ export default function CreditFile() {
     );
   }
 
+  const recommendation = getRecommendation(file);
+  const borderColor =
+    recommendation.tone === 'success'
+      ? 'border-success'
+      : recommendation.tone === 'warning'
+        ? 'border-warning'
+        : 'border-burn';
+
   return (
     <AppShell
       subNav={{
@@ -128,7 +158,37 @@ export default function CreditFile() {
         action: <StatusPill status={file.status as PillStatus} size="sm" />,
       }}
     >
-      <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:gap-10">
+      {/* Recommendation header */}
+      <GlassCard elevation={2} padding="lg" className={`border-l-4 ${borderColor}`}>
+        <p className={`font-display text-xl text-${recommendation.tone === 'success' ? 'success' : recommendation.tone === 'warning' ? 'warning' : 'burn'}`}>
+          {recommendation.label}
+        </p>
+      </GlassCard>
+
+      {/* Monthly fuel spend sparkline */}
+      {burnSparklineData.length >= 2 && (
+        <GlassCard elevation={1} padding="lg" className="mt-5">
+          <p className="text-sm text-ink-mute">Monthly fuel spend</p>
+          <div className="mt-4">
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={burnSparklineData}>
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `\u20A6${(v / 100).toLocaleString('en-NG')}`} />
+                <Tooltip formatter={(v: unknown) => [`\u20A6${(Number(v) / 100).toLocaleString('en-NG')}`, 'Spend']} />
+                <Bar dataKey="amountKobo" fill="var(--lg-burn)" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+      )}
+      {burnSparklineData.length > 0 && burnSparklineData.length < 2 && (
+        <GlassCard elevation={1} padding="lg" className="mt-5">
+          <p className="text-sm text-ink-mute">Monthly fuel spend</p>
+          <p className="mt-2 text-ink-mute">Not enough data for a trend.</p>
+        </GlassCard>
+      )}
+
+      <div className="grid gap-8 pt-8 lg:grid-cols-[1fr_1fr] lg:gap-10">
         {/* Left: the proposal */}
         <div>
           <h2 className="font-display text-2xl text-ink">The proposal</h2>
