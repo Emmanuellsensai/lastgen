@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Express } from 'express';
 import pino from 'pino';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -42,6 +42,10 @@ const OWNER_EMAIL = `e2e-owner-${stamp}@lastgen.test`;
 const OWNER_PASSWORD = 'e2e-Owner-Pass-1!';
 
 d('live e2e (real supabase)', () => {
+  // GoTrue and pooler cold starts routinely take seconds; the hermetic
+  // default of 5s produces flaky timeouts against a real region.
+  vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
+
   let env: Env;
   let app: Express;
   let service: SupabaseClient;
@@ -247,7 +251,7 @@ d('live e2e (real supabase)', () => {
     const quote = await request(app)
       .post(`/api/businesses/${businessId[0]}/quote`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ systemId: 'sys_shop_25', tenorMonths: 12 });
+      .send({ systemId: 'sys_lite_1k', tenorMonths: 24 });
 
     expect(quote.status).toBe(201);
     expect(quote.body.data.id).toBeTruthy();
