@@ -14,6 +14,8 @@
 import type {
   Asset,
   AssetStatus,
+  AdminOrder,
+  AdminUser,
   BankUser,
   Business,
   BurnProfile,
@@ -30,7 +32,9 @@ import type {
   ImpactSummary,
   Installment,
   KycRecord,
+  KycStatus,
   Loan,
+  LoanStatus,
   MeterReading,
   PagedEnvelope,
   Payment,
@@ -71,6 +75,17 @@ export interface SubmitKycInput {
   ninVerified: boolean;
   selfieUrl: string;
   bankSlipUrl: string;
+}
+
+/** KYC submission as the review queue renders it. */
+export type KycSubmission = KycRecord & { businessName: string };
+
+/** Outcome of reviewing a pending submission (MSW approve/reject shape). */
+export interface KycReviewResult {
+  id: string;
+  status: Extract<KycStatus, 'approved' | 'rejected'>;
+  rejectionReason?: string;
+  reviewedAt: string;
 }
 
 /** Internal full settlement result; the HTTP layer maps it to the slim PayResult. */
@@ -117,6 +132,21 @@ export interface Repository {
    * record is immutable and throws INVALID_TRANSITION.
    */
   submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord>;
+
+  /* Admin ---------------------------------------------------------- */
+  /** Users tab projection: every business with its asset/loan/KYC state. */
+  listAdminUsers(): Promise<AdminUser[]>;
+  /** KYC review queue joined with business names, optionally by status. */
+  listKycSubmissions(status?: KycStatus): Promise<KycSubmission[]>;
+  /**
+   * Transition a pending submission: approve clears it, reject records the
+   * reason. Unknown id throws NOT_FOUND; a non-pending record throws
+   * INVALID_TRANSITION. Live implementations emit a best-effort realtime
+   * notification so the owner's device can react.
+   */
+  reviewKyc(id: string, action: 'approve' | 'reject', reason?: string): Promise<KycReviewResult>;
+  /** Orders tab projection: active (non-closed) loans with full context. */
+  listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]>;
 
   /* Fuel logs and burn --------------------------------------------- */
   addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog>;

@@ -26,6 +26,8 @@ import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
+  AdminOrder,
+  AdminUser,
   Asset,
   BankUser,
   Business,
@@ -43,7 +45,9 @@ import type {
   ImpactSummary,
   Installment,
   KycRecord,
+  KycStatus,
   Loan,
+  LoanStatus,
   MeterReading,
   PagedEnvelope,
   Payment,
@@ -59,6 +63,8 @@ import type {
 import { buildSeed, DEMO_BUSINESS_ID, type AssetStatusHistoryEntry, type DemoDb } from './seed.js';
 import type {
   BankSession,
+  KycReviewResult,
+  KycSubmission,
   PaySettlement,
   ReceiptExtraction,
   RegisterBankInput,
@@ -856,6 +862,94 @@ export class InMemoryRepository implements Repository {
     };
     this.state.kycRecords[businessId] = record;
     return record;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Admin                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async listAdminUsers(): Promise<AdminUser[]> {
+    return this.state.businesses.map((b) => {
+      const asset = this.state.assets.find((a) => a.businessId === b.id);
+      const loan = asset ? this.state.loans.find((l) => l.assetId === asset.id) : undefined;
+      const kyc = this.state.kycRecords[b.id];
+      return {
+        id: b.id,
+        name: b.name,
+        city: b.city,
+        type: b.type,
+        createdAt: b.createdAt,
+        kycStatus: kyc?.status ?? 'unverified',
+        assetStatus: asset?.status ?? null,
+        assetId: asset?.id ?? null,
+        loanId: loan?.id ?? null,
+        loanBalanceKobo: loan?.balanceKobo ?? null,
+      };
+    });
+  }
+
+  async listKycSubmissions(status?: KycStatus): Promise<KycSubmission[]> {
+    const businessName = (id: string): string =>
+      this.state.businesses.find((b) => b.id === id)?.name ?? 'Unknown';
+    return Object.values(this.state.kycRecords)
+      .filter((r) => !status || r.status === status)
+      .map((r) => ({ ...r, businessName: businessName(r.businessId) }));
+  }
+
+  async reviewKyc(
+    id: string,
+    action: 'approve' | 'reject',
+    reason?: string,
+  ): Promise<KycReviewResult> {
+    const record = Object.values(this.state.kycRecords).find((r) => r.id === id);
+    if (!record) {
+      throw new ApiError('NOT_FOUND', 'KYC submission not found', 404);
+    }
+    if (record.status !== 'pending') {
+      throw new ApiError(
+        'INVALID_TRANSITION',
+        `KYC is ${record.status}; only pending submissions can be reviewed`,
+        409,
+      );
+    }
+    if (action === 'reject' && !reason?.trim()) {
+      throw new ApiError('VALIDATION', 'reason is required to reject a submission', 400);
+    }
+
+    record.status = action === 'approve' ? 'approved' : 'rejected';
+    record.reviewedAt = this.state.now.toISOString();
+    record.rejectionReason = action === 'reject' ? (reason as string) : null;
+
+    const result: KycReviewResult = {
+      id: record.id,
+      status: record.status,
+      reviewedAt: record.reviewedAt,
+    };
+    if (record.rejectionReason !== null) result.rejectionReason = record.rejectionReason;
+    return result;
+  }
+
+  async listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]> {
+    return this.state.loans
+      .filter((l) => l.status !== 'CLOSED')
+      .filter((l) => !status || l.status === status)
+      .map((loan) => {
+        const asset = this.state.assets.find((a) => a.id === loan.assetId);
+        const business = asset
+          ? this.state.businesses.find((b) => b.id === asset.businessId)
+          : undefined;
+        return {
+          loanId: loan.id,
+          businessName: business?.name ?? 'Unknown',
+          businessId: business?.id ?? '',
+          assetId: asset?.id ?? '',
+          assetStatus: asset?.status ?? 'ACTIVE',
+          balanceKobo: loan.balanceKobo,
+          monthlyPaymentKobo: loan.monthlyPaymentKobo,
+          nextDueAt: loan.nextDueAt,
+          status: loan.status,
+        };
+      });
   }
 
   /* ------------------------------------------------------------------ */

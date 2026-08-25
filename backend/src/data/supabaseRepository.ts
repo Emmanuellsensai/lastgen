@@ -49,6 +49,8 @@ import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
+  AdminOrder,
+  AdminUser,
   Asset,
   AssetStatus,
   BankUser,
@@ -67,7 +69,9 @@ import type {
   ImpactSummary,
   Installment,
   KycRecord,
+  KycStatus,
   Loan,
+  LoanStatus,
   MeterReading,
   PagedEnvelope,
   Payment,
@@ -83,6 +87,8 @@ import type {
 import type { AssetStatusHistoryEntry } from './seed.js';
 import type {
   BankSession,
+  KycReviewResult,
+  KycSubmission,
   PaySettlement,
   ReceiptExtraction,
   RegisterBankInput,
@@ -450,6 +456,147 @@ export class SupabaseRepository implements Repository {
         .single(),
     );
     return this.mapKycRecord(row as KycRecordRow);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Admin                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async listAdminUsers(): Promise<AdminUser[]> {
+    const businesses = (await this.run(this.db.from('businesses').select('*'))) ?? [];
+    const assets = (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
+    const loans =
+      (await this.run(this.db.from('loans').select('id,asset_id,balance_kobo'))) ?? [];
+    const kycs = (await this.run(this.db.from('kyc_records').select('business_id,status'))) ?? [];
+
+    return businesses.map((row) => {
+      const b = row as BusinessRow;
+      const asset = assets.find((a) => a.business_id === b.id);
+      const loan = asset ? loans.find((l) => l.asset_id === asset.id) : undefined;
+      const kyc = kycs.find((k) => k.business_id === b.id);
+      return {
+        id: b.id,
+        name: b.name,
+        city: b.city,
+        type: b.type,
+        createdAt: b.created_at,
+        kycStatus: (kyc?.status as KycStatus | undefined) ?? 'unverified',
+        assetStatus: (asset?.status as AssetStatus | undefined) ?? null,
+        assetId: asset?.id ?? null,
+        loanId: loan?.id ?? null,
+        loanBalanceKobo: loan ? Number(loan.balance_kobo) : null,
+      };
+    });
+  }
+
+  async listKycSubmissions(status?: KycStatus): Promise<KycSubmission[]> {
+    let query = this.db.from('kyc_records').select('*');
+    if (status) {
+      query = query.eq('status', status);
+    }
+    const records = (await this.run(query)) ?? [];
+    const businesses =
+      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+    const nameOf = (id: string): string =>
+      businesses.find((b) => b.id === id)?.name ?? 'Unknown';
+
+    return records.map((row) => ({
+      ...this.mapKycRecord(row as KycRecordRow),
+      businessName: nameOf((row as KycRecordRow).business_id),
+    }));
+  }
+
+  async reviewKyc(
+    id: string,
+    action: 'approve' | 'reject',
+    reason?: string,
+  ): Promise<KycReviewResult> {
+    if (action === 'reject' && !reason?.trim()) {
+      throw new ApiError('VALIDATION', 'reason is required to reject a submission', 400);
+    }
+
+    const existing = await this.run(
+      this.db.from('kyc_records').select('*').eq('id', id).maybeSingle(),
+    );
+    if (!existing) {
+      throw new ApiError('NOT_FOUND', 'KYC submission not found', 404);
+    }
+    const current = existing as KycRecordRow;
+    if (current.status !== 'pending') {
+      throw new ApiError(
+        'INVALID_TRANSITION',
+        `KYC is ${current.status}; only pending submissions can be reviewed`,
+        409,
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+    await this.run(
+      this.db
+        .from('kyc_records')
+        .update({
+          status: nextStatus,
+          reviewed_at: nowIso,
+          rejection_reason: action === 'reject' ? (reason as string).trim() : null,
+          updated_at: nowIso,
+        })
+        .eq('id', id),
+    );
+
+    // Best-effort owner notification over the same realtime posture as
+    // payment settlement — a broadcast failure never aborts the review.
+    try {
+      const channel = this.db.channel('notifications');
+      void channel.send({
+        type: 'broadcast',
+        event: 'kyc_reviewed',
+        payload: { kycId: id, businessId: current.business_id, status: nextStatus },
+      });
+    } catch {
+      // ignore
+    }
+
+    const result: KycReviewResult = {
+      id,
+      status: nextStatus,
+      reviewedAt: nowIso,
+    };
+    if (action === 'reject') result.rejectionReason = (reason as string).trim();
+    return result;
+  }
+
+  async listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]> {
+    let query = this.db.from('loans').select('*');
+    if (status) {
+      query = query.eq('status', status);
+    } else {
+      query = query.neq('status', 'CLOSED');
+    }
+    const loans = (await this.run(query)) ?? [];
+    const assets =
+      (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
+    const businesses =
+      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+
+    return loans.map((raw) => {
+      const loan = raw as LoanRow;
+      const asset = assets.find((a) => a.id === loan.asset_id);
+      const business = asset
+        ? businesses.find((b) => b.id === asset.business_id)
+        : undefined;
+      return {
+        loanId: loan.id,
+        businessName: business?.name ?? 'Unknown',
+        businessId: business?.id ?? '',
+        assetId: asset?.id ?? '',
+        assetStatus: (asset?.status as AssetStatus | undefined) ?? 'ACTIVE',
+        balanceKobo: Number(loan.balance_kobo),
+        monthlyPaymentKobo: Number(loan.monthly_payment_kobo),
+        nextDueAt: loan.next_due_at,
+        status: loan.status as LoanStatus,
+      };
+    });
   }
 
   /* ------------------------------------------------------------------ */
