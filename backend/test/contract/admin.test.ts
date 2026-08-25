@@ -33,9 +33,7 @@ describe('admin users contract', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.data.items.length).toBeGreaterThanOrEqual(8);
 
-    const adeze = res.body.data.items.find(
-      (u: { id: string }) => u.id === 'biz_adaeze_frozen',
-    );
+    const adeze = res.body.data.items.find((u: { id: string }) => u.id === 'biz_adaeze_frozen');
     expect(adeze).toMatchObject({
       name: 'Adaeze Frozen Foods',
       city: 'Lagos',
@@ -51,9 +49,7 @@ describe('admin users contract', () => {
     await submitKyc(app);
     const res = await request(app).get('/api/admin/users');
 
-    const adeze = res.body.data.items.find(
-      (u: { id: string }) => u.id === 'biz_adaeze_frozen',
-    );
+    const adeze = res.body.data.items.find((u: { id: string }) => u.id === 'biz_adaeze_frozen');
     expect(adeze.kycStatus).toBe('pending');
   });
 });
@@ -158,15 +154,11 @@ describe('admin power control contract', () => {
   });
 
   it('suspends an active asset and restores a suspended one', async () => {
-    const suspend = await request(app).post(
-      '/api/admin/assets/ast_biz_adaeze_frozen/toggle-power',
-    );
+    const suspend = await request(app).post('/api/admin/assets/ast_biz_adaeze_frozen/toggle-power');
     expect(suspend.status).toBe(200);
     expect(suspend.body.data).toEqual({ id: 'ast_biz_adaeze_frozen', status: 'SUSPENDED' });
 
-    const restore = await request(app).post(
-      '/api/admin/assets/ast_biz_adaeze_frozen/toggle-power',
-    );
+    const restore = await request(app).post('/api/admin/assets/ast_biz_adaeze_frozen/toggle-power');
     expect(restore.body.data).toEqual({ id: 'ast_biz_adaeze_frozen', status: 'ACTIVE' });
   });
 
@@ -176,9 +168,7 @@ describe('admin power control contract', () => {
     const business = (await repo.getBusiness('biz_gwarinpa_mart'))!;
     business.medicalFlag = true;
 
-    const res = await request(app).post(
-      '/api/admin/assets/ast_biz_gwarinpa_mart/toggle-power',
-    );
+    const res = await request(app).post('/api/admin/assets/ast_biz_gwarinpa_mart/toggle-power');
 
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('MEDICAL_FLAG');
@@ -219,9 +209,7 @@ describe('admin orders contract', () => {
     // The seed portfolio ships hundreds of loans; every projected row must
     // be an active receivable (CLOSED loans are history, not work items).
     expect(res.body.data.items.length).toBeGreaterThan(4);
-    expect(
-      res.body.data.items.every((o: { status: string }) => o.status !== 'CLOSED'),
-    ).toBe(true);
+    expect(res.body.data.items.every((o: { status: string }) => o.status !== 'CLOSED')).toBe(true);
 
     const frozen = res.body.data.items.find(
       (o: { loanId: string }) => o.loanId === 'loan_biz_adaeze_frozen',
@@ -234,7 +222,9 @@ describe('admin orders contract', () => {
     });
 
     const delinquentOnly = await request(app).get('/api/admin/orders?status=DELINQUENT');
-    expect(delinquentOnly.body.data.items.every((o: { status: string }) => o.status === 'DELINQUENT')).toBe(true);
+    expect(
+      delinquentOnly.body.data.items.every((o: { status: string }) => o.status === 'DELINQUENT'),
+    ).toBe(true);
 
     const badFilter = await request(app).get('/api/admin/orders?status=CLOSED');
     expect(badFilter.status).toBe(400);

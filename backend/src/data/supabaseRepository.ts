@@ -466,8 +466,7 @@ export class SupabaseRepository implements Repository {
   async listAdminUsers(): Promise<AdminUser[]> {
     const businesses = (await this.run(this.db.from('businesses').select('*'))) ?? [];
     const assets = (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
-    const loans =
-      (await this.run(this.db.from('loans').select('id,asset_id,balance_kobo'))) ?? [];
+    const loans = (await this.run(this.db.from('loans').select('id,asset_id,balance_kobo'))) ?? [];
     const kycs = (await this.run(this.db.from('kyc_records').select('business_id,status'))) ?? [];
 
     return businesses.map((row) => {
@@ -496,10 +495,8 @@ export class SupabaseRepository implements Repository {
       query = query.eq('status', status);
     }
     const records = (await this.run(query)) ?? [];
-    const businesses =
-      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
-    const nameOf = (id: string): string =>
-      businesses.find((b) => b.id === id)?.name ?? 'Unknown';
+    const businesses = (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+    const nameOf = (id: string): string => businesses.find((b) => b.id === id)?.name ?? 'Unknown';
 
     return records.map((row) => ({
       ...this.mapKycRecord(row as KycRecordRow),
@@ -575,17 +572,13 @@ export class SupabaseRepository implements Repository {
       query = query.neq('status', 'CLOSED');
     }
     const loans = (await this.run(query)) ?? [];
-    const assets =
-      (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
-    const businesses =
-      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+    const assets = (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
+    const businesses = (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
 
     return loans.map((raw) => {
       const loan = raw as LoanRow;
       const asset = assets.find((a) => a.id === loan.asset_id);
-      const business = asset
-        ? businesses.find((b) => b.id === asset.business_id)
-        : undefined;
+      const business = asset ? businesses.find((b) => b.id === asset.business_id) : undefined;
       return {
         loanId: loan.id,
         businessName: business?.name ?? 'Unknown',

@@ -128,9 +128,7 @@ describe('wallets contract', () => {
       phone: '+2348012345678',
     });
 
-    const res = await request(app)
-      .post('/api/wallets/fund')
-      .send({ amountKobo: 10_000_000 });
+    const res = await request(app).post('/api/wallets/fund').send({ amountKobo: 10_000_000 });
 
     expect(res.status).toBe(200);
     expect(res.body.data.balanceKobo).toBe(DEMO_WALLET_FUNDING_KOBO + 10_000_000);
@@ -154,9 +152,7 @@ describe('wallets contract', () => {
       phone: '+2348012345678',
     });
 
-    const res = await request(app)
-      .post('/api/wallets/fund')
-      .send({ amountKobo: 0 });
+    const res = await request(app).post('/api/wallets/fund').send({ amountKobo: 0 });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION');

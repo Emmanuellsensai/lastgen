@@ -52,10 +52,12 @@ describe('bank auth contract', () => {
     });
 
     it('rejects mismatched passwords', async () => {
-      const res = await request(app).post('/api/auth/bank/register').send({
-        ...REGISTER_BODY,
-        confirmPassword: 'different',
-      });
+      const res = await request(app)
+        .post('/api/auth/bank/register')
+        .send({
+          ...REGISTER_BODY,
+          confirmPassword: 'different',
+        });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toEqual({ code: 'VALIDATION', message: 'Passwords do not match' });
@@ -119,7 +121,9 @@ describe('bank auth contract', () => {
     });
 
     it('validates required fields', async () => {
-      const res = await request(app).post('/api/auth/bank/login').send({ bankId: 'wema-credit-01' });
+      const res = await request(app)
+        .post('/api/auth/bank/login')
+        .send({ bankId: 'wema-credit-01' });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toEqual({
@@ -137,9 +141,7 @@ describe('bank auth contract', () => {
       // that boundary.
       const live = createTestApp({ demoMode: false });
 
-      const register = await request(live.app)
-        .post('/api/auth/bank/register')
-        .send(REGISTER_BODY);
+      const register = await request(live.app).post('/api/auth/bank/register').send(REGISTER_BODY);
       expect(register.status).toBe(201);
 
       const guarded = await request(live.app).get('/api/me/session');

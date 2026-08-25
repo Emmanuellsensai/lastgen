@@ -102,11 +102,7 @@ describe('business kyc contract', () => {
       .post('/api/businesses/biz_adaeze_frozen/kyc/submit')
       .field('ninNumber', '12345678901')
       .attach('selfie', SELFIE, { filename: 'selfie.png', contentType: 'image/png' })
-      .attach(
-        'bankSlip',
-        Buffer.from('x'),
-        { filename: 'slip.txt', contentType: 'text/plain' },
-      );
+      .attach('bankSlip', Buffer.from('x'), { filename: 'slip.txt', contentType: 'text/plain' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toEqual({
