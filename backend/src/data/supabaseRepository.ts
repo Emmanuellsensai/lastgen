@@ -33,6 +33,7 @@
 // late errors to the caller instead of swallowing them.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseAuthOnly } from '../lib/supabase.js';
 import {
   CO2_KG_PER_LITRE_PETROL,
   DAYS_PER_MONTH,
@@ -886,7 +887,8 @@ export class SupabaseRepository implements Repository {
     password: string,
     known?: BankUser | null,
   ): Promise<BankSession> {
-    const { data, error } = await this.db.auth.signInWithPassword({
+    // Password grants must not touch this.db — see getSupabaseAuthOnly().
+    const { data, error } = await getSupabaseAuthOnly().auth.signInWithPassword({
       email: bankEmail(bankId),
       password,
     });
@@ -1579,6 +1581,21 @@ export class SupabaseRepository implements Repository {
         created_at: (await this.now()).toISOString(),
       }),
     );
+
+    // Auto-create a credit file for underwriting (matches in-memory behaviour).
+    await this.run(
+      this.db.from('credit_files').insert({
+        id: this.nextId('cf'),
+        business_id: businessId,
+        quote_id: quote.id,
+        affordability_ratio: Math.round((payment / burn.monthlyKobo) * 100) / 100,
+        load_profile_score: 74,
+        verified_months: burn.daysObserved >= 30 ? Math.floor(burn.daysObserved / 30) : 0,
+        status: 'PENDING',
+        created_at: (await this.now()).toISOString(),
+      }),
+    );
+
     return quote;
   }
 
