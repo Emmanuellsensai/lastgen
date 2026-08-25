@@ -49,6 +49,16 @@ describe('credit contract', () => {
     expect(res.body.data.schedulePreview.length).toBe(6);
   });
 
+  it('sits behind the auth boundary in live mode', async () => {
+    // The credit desk reads every business's file, so it is role-scoped. An
+    // owner asking after their own application uses
+    // GET /businesses/:id/application, which is scoped to one business.
+    const { app: liveApp } = createTestApp({ demoMode: false });
+    const res = await request(liveApp).get('/api/credit/applications');
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHORIZED');
+  });
+
   it('returns the contract 404 for an unknown application', async () => {
     const res = await request(app).get('/api/credit/applications/nope');
     expect(res.status).toBe(404);

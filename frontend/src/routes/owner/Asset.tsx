@@ -16,7 +16,7 @@ import PaymentSheet from './PaymentSheet';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import { Toast, ToastTitle } from '@/components/ui/toast';
-import type { Asset as AssetType, AssetStatus, Loan, MeterReading, Quote } from '@/types/api';
+import type { Asset as AssetType, AssetStatus, Loan, MeterReading, Payment, Quote } from '@/types/api';
 
 interface DailyReading {
   date: string;
@@ -26,8 +26,9 @@ interface DailyReading {
 export default function Asset() {
   const { id } = useParams<{ id: string }>();
   const { demoLoanId } = useSession();
-  // TODO(BE): needs GET /businesses/:id/summary to resolve live loanId
-  const effectiveLoanId = demoLoanId;
+  // Resolved from GET /businesses/:id/summary once the asset tells us which
+  // business it belongs to; the demo id seeds mock mode.
+  const [effectiveLoanId, setEffectiveLoanId] = useState<string | null>(demoLoanId);
 
   const [asset, setAsset] = useState<AssetType | null>(null);
   const [loan, setLoan] = useState<Loan | null>(null);
@@ -37,6 +38,10 @@ export default function Asset() {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const prevStatus = useRef<AssetStatus | null>(null);
+
+  /* Payment history */
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
 
   /* Generation history */
   const [meterReadings, setMeterReadings] = useState<MeterReading[]>([]);
@@ -62,12 +67,20 @@ export default function Asset() {
         const a = await api.assets.get(id!);
         if (cancelled) return;
         setAsset(a);
-        if (effectiveLoanId) {
-          const l = await api.loans.get(effectiveLoanId);
-          if (!cancelled) setLoan(l);
-          const q = await api.quotes.get(useSession.getState().demoQuoteId ?? '');
-          if (!cancelled) setQuote(q);
-        }
+
+        const summary = await api.businesses.summary(a.businessId).catch(() => null);
+        const loanId = summary?.loanId ?? demoLoanId;
+        const quoteId = summary?.quoteId ?? useSession.getState().demoQuoteId ?? null;
+        if (cancelled) return;
+        setEffectiveLoanId(loanId);
+
+        const [l, q] = await Promise.all([
+          loanId ? api.loans.get(loanId).catch(() => null) : null,
+          quoteId ? api.quotes.get(quoteId).catch(() => null) : null,
+        ]);
+        if (cancelled) return;
+        setLoan(l);
+        setQuote(q);
       } catch {
         // ignore
       } finally {
@@ -76,7 +89,22 @@ export default function Asset() {
     }
     load();
     return () => { cancelled = true; };
-  }, [id, effectiveLoanId]);
+  }, [id, demoLoanId]);
+
+  /* Payment ledger for this system's loan. */
+  useEffect(() => {
+    if (!effectiveLoanId) {
+      setPaymentsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    api.loans
+      .payments(effectiveLoanId)
+      .then((res) => { if (!cancelled) setPayments(res.items); })
+      .catch(() => { if (!cancelled) setPayments([]); })
+      .finally(() => { if (!cancelled) setPaymentsLoading(false); });
+    return () => { cancelled = true; };
+  }, [effectiveLoanId]);
 
   /* Fetch meter readings for generation history */
   useEffect(() => {
@@ -249,9 +277,37 @@ export default function Asset() {
           <AccordionItem value="payments">
             <AccordionTrigger className="py-5 text-base">Payment history</AccordionTrigger>
             <AccordionContent>
-              <p className="pt-2 leading-relaxed text-ink-mute">
-                Payment history coming soon.
-              </p>
+              {paymentsLoading ? (
+                <p className="pt-2 text-ink-mute">Loading payments...</p>
+              ) : payments.length === 0 ? (
+                <p className="pt-2 leading-relaxed text-ink-mute">
+                  No payments yet. Your first instalment appears here once it settles.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-3 pt-2">
+                  {payments.map((payment) => (
+                    <div
+                      key={payment.id}
+                      className="flex items-center justify-between border-b border-line/50 pb-3 last:border-0 last:pb-0"
+                    >
+                      <div>
+                        <Money kobo={payment.amountKobo} size="sm" />
+                        <p className="mt-1 text-xs text-ink-mute">
+                          {new Date(payment.paidAt).toLocaleDateString('en-NG', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-ink-mute">{payment.source}</p>
+                        <p className="mt-1 font-mono text-xs text-ink-soft">{payment.reference}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
