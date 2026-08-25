@@ -59,10 +59,7 @@ d('live e2e (real supabase)', () => {
 
   beforeAll(async () => {
     env = loadEnv();
-    expect(
-      env.supabaseUrl,
-      'SUPABASE_URL must be set for the live suite',
-    ).toBeTruthy();
+    expect(env.supabaseUrl, 'SUPABASE_URL must be set for the live suite').toBeTruthy();
     expect(env.demoMode, 'live suite refuses to run in demo mode').toBe(false);
 
     service = createClient(env.supabaseUrl as string, env.supabaseServiceKey as string, {
@@ -102,14 +99,12 @@ d('live e2e (real supabase)', () => {
   });
 
   it('registers a bank operator and returns a bearer token', async () => {
-    const res = await request(app)
-      .post('/api/auth/bank/register')
-      .send({
-        bankName: 'E2E Credit Desk',
-        bankId: BANK_ID,
-        password: BANK_PASSWORD,
-        confirmPassword: BANK_PASSWORD,
-      });
+    const res = await request(app).post('/api/auth/bank/register').send({
+      bankName: 'E2E Credit Desk',
+      bankId: BANK_ID,
+      password: BANK_PASSWORD,
+      confirmPassword: BANK_PASSWORD,
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.ok).toBe(true);
@@ -233,8 +228,7 @@ d('live e2e (real supabase)', () => {
   });
 
   it('records fuel logs and prices a lease', async () => {
-    const daysAgo = (n: number): string =>
-      new Date(stamp - n * 86_400_000).toISOString();
+    const daysAgo = (n: number): string => new Date(stamp - n * 86_400_000).toISOString();
     for (const [i, litres] of [5.2, 4.8, 5.5].entries()) {
       const log = await request(app)
         .post(`/api/businesses/${businessId[0]}/fuel-logs`)
@@ -367,9 +361,7 @@ d('live e2e (real supabase)', () => {
     const after = await request(app)
       .get('/api/admin/orders')
       .set('Authorization', `Bearer ${bankToken}`);
-    const settled = after.body.data.items.find(
-      (o: { loanId: string }) => o.loanId === loan.loanId,
-    );
+    const settled = after.body.data.items.find((o: { loanId: string }) => o.loanId === loan.loanId);
     expect(loan.balanceKobo - settled.balanceKobo).toBe(loan.monthlyPaymentKobo);
   });
 });

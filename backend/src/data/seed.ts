@@ -390,7 +390,12 @@ function buildQuote(spec: BusinessSpec, burn: BurnProfile): Quote {
     depositKobo,
     monthlyPaymentKobo: payment,
     aprBps: spec.aprBps,
-    totalPayableKobo: depositKobo + buildSchedule(principal, spec.aprBps, spec.tenorMonths, new Date()).reduce((s, row) => s + row.principalKobo + row.interestKobo, 0),
+    totalPayableKobo:
+      depositKobo +
+      buildSchedule(principal, spec.aprBps, spec.tenorMonths, new Date()).reduce(
+        (s, row) => s + row.principalKobo + row.interestKobo,
+        0,
+      ),
     monthlySavingsKobo: savings,
     savingsPct: Number(((savings / burn.monthlyKobo) * 100).toFixed(1)),
     breakEvenMonth: breakEvenMonth(depositKobo, savings),
@@ -428,7 +433,9 @@ function buildCreditFile(
 ): CreditFile {
   const affordabilityRatio = Number((quote.monthlyPaymentKobo / burn.monthlyKobo).toFixed(2));
   // Older businesses have more verified months of fuel data.
-  const businessAgeDays = Math.round((ANCHOR.getTime() - new Date(spec.createdAt).getTime()) / 86_400_000);
+  const businessAgeDays = Math.round(
+    (ANCHOR.getTime() - new Date(spec.createdAt).getTime()) / 86_400_000,
+  );
   const verifiedMonths = Math.min(12, Math.max(1, Math.floor(businessAgeDays / 30)));
   return {
     id: `cf_${spec.id}`,

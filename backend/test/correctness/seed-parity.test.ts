@@ -49,7 +49,11 @@ describe('seed counts and shape', () => {
 
   it('matches the asset and credit status distributions', () => {
     expect(statusCounts()).toEqual({ ACTIVE: 319, GRACE: 43, OWNED: 140, SUSPENDED: 22 });
-    expect(groupCounts(seed.creditFiles, (c) => c.status)).toEqual({ APPROVED: 4, PENDING: 4, DECLINED: 1 });
+    expect(groupCounts(seed.creditFiles, (c) => c.status)).toEqual({
+      APPROVED: 4,
+      PENDING: 4,
+      DECLINED: 1,
+    });
   });
 
   it('matches the fuel log count per business', () => {

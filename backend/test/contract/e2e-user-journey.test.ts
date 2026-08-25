@@ -93,9 +93,7 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/burn — system computes burn profile', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/burn`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/burn`).expect(200);
 
     expect(res.body.ok).toBe(true);
     const burn = res.body.data;
@@ -114,9 +112,7 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/systems — owner browses available solar systems', async () => {
-    const res = await agent
-      .get('/api/systems')
-      .expect(200);
+    const res = await agent.get('/api/systems').expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.items.length).toBeGreaterThan(0);
@@ -149,9 +145,7 @@ describe('E2E: First-time user journey', () => {
   });
 
   it('GET /api/quotes/:id — owner views quote details', async () => {
-    const res = await agent
-      .get(`/api/quotes/${quoteId}`)
-      .expect(200);
+    const res = await agent.get(`/api/quotes/${quoteId}`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.id).toBe(quoteId);
@@ -165,9 +159,7 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/credit/applications — bank sees the new application', async () => {
-    const res = await agent
-      .get('/api/credit/applications')
-      .expect(200);
+    const res = await agent.get('/api/credit/applications').expect(200);
 
     expect(res.body.ok).toBe(true);
     // Our new application should appear
@@ -180,9 +172,7 @@ describe('E2E: First-time user journey', () => {
   });
 
   it('GET /api/credit/applications/:id — bank views credit file detail', async () => {
-    const res = await agent
-      .get(`/api/credit/applications/${creditFileId}`)
-      .expect(200);
+    const res = await agent.get(`/api/credit/applications/${creditFileId}`).expect(200);
 
     expect(res.body.ok).toBe(true);
     const detail = res.body.data;
@@ -201,9 +191,7 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('POST /api/credit/applications/:id/approve — bank approves', async () => {
-    const res = await agent
-      .post(`/api/credit/applications/${creditFileId}/approve`)
-      .expect(201);
+    const res = await agent.post(`/api/credit/applications/${creditFileId}/approve`).expect(201);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data).toHaveProperty('loan');
@@ -243,9 +231,7 @@ describe('E2E: First-time user journey', () => {
   });
 
   it('GET /api/loans/:id — owner checks loan before payment', async () => {
-    const res = await agent
-      .get(`/api/loans/${loanId}`)
-      .expect(200);
+    const res = await agent.get(`/api/loans/${loanId}`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.id).toBe(loanId);
@@ -271,35 +257,25 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/loans/:id — loan balance decreased after payment', async () => {
-    const res = await agent
-      .get(`/api/loans/${loanId}`)
-      .expect(200);
+    const res = await agent.get(`/api/loans/${loanId}`).expect(200);
 
     expect(res.body.ok).toBe(true);
-    expect(res.body.data.balanceKobo).toBeLessThan(
-      res.body.data.principalKobo,
-    );
+    expect(res.body.data.balanceKobo).toBeLessThan(res.body.data.principalKobo);
   });
 
   it('GET /api/assets/:id — asset is still ACTIVE after payment', async () => {
-    const res = await agent
-      .get(`/api/assets/${assetId}`)
-      .expect(200);
+    const res = await agent.get(`/api/assets/${assetId}`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.status).toBe('ACTIVE');
   });
 
   it('GET /api/loans/:id/schedule — schedule shows paid installments', async () => {
-    const res = await agent
-      .get(`/api/loans/${loanId}/schedule`)
-      .expect(200);
+    const res = await agent.get(`/api/loans/${loanId}/schedule`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.items.length).toBeGreaterThan(0);
-    const paidInstallment = res.body.data.items.find(
-      (i: { paidAt?: string }) => i.paidAt,
-    );
+    const paidInstallment = res.body.data.items.find((i: { paidAt?: string }) => i.paidAt);
     expect(paidInstallment).toBeDefined();
   });
 
@@ -308,9 +284,7 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/portfolio/stats — portfolio includes new asset', async () => {
-    const res = await agent
-      .get('/api/portfolio/stats')
-      .expect(200);
+    const res = await agent.get('/api/portfolio/stats').expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.assetsFinanced).toBeGreaterThan(0);
@@ -323,9 +297,7 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/impact — impact metrics available', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/impact`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/impact`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.litresDisplaced).toBeGreaterThanOrEqual(0);
@@ -339,9 +311,7 @@ describe('E2E: First-time user journey', () => {
 
   it('POST /api/credit/applications/:id/decline — bank can decline', async () => {
     // Find a pending application that is NOT ours
-    const listRes = await agent
-      .get('/api/credit/applications?status=PENDING')
-      .expect(200);
+    const listRes = await agent.get('/api/credit/applications?status=PENDING').expect(200);
 
     const pending = listRes.body.data.items.find(
       (f: { businessId: string }) => f.businessId !== businessId,
@@ -362,19 +332,14 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id — returns 404 for nonexistent business', async () => {
-    const res = await agent
-      .get('/api/businesses/biz_nonexistent')
-      .expect(404);
+    const res = await agent.get('/api/businesses/biz_nonexistent').expect(404);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
 
   it('POST /api/businesses — validates required fields', async () => {
-    const res = await agent
-      .post('/api/businesses')
-      .send({ name: '' })
-      .expect(400);
+    const res = await agent.post('/api/businesses').send({ name: '' }).expect(400);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('VALIDATION');
@@ -385,16 +350,12 @@ describe('E2E: First-time user journey', () => {
   /* ------------------------------------------------------------------ */
 
   it('POST /api/demo/reset — demo reset restores seed data', async () => {
-    const res = await agent
-      .post('/api/demo/reset')
-      .expect(200);
+    const res = await agent.post('/api/demo/reset').expect(200);
 
     expect(res.body.ok).toBe(true);
 
     // Verify the demo business is back
-    const bizRes = await agent
-      .get('/api/businesses/biz_adaeze_frozen')
-      .expect(200);
+    const bizRes = await agent.get('/api/businesses/biz_adaeze_frozen').expect(200);
     expect(bizRes.body.data.name).toBe('Adaeze Frozen Foods');
   });
 });

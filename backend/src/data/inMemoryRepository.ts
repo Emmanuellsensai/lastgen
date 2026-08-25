@@ -294,7 +294,12 @@ export class InMemoryRepository implements Repository {
       depositKobo,
       monthlyPaymentKobo: payment,
       aprBps: DEFAULT_APR_BPS,
-      totalPayableKobo: depositKobo + buildSchedule(principal, DEFAULT_APR_BPS, input.tenorMonths, new Date()).reduce((s, row) => s + row.principalKobo + row.interestKobo, 0),
+      totalPayableKobo:
+        depositKobo +
+        buildSchedule(principal, DEFAULT_APR_BPS, input.tenorMonths, new Date()).reduce(
+          (s, row) => s + row.principalKobo + row.interestKobo,
+          0,
+        ),
       monthlySavingsKobo,
       savingsPct: Math.round((monthlySavingsKobo / burn.monthlyKobo) * 1000) / 10,
       breakEvenMonth: breakEvenMonth(depositKobo, monthlySavingsKobo),
@@ -940,8 +945,7 @@ export class InMemoryRepository implements Repository {
           : undefined;
         return {
           loanId: loan.id,
-          businessName:
-            business?.name ?? this.state.assetBusinessName[loan.assetId] ?? 'Unknown',
+          businessName: business?.name ?? this.state.assetBusinessName[loan.assetId] ?? 'Unknown',
           businessId: asset?.businessId ?? '',
           assetId: asset?.id ?? '',
           assetStatus: asset?.status ?? 'ACTIVE',
