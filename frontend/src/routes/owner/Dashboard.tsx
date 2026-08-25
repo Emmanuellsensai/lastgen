@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -7,6 +7,7 @@ import {
   Flame,
   Receipt,
   SignOut,
+  Warning,
 } from '@phosphor-icons/react';
 import { GlassCard, GlassNav, GlassSheet } from '@/components/ui/glass';
 import { cn } from '@/lib/cn';
@@ -14,7 +15,7 @@ import { StatusPill, Money, BurnCounter } from '@/components/lastgen';
 import { Toast, ToastTitle } from '@/components/ui/toast';
 import { AppShell } from '@/components/layout';
 import { Logo } from '@/components/layout/Logo';
-import { api } from '@/lib/api';
+import { api, API_MODE } from '@/lib/api';
 import { useSession } from '@/store/session';
 import type {
   Asset,
@@ -27,7 +28,12 @@ import type {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { demoBusinessId, demoLoanId, demoQuoteId, demoAssetId } = useSession();
+  const { businessId, demoBusinessId, demoLoanId, demoQuoteId, demoAssetId } = useSession();
+
+  const effectiveBusinessId = API_MODE === 'live' ? businessId : demoBusinessId;
+  const [assetId] = useState<string | null>(API_MODE === 'live' ? null : demoAssetId);
+  const [loanId] = useState<string | null>(API_MODE === 'live' ? null : demoLoanId);
+  const [quoteId] = useState<string | null>(API_MODE === 'live' ? null : demoQuoteId);
 
   const [business, setBusiness] = useState<Business | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -42,17 +48,39 @@ export default function Dashboard() {
   const [paying, setPaying] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
 
+
+  const prevStatus = useRef<Asset['status'] | null>(null);
+  const [suspendedBanner, setSuspendedBanner] = useState(false);
+
+  const isNewUser = !burn || burn.daysObserved === 0;
+  const hasQuote = !!quote;
+  const hasAsset = !!asset;
+
+  // Application status stepper steps
+  const stepFuel = !!burn && burn.daysObserved > 0;
+  const stepQuote = hasQuote;
+  const stepApplication = false; // TODO(BE): needs GET /businesses/:id/application
+  const stepInstalled = hasAsset && asset?.status !== undefined;
+  const steps = [
+    { label: 'Fuel logged', done: stepFuel },
+    { label: 'Quote reviewed', done: stepQuote },
+    { label: 'Application submitted', done: stepApplication },
+    { label: 'System installed', done: stepInstalled },
+  ];
+
+
+
   useEffect(() => {
-    if (!demoBusinessId) return;
+    if (!effectiveBusinessId) return;
     let cancelled = false;
     async function load() {
       try {
         const [b, a, l, q, fl] = await Promise.all([
-          api.businesses.get(demoBusinessId!),
-          api.assets.get(demoAssetId!),
-          api.loans.get(demoLoanId!),
-          api.quotes.get(demoQuoteId!),
-          api.fuelLogs.list(demoBusinessId!, 5),
+          api.businesses.get(effectiveBusinessId!),
+          api.assets.get(assetId!),
+          api.loans.get(loanId!),
+          api.quotes.get(quoteId!),
+          api.fuelLogs.list(effectiveBusinessId!, 5),
         ]);
         if (!cancelled) {
           setBusiness(b);
@@ -62,7 +90,7 @@ export default function Dashboard() {
           setFuelLogs(fl.items);
           setHasLogs(fl.items.length > 0);
           try {
-            const br = await api.businesses.burn(demoBusinessId!);
+            const br = await api.businesses.burn(effectiveBusinessId!);
             if (!cancelled) setBurn(br);
           } catch {
             // burn may not exist yet
@@ -76,7 +104,30 @@ export default function Dashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [demoBusinessId, demoAssetId, demoLoanId, demoQuoteId]);
+  }, [effectiveBusinessId, demoAssetId, demoLoanId, demoQuoteId]);
+
+  // Poll asset status every 5 seconds for suspension banner
+  useEffect(() => {
+    if (!assetId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const fresh = await api.assets.get(assetId);
+        if (active) {
+          if (prevStatus.current && prevStatus.current !== fresh.status) {
+            if (fresh.status === 'SUSPENDED') setSuspendedBanner(true);
+            else if (prevStatus.current === 'SUSPENDED') { setSuspendedBanner(false); setToastOpen(true); }
+          }
+          if (fresh.status === 'SUSPENDED') setSuspendedBanner(true);
+          prevStatus.current = fresh.status;
+          setAsset(fresh);
+        }
+      } catch { /* retry */ }
+    };
+    poll();
+    const timer = setInterval(poll, 5000);
+    return () => { active = false; clearInterval(timer); };
+  }, [assetId]);
 
   async function handlePay() {
     if (!demoLoanId) return;
@@ -107,6 +158,25 @@ export default function Dashboard() {
   function monthsPaid(): number {
     if (!loan || !quote) return 0;
     return quote.tenorMonths - Math.ceil(loan.balanceKobo / loan.monthlyPaymentKobo);
+  }
+
+
+  // New user state
+  if (isNewUser) {
+    return (
+      <AppShell nav={<GlassNav left={<Link to="/app" className="flex items-center gap-2.5"><Logo variant="mark" /></Link>} right={<button type="button" onClick={() => { useSession.getState().signOut(); navigate("/login"); }} className="flex items-center gap-1.5 text-sm text-ink-mute hover:text-ink"><SignOut size={16} weight="regular" /> Log out</button>} />} >
+        <div className="mx-auto max-w-lg">
+          <GlassCard elevation={2} padding="lg">
+            <h1 className="font-display text-2xl text-ink">Welcome. Let's start with your fuel.</h1>
+            <p className="mt-3 text-ink-soft">We need a few weeks of fuel spending to size your solar system and give you a real quote. It takes about two minutes.</p>
+            <div className="mt-8">
+              <a href="/log-fuel" className="inline-flex items-center justify-center rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper hover:bg-blue">Tell us your fuel history</a>
+            </div>
+            <p className="mt-4 text-sm text-ink-mute">You can also come back to this later.</p>
+          </GlassCard>
+        </div>
+      </AppShell>
+    );
   }
 
   if (loading) {
@@ -141,7 +211,21 @@ export default function Dashboard() {
     >
       <div className="mx-auto max-w-3xl">
         {/* Business summary hero */}
-        <GlassCard elevation={2} padding="lg">
+        
+        {/* Suspended banner */}
+        {suspendedBanner && (
+          <GlassCard padding="md" className="mb-6 border border-burn/30 bg-burn/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Warning size={24} weight="bold" className="text-burn" />
+                <p className="text-ink">Your system has been suspended. Pay to restore it.</p>
+              </div>
+              <button type="button" onClick={() => setPayOpen(true)} className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-paper hover:bg-blue">Pay now</button>
+            </div>
+          </GlassCard>
+        )}
+
+<GlassCard elevation={2} padding="lg">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="font-display text-2xl leading-tight text-ink md:text-3xl">
@@ -188,6 +272,23 @@ export default function Dashboard() {
           )}
         </GlassCard>
 
+
+        {/* Application status stepper */}
+        <GlassCard elevation={1} padding="lg" className="mt-6">
+          <p className="text-sm text-ink-mute mb-4">Application progress</p>
+          <div className="flex items-center">
+            {steps.map((step, i) => (
+              <div key={step.label} className="flex items-center flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium", step.done ? "bg-navy text-paper" : "bg-paper-3 text-ink-mute")} />
+                  <p className="mt-2 text-xs text-center text-ink-mute">{step.label}</p>
+                </div>
+                {i < steps.length - 1 && <div className={cn("h-0.5 flex-1 mx-1", step.done ? "bg-navy" : "bg-paper-3")} />}
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
         {/* Quick actions */}
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
@@ -207,7 +308,7 @@ export default function Dashboard() {
               )}
             </GlassCard>
           </Link>
-          <Link to={`/quote/${demoQuoteId}`}>
+          <Link to={`/quote/${quoteId ?? demoQuoteId ?? ""}`}>
             <GlassCard hoverable padding="lg" className="h-full">
               <Receipt size={28} weight="bold" className="text-navy" />
               <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
@@ -240,7 +341,7 @@ export default function Dashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => navigate(`/asset/${demoAssetId}`)}
+                onClick={() => navigate(`/asset/${assetId ?? demoAssetId ?? ""}`)}
                 className="flex items-center gap-2 self-start rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
               >
                 Pay now
