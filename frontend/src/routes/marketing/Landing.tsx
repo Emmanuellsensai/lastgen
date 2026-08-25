@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
@@ -6,6 +7,7 @@ import { Logo } from '@/components/layout/Logo';
 import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
 import { BurnCounter, Money, PhotoStrip, StatusPill } from '@/components/lastgen';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import {
   Accordion,
   AccordionContent,
@@ -168,6 +170,57 @@ const fadeUp = {
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 
+const PETROL_LITRES_PER_KWH = 0.40;
+const DIESEL_LITRES_PER_KWH = 0.30;
+
+function SavingsCalculator() {
+  const [fuelType, setFuelType] = useState<"petrol" | "diesel">("petrol");
+  const [kva, setKva] = useState("5");
+  const [hoursPerDay, setHoursPerDay] = useState("8");
+  const [pricePerLitre, setPricePerLitre] = useState("1100");
+  const [priceEdited, setPriceEdited] = useState(false);
+
+  const handleFuelType = (type: "petrol" | "diesel") => {
+    setFuelType(type);
+    if (!priceEdited) setPricePerLitre(type === "petrol" ? "1100" : "950");
+  };
+
+  const kvaNum = parseFloat(kva) || 0;
+  const hoursNum = parseFloat(hoursPerDay) || 0;
+  const priceNum = parseFloat(pricePerLitre) || 0;
+  const rate = fuelType === "petrol" ? PETROL_LITRES_PER_KWH : DIESEL_LITRES_PER_KWH;
+  const litresPerDay = kvaNum * rate * hoursNum;
+  const nairaPerMonth = litresPerDay * priceNum * 22;
+  const loanPayment = nairaPerMonth * 0.70;
+  const saving = nairaPerMonth - loanPayment;
+  const hasValues = kvaNum > 0 && hoursNum > 0 && priceNum > 0;
+
+  return (
+    <GlassCard elevation={2} padding="lg">
+      <div className="flex rounded-lg bg-paper-3 p-1 w-fit">
+        <button type="button" onClick={() => handleFuelType("petrol")} className={cn("rounded-md px-4 py-1.5 text-sm font-medium transition-colors duration-200", fuelType === "petrol" ? "bg-paper text-ink shadow-sm" : "text-ink-mute hover:text-ink")}>Petrol</button>
+        <button type="button" onClick={() => handleFuelType("diesel")} className={cn("rounded-md px-4 py-1.5 text-sm font-medium transition-colors duration-200", fuelType === "diesel" ? "bg-paper text-ink shadow-sm" : "text-ink-mute hover:text-ink")}>Diesel</button>
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div><label className="text-xs text-ink-mute">Generator (kVA)</label><input type="number" min="1" max="100" step="0.5" value={kva} onChange={(e) => setKva(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink" /></div>
+        <div><label className="text-xs text-ink-mute">Hours / day</label><input type="number" min="1" max="24" value={hoursPerDay} onChange={(e) => setHoursPerDay(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink" /></div>
+        <div><label className="text-xs text-ink-mute">Price / litre (naira)</label><input type="number" min="1" step="1" value={pricePerLitre} onChange={(e) => { setPricePerLitre(e.target.value); setPriceEdited(true); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink" /></div>
+      </div>
+      {hasValues ? (
+        <>
+          <div className="mt-6 grid grid-cols-3 gap-4">
+            <div><p className="text-xs text-ink-mute">You spend now</p><Money kobo={Math.round(nairaPerMonth * 100)} size="lg" className="mt-1 block text-burn" /></div>
+            <div><p className="text-xs text-ink-mute">You would pay Lastgen</p><Money kobo={Math.round(loanPayment * 100)} size="lg" className="mt-1 block text-navy" /></div>
+            <div><p className="text-xs text-ink-mute">You keep</p><Money kobo={Math.round(saving * 100)} size="lg" className="mt-1 block text-success" /></div>
+          </div>
+          <p className="mt-4 text-xs text-ink-mute">Based on {fuelType} at {priceNum.toLocaleString()} naira/litre, {litresPerDay.toFixed(1)}L/day. Your actual quote depends on a verified fuel log.</p>
+        </>
+      ) : null}
+      <div className="mt-5"><a href="/register" className="inline-flex items-center justify-center rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue">Get started</a></div>
+    </GlassCard>
+  );
+}
+
 export default function Landing() {
   return (
     <AppShell
@@ -220,6 +273,8 @@ export default function Landing() {
               {HERO.ctaSecondary}
             </Button>
           </div>
+
+          <SavingsCalculator />
 
           <GlassPanel elevation={1} className="mt-12 rounded-lg p-6">
             <p className="text-sm text-ink-mute">
