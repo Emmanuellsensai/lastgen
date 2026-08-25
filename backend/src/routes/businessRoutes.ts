@@ -72,6 +72,25 @@ export function createBusinessRouter(repo: Repository, env: Env): Router {
     })().catch(next);
   });
 
+  router.get('/businesses/:id/summary', (req, res, next) => {
+    void (async () => {
+      res.json(ok(await repo.businessSummary(req.params.id)));
+    })().catch(next);
+  });
+
+  router.get('/businesses/:id/application', (req, res, next) => {
+    void (async () => {
+      res.json(ok(await repo.applicationFor(req.params.id)));
+    })().catch(next);
+  });
+
+  router.delete('/businesses/:id/fuel-logs/:logId', (req, res, next) => {
+    void (async () => {
+      await repo.deleteFuelLog(req.params.id, req.params.logId);
+      res.json(ok({ ok: true }));
+    })().catch(next);
+  });
+
   router.get('/businesses/:id/burn', (req, res, next) => {
     void (async () => {
       const profile = await repo.burnProfileFor(req.params.id);

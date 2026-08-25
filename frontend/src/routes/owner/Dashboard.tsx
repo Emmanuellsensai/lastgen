@@ -108,57 +108,34 @@ export default function Dashboard() {
     let cancelled = false;
     async function load() {
       try {
-        const effectiveAssetId =
-          API_MODE === 'live' ? null : demoAssetId;
-        const effectiveLoanId =
-          API_MODE === 'live' ? null : demoLoanId;
-        const effectiveQuoteId =
-          API_MODE === 'live' ? null : demoQuoteId;
-
         const b = await api.businesses.get(effectiveBusinessId!);
         if (cancelled) return;
         setBusiness(b);
 
-        // Load asset: in live mode fetch from portfolio
-        if (API_MODE === 'live') {
-          try {
-            const assets = await api.portfolio.assets({ businessId: effectiveBusinessId! });
-            if (!cancelled && assets.items.length > 0) {
-              const a = assets.items[0];
-              setAsset(a);
-              prevAssetStatus.current = a.status;
-              if (a.status === 'SUSPENDED') setSuspendedBanner(true);
-              // Fetch loan from the asset
-              try {
-                const l = await api.loans.get(`loan_${a.id}`);
-                if (!cancelled) setLoan(l);
-              } catch { /* loan may not exist yet */ }
-            }
-          } catch { /* no assets yet */ }
-          // Fetch quote
-          try {
-            const quotes = await api.credit.applications({ businessId: effectiveBusinessId! } as never);
-            if (!cancelled && quotes.items.length > 0) {
-              const cf = quotes.items[0];
-              setCreditFile(cf);
-              setQuote(cf.quote);
-            }
-          } catch { /* no quote yet */ }
-        } else {
-          // Mock mode: use demo IDs
-          const [a, l, q] = await Promise.all([
-            effectiveAssetId ? api.assets.get(effectiveAssetId) : Promise.resolve(null),
-            effectiveLoanId ? api.loans.get(effectiveLoanId) : Promise.resolve(null),
-            effectiveQuoteId ? api.quotes.get(effectiveQuoteId) : Promise.resolve(null),
-          ]);
-          if (!cancelled) {
-            setAsset(a);
-            setLoan(l);
-            setQuote(q);
-            if (a) prevAssetStatus.current = a.status;
-            if (a?.status === 'SUSPENDED') setSuspendedBanner(true);
-          }
-        }
+        // One call resolves the owner's live ids. Previously live mode read the
+        // bank's portfolio endpoint and derived the loan id by string-building
+        // `loan_${assetId}`, which only ever matched seeded data. The demo ids
+        // stand in for mock mode if the summary is unavailable.
+        const summary = await api.businesses.summary(effectiveBusinessId!).catch(() => null);
+        const resolvedAssetId = summary?.assetId ?? (API_MODE === 'live' ? null : demoAssetId);
+        const resolvedLoanId = summary?.loanId ?? (API_MODE === 'live' ? null : demoLoanId);
+        const resolvedQuoteId = summary?.quoteId ?? (API_MODE === 'live' ? null : demoQuoteId);
+
+        // Each of these is optional: a business with no quote, no asset or no
+        // loan still renders the parts of the dashboard it does have.
+        const [a, l, q, cf] = await Promise.all([
+          resolvedAssetId ? api.assets.get(resolvedAssetId).catch(() => null) : null,
+          resolvedLoanId ? api.loans.get(resolvedLoanId).catch(() => null) : null,
+          resolvedQuoteId ? api.quotes.get(resolvedQuoteId).catch(() => null) : null,
+          api.businesses.application(effectiveBusinessId!).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setAsset(a);
+        setLoan(l);
+        setQuote(q ?? cf?.quote ?? null);
+        setCreditFile(cf);
+        if (a) prevAssetStatus.current = a.status;
+        if (a?.status === 'SUSPENDED') setSuspendedBanner(true);
 
         // Fuel logs
         try {
@@ -256,9 +233,7 @@ export default function Dashboard() {
     { label: 'Quote reviewed', complete: hasQuote },
     {
       label: 'Application submitted',
-      complete:
-        creditFile?.status === 'PENDING' ||
-        creditFile?.status === 'APPROVED',
+      complete: !!creditFile?.submittedAt || creditFile?.status === 'APPROVED',
     },
     {
       label: 'System installed',

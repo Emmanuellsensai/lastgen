@@ -25,5 +25,11 @@ export function createLoanRouter(repo: Repository): Router {
     })().catch(next);
   });
 
+  router.get('/loans/:id/payments', (req, res, next) => {
+    void (async () => {
+      res.json(ok({ items: await repo.paymentsFor(req.params.id) }));
+    })().catch(next);
+  });
+
   return router;
 }
