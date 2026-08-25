@@ -2,13 +2,20 @@ import { Router } from 'express';
 import { paymentAdapterFor } from '../adapters/factory.js';
 import type { Env } from '../config/env.js';
 import type { Repository } from '../data/repository.js';
+import { getSupabase } from '../lib/supabase.js';
 import { makeRequireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { kycStorageFor } from '../services/kycStorage.js';
+import { ninProviderFor } from '../services/ninVerification.js';
+import { createAuthRouter } from './authRoutes.js';
+import { createAdminRouter } from './adminRoutes.js';
 import { createAssetRouter } from './assetRoutes.js';
+import { createBankAuthRouter } from './bankAuthRoutes.js';
 import { createBusinessRouter } from './businessRoutes.js';
 import { createCreditRouter } from './creditRoutes.js';
 import { createDemoRouter } from './demoRoutes.js';
 import { createImpactRouter } from './impactRoutes.js';
+import { createKycRouter } from './kycRoutes.js';
 import { createLoanRouter } from './loanRoutes.js';
 import { createPaymentRouter } from './paymentRoutes.js';
 import { createPortfolioRouter } from './portfolioRoutes.js';
@@ -34,6 +41,10 @@ export function apiRouter(repo: Repository, env: Env): Router {
   // notifications and is never asked for a Lastgen bearer token.
   router.use(createWebhookRouter(repo, adapter));
 
+  // Bank registration and login also run BEFORE the auth boundary: a caller
+  // cannot present a bearer token it does not have yet.
+  router.use(createBankAuthRouter(repo, env));
+
   // Demo controls are unauthenticated (per the contract) but only exist in
   // demo mode; live deployments simply never mount this router.
   if (env.demoMode) {
@@ -41,7 +52,16 @@ export function apiRouter(repo: Repository, env: Env): Router {
   }
 
   router.use(makeRequireAuth(env));
+  router.use(createAuthRouter(repo, env));
   router.use(createBusinessRouter(repo, env));
+  // KYC needs the NIN provider and document storage seams; the Supabase
+  // client resolves lazily per upload so composition stays credential-free.
+  router.use(
+    createKycRouter(repo, env, {
+      ninProvider: ninProviderFor(env.ninProvider),
+      kycStorage: kycStorageFor(env, () => getSupabase()),
+    }),
+  );
   router.use(createSystemRouter(repo));
   router.use(createQuoteRouter(repo));
   router.use(createCreditRouter(repo));
@@ -51,6 +71,8 @@ export function apiRouter(repo: Repository, env: Env): Router {
   router.use(createWalletRouter(repo, env));
   router.use(createPortfolioRouter(repo));
   router.use(createImpactRouter(repo));
+  // The credit desk: every route inside enforces the bank/admin role.
+  router.use(createAdminRouter(repo, env));
 
   // Contract JSON 404 instead of Express's HTML fallback.
   router.use((_req, _res, next) => next(new ApiError('NOT_FOUND', 'Route not found', 404)));

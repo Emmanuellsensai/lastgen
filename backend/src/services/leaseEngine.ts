@@ -120,18 +120,20 @@ export function createLeaseQuote(input: LeaseQuoteInput): LeaseQuoteResult {
       'The solar payment must be lower than the monthly fuel spend',
       422,
     );
-  }
+  }    const schedule = buildSchedule(
+      input.systemPriceKobo - depositKobo,
+      input.aprBps,
+      input.tenorMonths,
+      input.firstDueAt ?? new Date(),
+    );
+    const scheduleSum = schedule.reduce(
+      (sum, row) => sum + row.principalKobo + row.interestKobo,
+      0,
+    );
 
-  const schedule = buildSchedule(
-    input.systemPriceKobo - depositKobo,
-    input.aprBps,
-    input.tenorMonths,
-    input.firstDueAt ?? new Date(),
-  );
-
-  return {
-    monthlyPaymentKobo: monthlyPaymentKoboValue,
-    totalPayableKobo: depositKobo + monthlyPaymentKoboValue * input.tenorMonths,
+    return {
+      monthlyPaymentKobo: monthlyPaymentKoboValue,
+      totalPayableKobo: depositKobo + scheduleSum,
     monthlySavingsKobo: savings,
     savingsPct: Number(((savings / input.burn.monthlyKobo) * 100).toFixed(1)),
     breakEvenMonth: breakEvenMonth(depositKobo, savings),

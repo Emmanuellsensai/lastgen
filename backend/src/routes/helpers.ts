@@ -35,3 +35,20 @@ export function singleFile(field: string): RequestHandler {
     });
   };
 }
+
+/**
+ * Multi-file multipart upload for named fields (e.g. the KYC submission's
+ * bankSlip + selfie). Same failure mapping as singleFile; files arrive on
+ * req.files keyed by field name.
+ */
+export function fileFields(
+  fields: { name: string; maxCount: number }[],
+): RequestHandler {
+  const middleware = upload.fields(fields);
+  return (req, res, next) => {
+    middleware(req, res, (err) => {
+      if (err) next(new ApiError('VALIDATION', err.message, 400));
+      else next();
+    });
+  };
+}

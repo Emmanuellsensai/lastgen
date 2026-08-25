@@ -32,13 +32,13 @@ describe('wallets contract', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.data.wallet).toMatchObject({
+    expect(res.body.data).toMatchObject({
       businessId: 'biz_adaeze_frozen',
       bankCode: WALLET_BANK_CODE,
       currency: WALLET_CURRENCY,
       balanceKobo: DEMO_WALLET_FUNDING_KOBO,
     });
-    expect(res.body.data.wallet.accountNumber).toMatch(/^\d{10}$/);
+    expect(res.body.data.accountNumber).toMatch(/^\d{10}$/);
   });
 
   it('is idempotent per business', async () => {
@@ -52,8 +52,8 @@ describe('wallets contract', () => {
     const first = await request(app).post('/api/wallets/create').send(body);
     const second = await request(app).post('/api/wallets/create').send(body);
 
-    expect(second.body.data.wallet.id).toBe(first.body.data.wallet.id);
-    expect(second.body.data.wallet.accountNumber).toBe(first.body.data.wallet.accountNumber);
+    expect(second.body.data.id).toBe(first.body.data.id);
+    expect(second.body.data.accountNumber).toBe(first.body.data.accountNumber);
   });
 
   it('requires the KYC fields', async () => {
@@ -117,6 +117,49 @@ describe('wallets contract', () => {
       amountKobo: DEMO_WALLET_FUNDING_KOBO,
       category: 'funding',
     });
+  });
+
+  it('funds the wallet with a simulated bank transfer', async () => {
+    await request(app).post('/api/wallets/create').send({
+      businessId: 'biz_adaeze_frozen',
+      nin: '12345678901',
+      firstName: 'Adaeze',
+      lastName: 'Okonkwo',
+      phone: '+2348012345678',
+    });
+
+    const res = await request(app)
+      .post('/api/wallets/fund')
+      .send({ amountKobo: 10_000_000 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.balanceKobo).toBe(DEMO_WALLET_FUNDING_KOBO + 10_000_000);
+
+    // Statement should now have 2 entries: opening credit + fund
+    const stmt = await request(app).get('/api/wallets/statement');
+    expect(stmt.body.data.items).toHaveLength(2);
+    expect(stmt.body.data.items[0]).toMatchObject({
+      direction: 'IN',
+      amountKobo: 10_000_000,
+      category: 'funding',
+    });
+  });
+
+  it('rejects funding with zero or negative amount', async () => {
+    await request(app).post('/api/wallets/create').send({
+      businessId: 'biz_adaeze_frozen',
+      nin: '12345678901',
+      firstName: 'Adaeze',
+      lastName: 'Okonkwo',
+      phone: '+2348012345678',
+    });
+
+    const res = await request(app)
+      .post('/api/wallets/fund')
+      .send({ amountKobo: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION');
   });
 
   it('settles a wallet payment and debits the balance in one transaction', async () => {

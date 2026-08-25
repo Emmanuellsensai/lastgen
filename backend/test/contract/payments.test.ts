@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildSeed } from '../../src/data/seed.js';
 import type { TestApp } from '../helpers.js';
 import { createTestApp } from '../helpers.js';
 
@@ -155,8 +156,11 @@ describe('payments contract', () => {
   });
 
   it('rejects paying a closed loan', async () => {
+    const seed = buildSeed();
+    const closed = seed.loans.find((l) => l.status === 'CLOSED');
+    expect(closed).toBeDefined();
     const res = await request(app)
-      .post('/api/loans/loan_p000/pay')
+      .post(`/api/loans/${closed!.id}/pay`)
       .send({ source: 'bank_account', amountKobo: 1000 });
     expect(res.status).toBe(409);
     expect(res.body.error).toEqual({

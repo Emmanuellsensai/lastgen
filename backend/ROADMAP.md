@@ -2,7 +2,7 @@
 
 **Project:** Lastgen — asset-finance for Nigerian informal businesses
 **Branch:** `feat/backend` · **Document status:** living plan, updated every phase
-**Last updated:** 19 August 2026
+**Last updated:** 24 August 2026
 
 This is the canonical map for completing the Lastgen backend. It defines the
 remaining phases, the deliverables, the verification gate, the commit
@@ -88,10 +88,117 @@ Supabase or a live payment provider.
 | 5 | Portfolio + impact parity | ✅ complete (2 commits) |
 | 6 | Demo routes + README + Supabase/deploy | ⬜ pending |
 | 7 | Integration + final docs + PR prep | ⬜ pending |
+| 8 | RBAC + bank identity | ✅ complete (6 commits) |
+| 9 | KYC lifecycle | ✅ complete (6 commits) |
+| 10 | Admin surface | ✅ complete (3 commits) |
+| 11 | Docs + env polish for the admin sprint | ✅ complete (2 commits) |
 
 ---
 
-## 3. Phase 2 — Data layer + deterministic seed
+## 3. Phases 8–11 — bank identity, KYC and the admin surface
+
+**Driver.** The frontend build sprint (`frontend/buildSummary.md`) shipped bank
+auth pages, a KYC flow and a four-tab admin dashboard, all mocked in
+`frontend/src/mocks/handlers.ts` (bankAuthHandlers, kycHandlers,
+adminHandlers — lines 844–1004). Eleven endpoints are required; none exist in
+the backend today (no role model, no bank identity, no KYC records, no admin
+surface). Per §1.1 the MSW handlers are the executable specification: parity
+is the acceptance bar, with two deliberate hardenings where the mocks are
+looser than production must be:
+
+1. **Login fails closed.** The mock accepts any `bankId`/`password`; the
+   backend requires a prior registration and rejects unknown or wrong
+   credentials with `401 UNAUTHORIZED`.
+2. **Role checks are real.** The mock cannot express authorization; the
+   backend gates `/admin/*` behind `role ∈ {bank, admin}`.
+
+### Phase 8 — RBAC + bank identity (complete)
+- **Delivered:** `UserRole` model + `makeRequireRole` gate (demo permissive,
+  live reads server-only `app_metadata.role`, FORBIDDEN 403 for role denials);
+  bank identities via `Repository.registerBank/authenticateBank` (in-memory
+  map with deterministic tokens; Supabase auth.users + `bank_users` mirror +
+  synthesized emails); public `/auth/bank/register` (201) and
+  `/auth/bank/login` mounted before the auth boundary; additive
+  `migrations/rbac-kyc.sql`.
+- **Tests:** `backend/test/contract/bank-auth.test.ts` (10).
+- **Verification:** typecheck ✅, lint ✅, full suite 199/199 ✅, boot smoke
+  (health, register 201 envelope, fail-closed 401 login) ✅.
+
+### Phase 9 — KYC lifecycle (complete)
+- **Delivered:** `fileFields` multer helper (bankSlip + selfie, 5 MB each);
+  `services/ninVerification.ts` provider seam (`NIN_PROVIDER=simulated`
+  validates 11 digits and passes; `nimc` fails closed with UNAVAILABLE until
+  the real adapter lands); `services/kycStorage.ts` (demo data URLs / live
+  private-bucket signed URLs, Supabase client resolved lazily per upload);
+  `Repository.kycRecordFor/submitKyc` on both implementations (Supabase
+  upserts on the per-business unique index); `GET /businesses/:id/kyc`
+  synthesizing an unverified projection and multipart submit parking the
+  record in `pending`; live-mode ownership enforced like the wallet router.
+- **Invariant:** approved records are immutable — resubmission throws
+  `409 INVALID_TRANSITION` because it would silently reopen a reviewed
+  identity.
+- **Tests:** `backend/test/contract/kyc.test.ts` (9).
+- **Verification:** typecheck ✅, lint ✅, full suite 208/208 ✅.
+
+### Phase 10 — Admin surface (complete)
+
+**Goal.** The five admin views behind one guarded router.
+
+**Design.** `src/routes/adminRoutes.ts` mounts every route behind
+`makeRequireRole(env, 'bank', 'admin')`. `GET /admin/users` joins businesses → asset →
+loan → kyc into the AdminUser projection; `GET /admin/kyc?status=` lists
+submissions joined with business names; approve/reject transition the KYC
+state machine and emit a best-effort realtime notification broadcast (same
+try/catch posture as `broadcastPaymentStatus`). `POST /admin/assets/:id/toggle-power`
+routes through the existing AssetStateMachine (`suspendAsset`/`restoreAsset`,
+reason `admin-toggle`), preserving the `409 MEDICAL_FLAG` invariant.
+`GET /admin/orders?status=` projects non-CLOSED loans; `POST /admin/loans/:id/approve-payment`
+settles through atomic `payLoan(loanId, monthlyPaymentKobo, 'SIMULATED',
+'ADMIN-…')` exactly as the mock does.
+
+**Shipped (commits 3188d0f, edf1544, e1226ce).** Repository seam gained
+`listAdminUsers`, `listKycSubmissions`, `reviewKyc` and `listAdminOrders`
+(both implementations); live review broadcasts `kyc_reviewed` on the
+notifications channel. Hardening beyond the MSW mock: OWNED assets refuse
+the toggle up front with the state machine's message, reject requires a
+reason, non-pending reviews answer 409, unknown status filters answer 400,
+and the in-memory orders projection falls back to the seed's denormalised
+`assetBusinessName` map for portfolio rows without a backing business.
+15 contract tests (`test/contract/admin.test.ts`) cover every tab including
+the medical-flag guard and closure-by-repeated-approval. Gate: typecheck ✓,
+lint 0 errors ✓, 223/223 tests across 25 suites ✓.
+
+### Phase 11 — Docs + env polish (complete)
+
+`backend/.env.example` gains documented `NIN_PROVIDER=simulated` and
+`KYC_BUCKET=kyc-docs` (parsing landed in `config/env.ts` with Phase 9);
+the README configuration table and endpoint reference now list the bank
+identity, KYC and admin desk routes; `AUDIT.md` §22 records Phases 8–10
+(closing the reference gap in earlier commit messages); BACKEND_PROGRESS
+status matrix reflects the new deliverables and test counts. ROADMAP
+dashboard rows flip as each gate passes.
+
+**Shipped (commits 7c41c0f, <docs-close>).** All eleven phases complete:
+the backend implements every route the frontend sprint consumes, with
+RBAC enforced server-side, KYC documents in a private bucket, atomic
+settlement on every payment entry path and 223 green tests pinning the
+contract.
+
+**Commit plan (phases 8–11).**
+
+```
+docs(backend): plan phases 8-11 (bank auth, KYC, admin surface)
+feat(backend): add role-aware auth middleware and bank identity types
+feat(backend): add bank_users repository methods (memory + supabase)
+feat(backend): add public /auth/bank/register and /auth/bank/login routes
+feat(backend): add additive rbac-kyc migration
+test(backend): cover bank-auth contract incl. live-mount guard
+<phase 9..11 commits planned at their phase start>
+```
+
+---
+
+## 4. Phase 2 — Data layer + deterministic seed
 
 **Goal.** Give the API a real, deterministic dataset. A typed `Repository`
 seam isolates routes from storage; the in-memory implementation ports
@@ -132,7 +239,7 @@ values captured from its first build on 2026-08-19.
 
 ---
 
-## 4. Phases 3–7 (map)
+## 5. Phases 3–7 (map)
 
 ### Phase 3 — Happy-path routes (complete)
 - **Goal:** every contract route except payments returns real data through the
@@ -208,7 +315,7 @@ values captured from its first build on 2026-08-19.
 
 ---
 
-## 5. Cross-cutting invariants
+## 6. Cross-cutting invariants
 
 - **Asset states:** ACTIVE → GRACE → SUSPENDED → ACTIVE, plus → OWNED when the
   loan balance clears. The single `assetStateMachine.transition` owns every
@@ -224,7 +331,7 @@ values captured from its first build on 2026-08-19.
 
 ---
 
-## 6. Review checkpoints (team-lead gates)
+## 7. Review checkpoints (team-lead gates)
 
 | Phase | Checkpoint |
 | --- | --- |
@@ -234,7 +341,7 @@ values captured from its first build on 2026-08-19.
 
 ---
 
-## 7. Decision register (pointer)
+## 8. Decision register (pointer)
 
 Full register with rationales: `backend/BACKEND_PROGRESS.md` §7. Locked entries
 relevant to this roadmap: float intermediates + single `Math.round` at kobo;

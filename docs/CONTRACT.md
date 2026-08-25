@@ -1,102 +1,284 @@
+# LASTGEN API CONTRACT — FROZEN
+
+**Base:** `/api` · **Auth:** `Bearer <supabase_jwt>` (live) / unauthenticated (demo) · **Money:** KOBO (integer) · **Energy:** Wh (integer)
+
+**Envelope:** `{ ok: boolean, data?: T, error?: { code, message } }`
+
+**Health:** `GET /health` → `{ ok: true }`
+
+---
+
+## SHARED CONSTANTS (both sides MUST use these exact values)
+
+| Constant | Value | Notes |
+|---|---|---|
+| `CO2_KG_PER_LITRE_PETROL` | 2.31 | |
+| `CO2_KG_PER_LITRE_DIESEL` | 2.68 | |
+| `DEFAULT_GRACE_PERIOD_HOURS` | 72 | |
+| `MIN_LIGHTING_CIRCUIT_W` | 40 | Preserved even when suspended |
+| `WALLET_BANK_CODE` | 035 | Wema/ALAT |
+| `WALLET_CURRENCY` | NGN | |
+| `DEMO_WALLET_FUNDING_KOBO` | 5,000,000 | ₦50,000 pre-funded in demo mode |
+| `DEFAULT_APR_BPS` | 2800 | 28% annual percentage rate |
+| `MIN_TENOR_MONTHS` | 6 | Minimum loan term |
+| `DEFAULT_DEPOSIT_RATIO` | 0.1 | 10% of system price |
+| `PETROL_PRICE_PER_LITRE_KOBO` | 115,000 | ₦1,150 per litre |
+| `KOBO_PER_NAIRA` | 100 | Conversion factor |
+| `DAYS_PER_MONTH` | 30 | Burn projection |
+| `DAYS_PER_YEAR` | 365 | Burn projection |
+
+---
+
+## AUTH
+
 ```
-LASTGEN API CONTRACT — FROZEN
-BASE /api · Auth: Bearer <supabase_jwt> · Money in KOBO (int) · Energy in Wh (int)
-Envelope: { ok: boolean, data?: T, error?: { code, message } }
+POST /auth/login       { email, password }    -> { user, role, businessId, accessToken }
+POST /auth/register    { email, password, fullName, phone } -> { user, role, businessId, accessToken }
+POST /auth/verify-nin  { nin }                -> { verified, owner }
+GET  /me/session                              -> { role, businessId, name }
+```
 
-SHARED CONSTANTS (both sides MUST use these exact values)
-  CO2_KG_PER_LITRE_PETROL = 2.31
-  CO2_KG_PER_LITRE_DIESEL = 2.68
-  DEFAULT_GRACE_PERIOD_HOURS = 72
-  MIN_LIGHTING_CIRCUIT_W = 40      // preserved even when suspended
+- `POST /auth/*` — demo-only shims. In live mode, use Supabase directly.
+- `GET /me/session` — resolves the authenticated user to their business via `owner_id`. Returns `{ role: 'owner' | 'bank', businessId: string | null, name: string }`.
+- `POST /auth/verify-nin` — simulates NIN verification with a 1.5s delay.
 
-BUSINESS & BURN
-POST /businesses            { name, type, city, generatorKva?, hoursPerDay? } -> Business
-GET  /businesses/:id                                    -> Business
-POST /businesses/:id/receipts   multipart: file         -> FuelLog   (vision extract)
-POST /businesses/:id/fuel-logs  { litres, amountKobo, pricePerLitreKobo, loggedAt } -> FuelLog
-GET  /businesses/:id/burn                               -> BurnProfile
+---
 
-QUOTES
-GET  /systems                ?minKw&maxPriceKobo        -> { items: SolarSystem[] }
+## BUSINESS & BURN
+
+```
+POST /businesses                    { name, type, city, generatorKva?, hoursPerDay? } -> Business
+GET  /businesses/:id                                        -> Business
+POST /businesses/:id/receipts       multipart: file         -> FuelLog   (vision extract)
+POST /businesses/:id/fuel-logs      { litres, amountKobo, pricePerLitreKobo, loggedAt } -> FuelLog
+GET  /businesses/:id/fuel-logs      ?limit&offset           -> { items: FuelLog[], total }
+GET  /businesses/:id/burn                                   -> BurnProfile
+```
+
+- `POST /businesses` stores `ownerId` from `req.user.id` for session resolution.
+- `POST /businesses/:id/receipts` uses Gemini Vision OCR to extract fuel details from a petrol receipt image.
+- `GET /businesses/:id/fuel-logs` returns logs sorted newest-first, with `limit` (default 30, max 100) and `offset`.
+
+---
+
+## QUOTES
+
+```
+GET  /systems                ?minKw&maxPriceKobo            -> { items: SolarSystem[] }
 POST /businesses/:id/quote   { systemId, tenorMonths, depositKobo? } -> Quote
 GET  /quotes/:id                                        -> Quote
+```
 
-CREDIT (bank side)
-GET  /credit/applications    ?status                    -> { items: CreditFile[] }
-GET  /credit/applications/:id                           -> CreditFileDetail
-POST /credit/applications/:id/approve                   -> { loan, asset }
-POST /credit/applications/:id/decline  { reason }       -> CreditFile
+- A quote is only valid when `monthlySavingsKobo > 0`. Reject otherwise with `QUOTE_NOT_VIABLE`.
+- `POST /businesses/:id/quote` auto-creates a `CreditFile` in `PENDING` status.
+- `depositKobo` defaults to 10% of system price if omitted.
 
-ASSETS & ENFORCEMENT
+---
+
+## CREDIT (bank side)
+
+```
+GET  /credit/applications    ?status=PENDING|APPROVED|DECLINED  -> { items: CreditFile[] }
+GET  /credit/applications/:id                                   -> CreditFileDetail
+POST /credit/applications/:id/approve                           -> { loan, asset }
+POST /credit/applications/:id/decline    { reason }             -> CreditFile
+```
+
+- `CreditFileDetail` extends `CreditFile` with `fuelLogs: FuelLog[]` and `schedulePreview: Installment[]`.
+- Approve provisions a new `Loan` + `Asset` and transitions the credit file to `APPROVED`.
+- Decline transitions to `DECLINED` with the provided reason.
+
+---
+
+## ASSETS & ENFORCEMENT
+
+```
 GET  /assets/:id                                        -> Asset
 GET  /assets/:id/meter       ?from&to                   -> { items: MeterReading[] }
 POST /assets/:id/suspend     { reason }                 -> Asset   (bank only)
 POST /assets/:id/restore                                -> Asset   (bank only)
+```
 
-LOANS & PAYMENTS
+- Suspension follows the asset state machine. Business with `medicalFlag: true` cannot be suspended.
+- Meter readings are generated by the meter simulator in demo mode.
+
+---
+
+## LOANS & PAYMENTS
+
+```
 GET  /loans/:id                                         -> Loan
-POST /loans/:id/pay          { amountKobo }             -> { payment, loan, asset }
 GET  /loans/:id/schedule                                -> { items: Installment[] }
+POST /loans/:id/pay          { source, amountKobo? }    -> { paymentId, platformTransactionReference, status }
+```
 
-PORTFOLIO
+- `source`: `'wallet' | 'bank_account'`
+- `amountKobo` is optional; defaults to the next unpaid installment amount.
+- **Wallet payment** — instant debit. Returns `status: 'SUCCESS'` immediately. Returns `402 PAYMENT_REQUIRED` if balance insufficient.
+- **Bank payment** — returns `status: 'pending_authorisation'` with `paymentId`. Frontend polls `GET /payments/:reference/status`.
+- The response intentionally omits loan/asset internals. Frontend MUST re-fetch after settlement.
+
+---
+
+## PAYMENTS
+
+```
+GET  /payments/:reference/status    -> { status, payment }
+```
+
+- Accepts transaction `reference` OR `paymentId`.
+- Reconciles with ALAT on each poll if still pending.
+- Returns terminal states: `SUCCESS`, `FAILED`, `EXPIRED`.
+
+---
+
+## WALLETS
+
+```
+POST /wallets/create    { businessId, nin, firstName, lastName, phone } -> Wallet
+POST /wallets/fund      { amountKobo }                                  -> Wallet
+GET  /wallets/balance                                                    -> Wallet
+GET  /wallets/statement   ?limit&before                                  -> { items: WalletTransaction[] }
+```
+
+- `POST /wallets/create` — idempotent per business. Demo mode pre-funds ₦50,000.
+- `POST /wallets/fund` — simulates a bank transfer. Credits the wallet with an `IN` transaction. Max ₦500,000 per transfer.
+- `GET /wallets/balance` and `GET /wallets/statement` resolve the business from `req.user` — never from the request body.
+
+---
+
+## PORTFOLIO
+
+```
 GET  /portfolio/stats                                   -> PortfolioStats
 GET  /portfolio/assets       ?status&city&page          -> { items: Asset[], total }
 POST /portfolio/export                                  -> { url, generatedAt }
+GET  /exports/:filename                                 -> CSV file
+```
 
-IMPACT
+- Assets paginated at 25 per page.
+- Export returns a URL; the CSV is served by `GET /exports/:filename`.
+
+---
+
+## IMPACT
+
+```
 GET  /businesses/:id/impact  ?period=month|year|all     -> ImpactSummary
 GET  /businesses/:id/wrapped ?year                      -> WrappedPayload
+```
 
-DEMO CONTROL (unauthenticated, demo only)
+---
+
+## DEMO CONTROL (unauthenticated, demo only)
+
+```
 POST /demo/reset                                        -> { ok }
 POST /demo/advance-time      { days }                   -> { ok }
 POST /demo/miss-payment      { loanId }                 -> { loan, asset }
+```
 
-WEBHOOKS
+---
+
+## WEBHOOKS
+
+```
 POST /webhooks/alat          ALAT Transaction Notification payload -> { ok }
-                             MUST be idempotent on transactionReference
+```
 
-TYPES
-Business      { id, name, type, city, generatorKva, hoursPerDay, createdAt }
-FuelLog       { id, businessId, source:'receipt'|'manual', litres, amountKobo,
+- MUST be idempotent on `transactionReference`.
+
+---
+
+## TYPES
+
+```
+Business      { id, name, type, city, generatorKva, hoursPerDay, createdAt, medicalFlag? }
+FuelLog       { id, businessId, source: 'receipt' | 'manual', litres, amountKobo,
                 pricePerLitreKobo, loggedAt, receiptUrl?, confidence? }
 BurnProfile   { businessId, litresPerDay, dailyKobo, monthlyKobo, annualKobo,
-                daysObserved, verified:boolean, computedAt }
-SolarSystem   { id, name, capacityKw, panelW, batteryKwh, inverterKva,
-                priceKobo, coversKva }
-Quote         { id, businessId, system:SolarSystem, tenorMonths, depositKobo,
+                daysObserved, verified: boolean, computedAt }
+SolarSystem   { id, name, capacityKw, panelW, batteryKwh, inverterKva, priceKobo, coversKva }
+Quote         { id, businessId, system: SolarSystem, tenorMonths, depositKobo,
                 monthlyPaymentKobo, aprBps, totalPayableKobo,
                 monthlySavingsKobo, savingsPct, breakEvenMonth }
-CreditFile    { id, businessId, business:Business, burn:BurnProfile,
-                quote:Quote, affordabilityRatio, loadProfileScore,
-                verifiedMonths, status:'PENDING'|'APPROVED'|'DECLINED', createdAt }
+CreditFile    { id, businessId, business: Business, burn: BurnProfile,
+                quote: Quote, affordabilityRatio, loadProfileScore,
+                verifiedMonths, status: 'PENDING' | 'APPROVED' | 'DECLINED', createdAt }
+CreditFileDetail extends CreditFile { fuelLogs: FuelLog[], schedulePreview: Installment[] }
 Asset         { id, businessId, systemId, serial, controllerId,
-                status:'ACTIVE'|'GRACE'|'SUSPENDED'|'OWNED',
-                installedAt, suspendedAt?, suspendReason? }
+                status: 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'OWNED',
+                installedAt, suspendedAt?, suspendReason?, city? }
 Loan          { id, assetId, principalKobo, tenorMonths, monthlyPaymentKobo,
-                balanceKobo, nextDueAt, status:'ACTIVE'|'DELINQUENT'|'CLOSED' }
+                balanceKobo, nextDueAt, status: 'ACTIVE' | 'DELINQUENT' | 'CLOSED' }
 Installment   { n, dueAt, principalKobo, interestKobo, balanceKobo, paidAt? }
-Payment       { id, loanId, amountKobo, paidAt, source:'ALAT'|'SIMULATED', reference }
+Payment       { id, loanId, amountKobo, paidAt, source: 'ALAT' | 'SIMULATED' | 'WALLET',
+                reference, status: PaymentStatus, platformTransactionReference? }
 MeterReading  { id, assetId, ts, whGenerated, whConsumed, batterySocPct }
-ImpactSummary { litresDisplaced, co2KgAvoided, nairaSavedKobo,
-                kwhGenerated, monthsToOwnership }
-PortfolioStats{ assetsFinanced, portfolioValueKobo, repaymentRatePct,
-                parPct, suspendedCount, litresDisplaced, co2TonnesAvoided,
-                byCity:[{city,count}] }
+ImpactSummary { litresDisplaced, co2KgAvoided, nairaSavedKobo, kwhGenerated, monthsToOwnership }
+PortfolioStats{ assetsFinanced, portfolioValueKobo, repaymentRatePct, parPct,
+                suspendedCount, litresDisplaced, co2TonnesAvoided, byCity: [{ city, count }] }
 WrappedPayload{ year, nairaSavedKobo, litresNotBurned, co2KgAvoided,
                 kwhGenerated, monthsToOwnership, bestMonth, rank }
-
-STATE MACHINES
-Asset: ACTIVE -> GRACE (payment overdue)
-       GRACE  -> SUSPENDED (grace expires)  | -> ACTIVE (payment received)
-       SUSPENDED -> ACTIVE (payment received)
-       ACTIVE -> OWNED (loan balance = 0)
-       Suspension NEVER applies if business.medicalFlag = true
-Loan:  ACTIVE -> DELINQUENT -> ACTIVE | CLOSED
-
-LEASE MATH (both sides must match exactly)
-  monthlyRate = aprBps / 10000 / 12
-  payment = P * r / (1 - (1+r)^-n)        // standard amortisation
-  monthlySavings = burn.monthlyKobo - quote.monthlyPaymentKobo
-  A quote is only VALID if monthlySavings > 0. Reject otherwise.
+Wallet        { id, businessId, accountNumber, bankCode, balanceKobo, currency, createdAt }
+WalletTransaction { id, walletId, ts, direction: 'IN' | 'OUT', amountKobo,
+                    description, reference, category }
 ```
+
+---
+
+## STATE MACHINES
+
+**Asset:**
+```
+ACTIVE -> GRACE     (payment overdue)
+GRACE  -> SUSPENDED (grace expires)  | -> ACTIVE (payment received)
+SUSPENDED -> ACTIVE (payment received)
+ACTIVE -> OWNED     (loan balance = 0)
+```
+Suspension NEVER applies if `business.medicalFlag = true`.
+
+**Loan:**
+```
+ACTIVE -> DELINQUENT -> ACTIVE | CLOSED
+```
+
+---
+
+## LEASE MATH (both sides must match exactly)
+
+```
+monthlyRate = aprBps / 10000 / 12
+payment = P * r / (1 - (1+r)^-n)        // standard amortisation
+totalPayable = depositKobo + sum(schedule[i].principalKobo + schedule[i].interestKobo)
+monthlySavings = burn.monthlyKobo - quote.monthlyPaymentKobo
+```
+
+A quote is only VALID if `monthlySavings > 0`. Reject otherwise.
+
+---
+
+## ERROR CODES
+
+| Code | HTTP | When |
+|---|---|---|
+| `VALIDATION` | 400 | Bad parameters, missing fields |
+| `UNAUTHORIZED` | 401 | No bearer token (live mode) |
+| `NOT_FOUND` | 404 | Resource doesn't exist |
+| `PAYMENT_REQUIRED` | 402 | Insufficient wallet balance |
+| `INVALID_TRANSITION` | 409 | Operation on wrong state |
+| `MEDICAL_FLAG` | 409 | Suspension blocked (medical load) |
+| `QUOTE_NOT_VIABLE` | 422 | Solar costs more than fuel burn |
+| `UNAVAILABLE` | 503 | ALAT gateway unreachable |
+
+---
+
+## ADDITIONAL ENDPOINTS
+
+```
+GET  /health                                        -> { ok: true }
+GET  /exports/:filename                             -> CSV file
+```
+
+- `GET /health` — health check, returns `{ ok: true }`.
+- `GET /exports/:filename` — serves portfolio CSV exports. Filename must start with `lastgen-portfolio-` and end with `.csv`.

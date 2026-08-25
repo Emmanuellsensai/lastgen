@@ -26,7 +26,10 @@ import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
+  AdminOrder,
+  AdminUser,
   Asset,
+  BankUser,
   Business,
   BurnProfile,
   CreateBusinessBody,
@@ -41,7 +44,10 @@ import type {
   ImpactPeriod,
   ImpactSummary,
   Installment,
+  KycRecord,
+  KycStatus,
   Loan,
+  LoanStatus,
   MeterReading,
   PagedEnvelope,
   Payment,
@@ -56,9 +62,14 @@ import type {
 } from '../types/api.js';
 import { buildSeed, DEMO_BUSINESS_ID, type AssetStatusHistoryEntry, type DemoDb } from './seed.js';
 import type {
+  BankSession,
+  KycReviewResult,
+  KycSubmission,
   PaySettlement,
   ReceiptExtraction,
+  RegisterBankInput,
   Repository,
+  SubmitKycInput,
   WalletStatementQuery,
 } from './repository.js';
 
@@ -72,6 +83,10 @@ export class InMemoryRepository implements Repository {
   private seq = 0;
   private serialSeqValue = 10_000;
   private walletSeqValue = 2_010_000_000;
+  /** Maps ownerId → businessId for the in-memory demo. */
+  private ownerBusinessMap = new Map<string, string>();
+  /** Demo credit-desk identities, keyed by bankId. Cleared on reset like all state. */
+  private banks = new Map<string, { user: BankUser; password: string }>();
 
   constructor() {
     this.state = buildSeed();
@@ -114,13 +129,14 @@ export class InMemoryRepository implements Repository {
     this.seq = 0;
     this.serialSeqValue = 10_000;
     this.walletSeqValue = 2_010_000_000;
+    this.banks.clear();
   }
 
   /* ------------------------------------------------------------------ */
   /* Businesses                                                          */
   /* ------------------------------------------------------------------ */
 
-  async createBusiness(input: CreateBusinessBody, _ownerId?: string | null): Promise<Business> {
+  async createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business> {
     if (!input?.name || !input?.type || !input?.city) {
       throw new ApiError('VALIDATION', 'name, type and city are required', 400);
     }
@@ -145,6 +161,8 @@ export class InMemoryRepository implements Repository {
       verified: false,
       computedAt: this.state.now.toISOString(),
     });
+    // Track owner → business mapping for session resolution.
+    if (ownerId) this.ownerBusinessMap.set(ownerId, business.id);
     return business;
   }
 
@@ -276,12 +294,37 @@ export class InMemoryRepository implements Repository {
       depositKobo,
       monthlyPaymentKobo: payment,
       aprBps: DEFAULT_APR_BPS,
-      totalPayableKobo: payment * input.tenorMonths + depositKobo,
+      totalPayableKobo: depositKobo + buildSchedule(principal, DEFAULT_APR_BPS, input.tenorMonths, new Date()).reduce((s, row) => s + row.principalKobo + row.interestKobo, 0),
       monthlySavingsKobo,
       savingsPct: Math.round((monthlySavingsKobo / burn.monthlyKobo) * 1000) / 10,
       breakEvenMonth: breakEvenMonth(depositKobo, monthlySavingsKobo),
     };
     this.state.quotes.push(quote);
+
+    // Auto-create a credit file for underwriting (matches MSW reference behaviour).
+    const business = this.state.businesses.find((b) => b.id === businessId);
+    const creditFile: CreditFile = {
+      id: this.nextId('cf'),
+      businessId,
+      business: business ?? {
+        id: businessId,
+        name: businessId,
+        type: '',
+        city: 'Lagos',
+        generatorKva: 0,
+        hoursPerDay: 0,
+        createdAt: '',
+      },
+      burn,
+      quote,
+      affordabilityRatio: Math.round((payment / burn.monthlyKobo) * 100) / 100,
+      loadProfileScore: 74,
+      verifiedMonths: burn.daysObserved >= 30 ? Math.floor(burn.daysObserved / 30) : 0,
+      status: 'PENDING',
+      createdAt: this.state.now.toISOString(),
+    };
+    this.state.creditFiles.push(creditFile);
+
     return quote;
   }
 
@@ -361,6 +404,10 @@ export class InMemoryRepository implements Repository {
     );
     this.state.assetCity[asset.id] = file.business.city;
     this.state.assetBusinessName[asset.id] = file.business.name;
+    // Store the created resource IDs on the credit file so the frontend can
+    // discover them when resolving a session (quote → asset → loan).
+    file.loanId = loan.id;
+    file.assetId = asset.id;
     return { loan, asset };
   }
 
@@ -745,9 +792,165 @@ export class InMemoryRepository implements Repository {
   }
 
   async businessForOwner(ownerId: string): Promise<Business | undefined> {
+    // Check the owner→business map first (populated by createBusiness).
+    const mappedId = this.ownerBusinessMap.get(ownerId);
+    if (mappedId) return this.getBusiness(mappedId);
     // Demo auth attaches the fixed demo-user; it owns the seeded demo business.
     if (ownerId === 'demo-user') return this.getBusiness(DEMO_BUSINESS_ID);
     return undefined;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Banks                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async registerBank(input: RegisterBankInput): Promise<BankSession> {
+    const bankId = input.bankId.trim();
+    if (!bankId) {
+      throw new ApiError('VALIDATION', 'Bank name, bank ID and password are required', 400);
+    }
+    if (this.banks.has(bankId)) {
+      throw new ApiError('VALIDATION', 'Bank ID already registered', 400);
+    }
+    const user: BankUser = {
+      id: `bank_${bankId}`,
+      bankId,
+      bankName: input.bankName.trim(),
+      createdAt: this.state.now.toISOString(),
+    };
+    // Demo only: credentials live in process memory and never leave it.
+    // Live mode delegates hashing and storage to Supabase Auth.
+    this.banks.set(bankId, { user, password: input.password });
+    return { user, accessToken: `tok_bank_${bankId}` };
+  }
+
+  async authenticateBank(bankId: string, password: string): Promise<BankSession> {
+    const entry = this.banks.get(bankId.trim());
+    if (!entry || entry.password !== password) {
+      throw new ApiError('UNAUTHORIZED', 'Invalid bank ID or password', 401);
+    }
+    return { user: entry.user, accessToken: `tok_bank_${entry.user.bankId}` };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* KYC                                                                 */
+  /* ------------------------------------------------------------------ */
+
+  async kycRecordFor(businessId: string): Promise<KycRecord | undefined> {
+    await this.findBusinessOrThrow(businessId);
+    return this.state.kycRecords[businessId];
+  }
+
+  async submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord> {
+    await this.findBusinessOrThrow(businessId);
+    const existing = this.state.kycRecords[businessId];
+    if (existing?.status === 'approved') {
+      throw new ApiError('INVALID_TRANSITION', 'KYC is already approved', 409);
+    }
+    const record: KycRecord = {
+      id: existing?.id ?? `kyc_${businessId}`,
+      businessId,
+      userId: input.userId ?? existing?.userId ?? '',
+      status: 'pending',
+      submittedAt: this.state.now.toISOString(),
+      reviewedAt: null,
+      rejectionReason: null,
+      selfieUrl: input.selfieUrl,
+      bankSlipUrl: input.bankSlipUrl,
+      ninNumber: input.ninNumber,
+      ninVerified: input.ninVerified,
+    };
+    this.state.kycRecords[businessId] = record;
+    return record;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Admin                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async listAdminUsers(): Promise<AdminUser[]> {
+    return this.state.businesses.map((b) => {
+      const asset = this.state.assets.find((a) => a.businessId === b.id);
+      const loan = asset ? this.state.loans.find((l) => l.assetId === asset.id) : undefined;
+      const kyc = this.state.kycRecords[b.id];
+      return {
+        id: b.id,
+        name: b.name,
+        city: b.city,
+        type: b.type,
+        createdAt: b.createdAt,
+        kycStatus: kyc?.status ?? 'unverified',
+        assetStatus: asset?.status ?? null,
+        assetId: asset?.id ?? null,
+        loanId: loan?.id ?? null,
+        loanBalanceKobo: loan?.balanceKobo ?? null,
+      };
+    });
+  }
+
+  async listKycSubmissions(status?: KycStatus): Promise<KycSubmission[]> {
+    const businessName = (id: string): string =>
+      this.state.businesses.find((b) => b.id === id)?.name ?? 'Unknown';
+    return Object.values(this.state.kycRecords)
+      .filter((r) => !status || r.status === status)
+      .map((r) => ({ ...r, businessName: businessName(r.businessId) }));
+  }
+
+  async reviewKyc(
+    id: string,
+    action: 'approve' | 'reject',
+    reason?: string,
+  ): Promise<KycReviewResult> {
+    const record = Object.values(this.state.kycRecords).find((r) => r.id === id);
+    if (!record) {
+      throw new ApiError('NOT_FOUND', 'KYC submission not found', 404);
+    }
+    if (record.status !== 'pending') {
+      throw new ApiError(
+        'INVALID_TRANSITION',
+        `KYC is ${record.status}; only pending submissions can be reviewed`,
+        409,
+      );
+    }
+    if (action === 'reject' && !reason?.trim()) {
+      throw new ApiError('VALIDATION', 'reason is required to reject a submission', 400);
+    }
+
+    record.status = action === 'approve' ? 'approved' : 'rejected';
+    record.reviewedAt = this.state.now.toISOString();
+    record.rejectionReason = action === 'reject' ? (reason as string) : null;
+
+    const result: KycReviewResult = {
+      id: record.id,
+      status: record.status,
+      reviewedAt: record.reviewedAt,
+    };
+    if (record.rejectionReason !== null) result.rejectionReason = record.rejectionReason;
+    return result;
+  }
+
+  async listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]> {
+    return this.state.loans
+      .filter((l) => l.status !== 'CLOSED')
+      .filter((l) => !status || l.status === status)
+      .map((loan) => {
+        const asset = this.state.assets.find((a) => a.id === loan.assetId);
+        const business = asset
+          ? this.state.businesses.find((b) => b.id === asset.businessId)
+          : undefined;
+        return {
+          loanId: loan.id,
+          businessName:
+            business?.name ?? this.state.assetBusinessName[loan.assetId] ?? 'Unknown',
+          businessId: asset?.businessId ?? '',
+          assetId: asset?.id ?? '',
+          assetStatus: asset?.status ?? 'ACTIVE',
+          balanceKobo: loan.balanceKobo,
+          monthlyPaymentKobo: loan.monthlyPaymentKobo,
+          nextDueAt: loan.nextDueAt,
+          status: loan.status,
+        };
+      });
   }
 
   /* ------------------------------------------------------------------ */

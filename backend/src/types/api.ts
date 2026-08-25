@@ -36,6 +36,58 @@ export type PaymentStatus =
   'pending_authorisation' | 'authorised' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
 export type ImpactPeriod = 'month' | 'year' | 'all';
 
+/**
+ * API roles. `owner` is the default for business users; `bank` and `admin`
+ * belong to credit-desk identities and gate the /admin/* surface. The claim
+ * lives in Supabase app_metadata (server-only) so clients cannot escalate.
+ */
+export type UserRole = 'owner' | 'bank' | 'admin';
+
+/** KYC review lifecycle for business identity verification. */
+export type KycStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
+
+/** Full KYC record for a business identity verification. */
+export interface KycRecord {
+  id: string;
+  businessId: string;
+  userId: string;
+  status: KycStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  selfieUrl: string | null;
+  bankSlipUrl: string | null;
+  ninNumber: string | null;
+  ninVerified: boolean;
+}
+
+/** User row of the admin desk's Users tab. */
+export interface AdminUser {
+  id: string;
+  name: string;
+  city: string;
+  type: string;
+  createdAt: string;
+  kycStatus: KycStatus;
+  assetStatus: AssetStatus | null;
+  assetId: string | null;
+  loanId: string | null;
+  loanBalanceKobo: number | null;
+}
+
+/** Loan row of the admin desk's Orders tab. */
+export interface AdminOrder {
+  loanId: string;
+  businessName: string;
+  businessId: string;
+  assetId: string;
+  assetStatus: AssetStatus;
+  balanceKobo: number;
+  monthlyPaymentKobo: number;
+  nextDueAt: string;
+  status: LoanStatus;
+}
+
 /* Entities */
 export interface Business {
   id: string;
@@ -108,6 +160,9 @@ export interface CreditFile {
   verifiedMonths: number;
   status: CreditFileStatus;
   createdAt: string;
+  /** Set when the credit file is approved — links to the created loan and asset. */
+  loanId?: string;
+  assetId?: string;
 }
 
 export interface Asset {
@@ -228,6 +283,35 @@ export interface WrappedPayload {
 export interface CreditFileDetail extends CreditFile {
   fuelLogs: FuelLog[];
   schedulePreview: Installment[];
+}
+
+/* Bank identity ------------------------------------------------------ */
+
+/** A credit-desk identity (bank user) as stored by the repository. */
+export interface BankUser {
+  id: string;
+  bankId: string;
+  bankName: string;
+  createdAt: string;
+}
+
+export interface BankRegisterBody {
+  bankName: string;
+  bankId: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface BankLoginBody {
+  bankId: string;
+  password: string;
+}
+
+/** Response payload for POST /auth/bank/register and POST /auth/bank/login. */
+export interface BankAuthResult {
+  user: { id: string; bankId: string; bankName: string };
+  role: 'bank';
+  accessToken: string;
 }
 
 /* Request bodies */

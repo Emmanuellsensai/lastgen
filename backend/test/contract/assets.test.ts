@@ -95,7 +95,11 @@ describe('assets contract', () => {
   });
 
   it('rejects suspending an owned asset', async () => {
-    const res = await request(app).post('/api/assets/ast_p000/suspend').send({ reason: 'Overdue' });
+    // Find any OWNED asset from the seed portfolio
+    const seed = buildSeed();
+    const owned = seed.assets.find((a) => a.status === 'OWNED');
+    expect(owned).toBeDefined();
+    const res = await request(app).post(`/api/assets/${owned!.id}/suspend`).send({ reason: 'Overdue' });
 
     expect(res.status).toBe(409);
     expect(res.body.error).toEqual({
@@ -105,7 +109,10 @@ describe('assets contract', () => {
   });
 
   it('rejects restoring an owned asset', async () => {
-    const res = await request(app).post('/api/assets/ast_p000/restore');
+    const seed = buildSeed();
+    const owned = seed.assets.find((a) => a.status === 'OWNED');
+    expect(owned).toBeDefined();
+    const res = await request(app).post(`/api/assets/${owned!.id}/restore`);
     expect(res.status).toBe(409);
     expect(res.body.error).toEqual({
       code: 'INVALID_TRANSITION',

@@ -17,6 +17,9 @@ declare global {
 
 const DEMO_USER = { id: 'demo-user', email: 'demo@lastgen.local' } as User;
 
+/** API roles, mirroring UserRole in types/api.ts. */
+export type Role = 'owner' | 'bank' | 'admin';
+
 /**
  * Authentication boundary. In demo mode the whole API is unauthenticated so
  * the frontend can run the full flow without signing in; in live mode a valid
@@ -57,4 +60,35 @@ async function requireAuth(req: Request, _res: Response, next: NextFunction) {
     // (Express 4 does not forward rejected promises) or leaking internals.
     next(new ApiError('UNAUTHORIZED', 'A valid bearer token is required', 401));
   }
+}
+
+/**
+ * Authorization gate for role-scoped surfaces (the bank/admin desk).
+ *
+ * Demo mode permits every caller — consistent with the demo philosophy that
+ * the whole API runs unauthenticated so the full flow works without Supabase.
+ * Live mode requires an authenticated user whose Supabase app_metadata.role
+ * is one of the allowed roles; app_metadata is server-only, so a client
+ * cannot escalate itself by editing user metadata.
+ *
+ * FORBIDDEN (403) is an additive extension of the contract error table:
+ * UNAUTHORIZED would be wrong — the caller IS authenticated, just not allowed.
+ */
+export function makeRequireRole(env: Pick<Env, 'demoMode'>, ...allowed: Role[]): RequestHandler {
+  if (env.demoMode) {
+    return (_req, _res, next) => next();
+  }
+  return (req, _res, next) => {
+    if (!req.user) {
+      // Only reachable if mounted before requireAuth — fail closed loudly.
+      next(new ApiError('UNAUTHORIZED', 'A valid bearer token is required', 401));
+      return;
+    }
+    const role = req.user.app_metadata?.role as Role | undefined;
+    if (!role || !allowed.includes(role)) {
+      next(new ApiError('FORBIDDEN', 'You do not have access to this resource', 403));
+      return;
+    }
+    next();
+  };
 }

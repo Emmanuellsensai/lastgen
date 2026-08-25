@@ -19,19 +19,19 @@ describe('portfolio contract', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
     expect(res.body.data).toEqual({
-      assetsFinanced: 523,
-      portfolioValueKobo: 256_396_630_000,
+      assetsFinanced: 524,
+      portfolioValueKobo: 260_712_290_000,
       repaymentRatePct: 87.8,
       parPct: 12.2,
-      suspendedCount: 21,
-      litresDisplaced: 395388,
-      co2TonnesAvoided: 913.3,
+      suspendedCount: 22,
+      litresDisplaced: 396144,
+      co2TonnesAvoided: 915.1,
       byCity: [
         { city: 'Lagos', count: 215 },
         { city: 'Abuja', count: 100 },
         { city: 'Ibadan', count: 78 },
         { city: 'Port Harcourt', count: 58 },
-        { city: 'Kano', count: 41 },
+        { city: 'Kano', count: 42 },
         { city: 'Benin City', count: 31 },
       ],
     });
@@ -41,7 +41,7 @@ describe('portfolio contract', () => {
     const page1 = await request(app).get('/api/portfolio/assets');
     expect(page1.status).toBe(200);
     expect(page1.body.data.items).toHaveLength(25);
-    expect(page1.body.data.total).toBe(523);
+    expect(page1.body.data.total).toBe(524);
 
     const page2 = await request(app).get('/api/portfolio/assets?page=2');
     expect(page2.body.data.items).toHaveLength(25);
@@ -52,7 +52,7 @@ describe('portfolio contract', () => {
   it('filters by status', async () => {
     const res = await request(app).get('/api/portfolio/assets?status=SUSPENDED');
     expect(res.status).toBe(200);
-    expect(res.body.data.total).toBe(21);
+    expect(res.body.data.total).toBe(22);
     for (const item of res.body.data.items) expect(item.status).toBe('SUSPENDED');
   });
 

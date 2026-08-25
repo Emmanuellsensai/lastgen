@@ -50,7 +50,8 @@ export function createWalletRouter(repo: Repository, env: Env): Router {
           'funding',
         );
       }
-      res.json(ok({ wallet: (await repo.walletForBusiness(wallet.businessId)) ?? wallet }));
+      const fresh = await repo.walletForBusiness(wallet.businessId);
+      res.json(ok(fresh ?? wallet));
     })().catch(next);
   });
 
@@ -60,6 +61,34 @@ export function createWalletRouter(repo: Repository, env: Env): Router {
       const wallet = await repo.walletForBusiness(businessId);
       if (!wallet) throw new ApiError('NOT_FOUND', 'Wallet not found', 404);
       res.json(ok(wallet));
+    })().catch(next);
+  });
+
+  router.post('/wallets/fund', (req, res, next) => {
+    void (async () => {
+      const businessId = await resolveBusinessId(req, repo, env);
+      const wallet = await repo.walletForBusiness(businessId);
+      if (!wallet) throw new ApiError('NOT_FOUND', 'Wallet not found', 404);
+
+      const body = (req.body ?? {}) as { amountKobo?: number };
+      const amount = Math.round(body.amountKobo ?? 0);
+      if (amount <= 0) {
+        throw new ApiError('VALIDATION', 'amountKobo must be greater than zero', 400);
+      }
+      if (amount > 50_000_000) {
+        throw new ApiError('VALIDATION', 'Maximum single funding is ₦500,000', 400);
+      }
+
+      // Simulate a bank transfer: credit the wallet with an IN transaction.
+      const reference = `TRF-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const funded = await repo.creditWallet(
+        wallet.id,
+        amount,
+        `Bank transfer from ${wallet.accountNumber}`,
+        reference,
+        'funding',
+      );
+      res.json(ok(funded));
     })().catch(next);
   });
 
