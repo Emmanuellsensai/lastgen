@@ -148,8 +148,12 @@ export interface Repository {
   /** Orders tab projection: active (non-closed) loans with full context. */
   listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]>;
 
+  /* Business summary ----------------------------------------------- */
+  businessSummary(businessId: string): Promise<{ assetId: string | null; loanId: string | null; quoteId: string | null }>;
+
   /* Fuel logs and burn --------------------------------------------- */
   addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog>;
+  deleteFuelLog(businessId: string, logId: string): Promise<void>;
   addReceiptLog(
     businessId: string,
     extraction: ReceiptExtraction,
@@ -165,8 +169,10 @@ export interface Repository {
   /* Quotes --------------------------------------------------------- */
   createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote>;
   getQuote(id: string): Promise<Quote | undefined>;
+  acceptQuote(quoteId: string): Promise<{ creditFileId: string; status: string }>;
 
   /* Credit --------------------------------------------------------- */
+  creditFileForBusiness(businessId: string): Promise<CreditFile | null>;
   listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]>;
   getCreditFile(id: string): Promise<CreditFileDetail | undefined>;
   approveCreditFile(id: string): Promise<{ loan: Loan; asset: Asset }>;
@@ -181,6 +187,7 @@ export interface Repository {
 
   /* Loans ---------------------------------------------------------- */
   getLoan(id: string): Promise<Loan | undefined>;
+  paymentsForLoan(loanId: string): Promise<Payment[]>;
   loanByAsset(assetId: string): Promise<Loan | undefined>;
   scheduleFor(loanId: string): Promise<Installment[]>;
   /**

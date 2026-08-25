@@ -24,5 +24,12 @@ export function createQuoteRouter(repo: Repository): Router {
     })().catch(next);
   });
 
+  router.post('/quotes/:id/accept', (req, res, next) => {
+    void (async () => {
+      const result = await repo.acceptQuote(req.params.id);
+      res.status(201).json(ok(result));
+    })().catch(next);
+  });
+
   return router;
 }

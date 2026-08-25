@@ -25,5 +25,14 @@ export function createLoanRouter(repo: Repository): Router {
     })().catch(next);
   });
 
+  router.get('/loans/:id/payments', (req, res, next) => {
+    void (async () => {
+      const loan = await repo.getLoan(req.params.id);
+      if (!loan) throw new ApiError('NOT_FOUND', 'Loan not found', 404);
+      const items = await repo.paymentsForLoan(req.params.id);
+      res.json(ok({ items }));
+    })().catch(next);
+  });
+
   return router;
 }

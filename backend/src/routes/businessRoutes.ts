@@ -80,5 +80,32 @@ export function createBusinessRouter(repo: Repository, env: Env): Router {
     })().catch(next);
   });
 
+  router.get('/businesses/:id/summary', (req, res, next) => {
+    void (async () => {
+      if (!(await repo.getBusiness(req.params.id))) {
+        throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      }
+      const summary = await repo.businessSummary(req.params.id);
+      res.json(ok(summary));
+    })().catch(next);
+  });
+
+  router.delete('/businesses/:id/fuel-logs/:logId', (req, res, next) => {
+    void (async () => {
+      await repo.deleteFuelLog(req.params.id, req.params.logId);
+      res.json(ok({ ok: true as const }));
+    })().catch(next);
+  });
+
+  router.get('/businesses/:id/application', (req, res, next) => {
+    void (async () => {
+      if (!(await repo.getBusiness(req.params.id))) {
+        throw new ApiError('NOT_FOUND', 'Business not found', 404);
+      }
+      const cf = await repo.creditFileForBusiness(req.params.id);
+      res.json(ok(cf));
+    })().catch(next);
+  });
+
   return router;
 }
