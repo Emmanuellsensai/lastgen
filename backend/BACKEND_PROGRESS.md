@@ -96,6 +96,7 @@ reproduce their externally observable behaviour without importing any code from
 | Bank identities                   | ✅     | `/auth/bank/register`+`/login`, Supabase Auth-backed; `bank_users` mirror (Phase 8)                                                                |
 | RBAC/KYC migration                | ✅     | `migrations/rbac-kyc.sql`: bank_users, kyc_records, kyc-docs bucket (Phase 8)                                                                      |
 | KYC lifecycle                     | ✅     | Business get/submit + NIN provider seam + document storage (Phase 9)                                                                              |
+| Admin surface                     | ✅     | Guarded `/admin/*` router: users, KYC review, power control, orders + atomic approve-payment (Phase 10)                                            |
 | Render deployment verification    | ⬜     | Needs live Supabase + ALAT credentials                                                                                                            |
 
 ## 5. Implemented foundation (Phase 0)
@@ -367,6 +368,41 @@ Driver: the frontend KYC page submits NIN + bank slip + selfie
   validation matrix (documents/mime/NIN), resubmission semantics,
   read-after-write consistency.
 
+### 6.15 Admin surface (Phase 10)
+
+Driver: the frontend admin desk renders four tabs — Users, KYC review,
+Solar control, Orders — all against `/admin/*` (handlers.ts lines 844–1004).
+
+- **Router.** `src/routes/adminRoutes.ts` mounts every route behind
+  `makeRequireRole(env, 'bank', 'admin')`: demo mode stays permissive like
+  the rest of the demo surface; live mode demands the server-assigned
+  bank/admin role claim.
+- **Endpoints.** `GET /admin/users` projects businesses joined with asset →
+  loan → kyc state (`kycStatus` defaults to `unverified` before a first
+  submission); `GET /admin/kyc?status=` lists submissions with business
+  names; `POST /admin/kyc/:id/approve|reject` transition pending records
+  only (reject requires a reason, non-pending answers 409); `POST
+  /admin/assets/:id/toggle-power` suspends ACTIVE assets and restores
+  suspended ones through the state machine; `GET /admin/orders?status=`
+  projects non-CLOSED loans fleet-wide; `POST /admin/loans/:id/approve-payment`
+  settles one installment atomically.
+- **Invariants preserved.** Power control delegates to
+  `suspendAsset`/`restoreAsset` so medical-flagged businesses answer 409
+  MEDICAL_FLAG and owned assets refuse suspension; approve-payment runs the
+  same atomic `payLoan` primitive as wallet pay/webhook settle with
+  SIMULATED `ADMIN-<ts>` references; closed loans refuse settlement.
+- **Realtime.** Live reviews broadcast best-effort `kyc_reviewed` on the
+  notifications channel — same try/catch posture as payment settlement.
+- **Repository.** New seam methods `listAdminUsers`, `listKycSubmissions`,
+  `reviewKyc`, `listAdminOrders` on both implementations; the in-memory
+  orders projection falls back to the seed's denormalised
+  `assetBusinessName` map because portfolio rows have no backing business
+  record (live mode joins through the businesses FK instead).
+- **Tests.** `backend/test/contract/admin.test.ts` (15): projections,
+  filters and validation, approve-once/reject-with-reason, medical-flag and
+  OWNED guards, exact balance-delta settlement, closure by repeated
+  approval. Gate: typecheck ✓, lint 0 errors ✓, 223/223 tests / 25 suites ✓.
+
 ## 7. Decision register
 
 | Decision                    | Choice                                                                           | Rationale                                                                                     |
@@ -402,6 +438,10 @@ Driver: the frontend KYC page submits NIN + bank slip + selfie
 | ALAT integration            | Real HTTPS adapter (transfer-fund-request + CheckTransactionStatus), mock-tested | No sandbox credentials available; `fetchFn` injectable keeps the wire contract pinned         |
 | Supabase correctness        | Full `SupabaseRepository` on an async `Repository` seam                          | supabase-js is async; converting the seam (not casting) keeps the interface honest            |
 | Wallet debit atomicity      | Single `UPDATE … WHERE balance_kobo >= amount` (compare-and-swap)                | The 402 guard is race-free in Postgres without a server-side function                         |
+| Admin power control         | Routed through `suspendAsset`/`restoreAsset`, OWNED rejected up front            | Reusing the state machine keeps MEDICAL_FLAG and transition invariants intact on every path   |
+| Admin payment approval      | Atomic `payLoan(loanId, monthlyPaymentKobo, 'SIMULATED', 'ADMIN-…')`             | One settlement primitive for wallet pay, webhook, consent and the credit desk — no side door  |
+| Admin KYC review broadcast  | Best-effort `kyc_reviewed` notification, try/catch swallowed                     | Mirrors settlement broadcasts; a realtime outage must never fail a review                     |
+| Orders projection scope     | All non-CLOSED loans incl. portfolio rows without business records               | The credit desk works receivables fleet-wide; names fall back to denormalised seed maps       |
 | Demo realtime               | No Supabase Realtime in demo → frontend polls status then re-fetches the loan    | Documented in the handoff; `payment.status_changed` only on a Supabase deployment             |
 
 ## 8. Phase log

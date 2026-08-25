@@ -90,7 +90,7 @@ Supabase or a live payment provider.
 | 7 | Integration + final docs + PR prep | ⬜ pending |
 | 8 | RBAC + bank identity | ✅ complete (6 commits) |
 | 9 | KYC lifecycle | ✅ complete (6 commits) |
-| 10 | Admin surface | ⬜ pending |
+| 10 | Admin surface | ✅ complete (3 commits) |
 | 11 | Docs + env polish for the admin sprint | ⬜ pending |
 
 ---
@@ -140,12 +140,12 @@ looser than production must be:
 - **Tests:** `backend/test/contract/kyc.test.ts` (9).
 - **Verification:** typecheck ✅, lint ✅, full suite 208/208 ✅.
 
-### Phase 10 — Admin surface
+### Phase 10 — Admin surface (complete)
 
 **Goal.** The five admin views behind one guarded router.
 
 **Design.** `src/routes/adminRoutes.ts` mounts every route behind
-`requireRole('bank', 'admin')`. `GET /admin/users` joins businesses → asset →
+`makeRequireRole(env, 'bank', 'admin')`. `GET /admin/users` joins businesses → asset →
 loan → kyc into the AdminUser projection; `GET /admin/kyc?status=` lists
 submissions joined with business names; approve/reject transition the KYC
 state machine and emit a best-effort realtime notification broadcast (same
@@ -155,6 +155,18 @@ reason `admin-toggle`), preserving the `409 MEDICAL_FLAG` invariant.
 `GET /admin/orders?status=` projects non-CLOSED loans; `POST /admin/loans/:id/approve-payment`
 settles through atomic `payLoan(loanId, monthlyPaymentKobo, 'SIMULATED',
 'ADMIN-…')` exactly as the mock does.
+
+**Shipped (commits 3188d0f, edf1544, e1226ce).** Repository seam gained
+`listAdminUsers`, `listKycSubmissions`, `reviewKyc` and `listAdminOrders`
+(both implementations); live review broadcasts `kyc_reviewed` on the
+notifications channel. Hardening beyond the MSW mock: OWNED assets refuse
+the toggle up front with the state machine's message, reject requires a
+reason, non-pending reviews answer 409, unknown status filters answer 400,
+and the in-memory orders projection falls back to the seed's denormalised
+`assetBusinessName` map for portfolio rows without a backing business.
+15 contract tests (`test/contract/admin.test.ts`) cover every tab including
+the medical-flag guard and closure-by-repeated-approval. Gate: typecheck ✓,
+lint 0 errors ✓, 223/223 tests across 25 suites ✓.
 
 ### Phase 11 — Docs + env polish
 
