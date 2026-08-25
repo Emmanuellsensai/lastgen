@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Wallet } from '@phosphor-icons/react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppShell } from '@/components/layout';
 import { GlassCard, GlassPanel } from '@/components/ui/glass';
 import { ImpactRing, Money, StatusPill } from '@/components/lastgen';
@@ -15,11 +16,18 @@ import PaymentSheet from './PaymentSheet';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import { Toast, ToastTitle } from '@/components/ui/toast';
-import type { Asset as AssetType, AssetStatus, Loan, Quote } from '@/types/api';
+import type { Asset as AssetType, AssetStatus, Loan, MeterReading, Quote } from '@/types/api';
+
+interface DailyReading {
+  date: string;
+  whGenerated: number;
+}
 
 export default function Asset() {
   const { id } = useParams<{ id: string }>();
   const { demoLoanId } = useSession();
+  // TODO(BE): needs GET /businesses/:id/summary to resolve live loanId
+  const effectiveLoanId = demoLoanId;
 
   const [asset, setAsset] = useState<AssetType | null>(null);
   const [loan, setLoan] = useState<Loan | null>(null);
@@ -30,6 +38,22 @@ export default function Asset() {
   const [toastMsg, setToastMsg] = useState('');
   const prevStatus = useRef<AssetStatus | null>(null);
 
+  /* Generation history */
+  const [meterReadings, setMeterReadings] = useState<MeterReading[]>([]);
+  const [meterLoading, setMeterLoading] = useState(true);
+
+  const dailyData = useMemo<DailyReading[]>(() => {
+    if (meterReadings.length === 0) return [];
+    const byDay = new Map<string, number>();
+    for (const r of meterReadings) {
+      const day = r.ts.split('T')[0];
+      byDay.set(day, (byDay.get(day) ?? 0) + r.whGenerated);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, whGenerated]) => ({ date, whGenerated }));
+  }, [meterReadings]);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -38,10 +62,10 @@ export default function Asset() {
         const a = await api.assets.get(id!);
         if (cancelled) return;
         setAsset(a);
-        if (demoLoanId) {
-          const l = await api.loans.get(demoLoanId);
+        if (effectiveLoanId) {
+          const l = await api.loans.get(effectiveLoanId);
           if (!cancelled) setLoan(l);
-          const q = await api.quotes.get(useSession.getState().demoQuoteId!);
+          const q = await api.quotes.get(useSession.getState().demoQuoteId ?? '');
           if (!cancelled) setQuote(q);
         }
       } catch {
@@ -52,9 +76,29 @@ export default function Asset() {
     }
     load();
     return () => { cancelled = true; };
-  }, [id, demoLoanId]);
+  }, [id, effectiveLoanId]);
 
-  // Poll asset status every 2 seconds
+  /* Fetch meter readings for generation history */
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().split('T')[0];
+    async function loadMeter() {
+      try {
+        const result = await api.assets.meter(id!, { from: thirtyDaysAgo, to: today });
+        if (!cancelled) setMeterReadings(result.items);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setMeterLoading(false);
+      }
+    }
+    loadMeter();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  // Poll asset status every 5 seconds
   useEffect(() => {
     if (!id) return;
     let active = true;
@@ -78,7 +122,7 @@ export default function Asset() {
       }
     };
     poll();
-    const timer = setInterval(poll, 2000);
+    const timer = setInterval(poll, 5000);
     return () => { active = false; clearInterval(timer); };
   }, [id]);
 
@@ -181,17 +225,32 @@ export default function Asset() {
           <AccordionItem value="history">
             <AccordionTrigger className="py-5 text-base">Generation history</AccordionTrigger>
             <AccordionContent>
-              <p className="pt-2 leading-relaxed">
-                Ninety days of readings, plotted by day. Wired to the meter endpoint in the next pass.
-              </p>
+              {meterLoading ? (
+                <p className="pt-2 text-ink-mute">Loading readings...</p>
+              ) : dailyData.length === 0 ? (
+                <p className="pt-2 leading-relaxed text-ink-mute">
+                  No generation data yet. Readings appear once your system is installed.
+                </p>
+              ) : (
+                <div className="pt-2">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={dailyData}>
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} unit=" kWh" tickFormatter={(v) => (v / 1000).toFixed(1)} />
+                      <Tooltip formatter={(v: unknown) => [`${(Number(v) / 1000).toFixed(2)} kWh`, 'Generated']} />
+                      <Bar dataKey="whGenerated" fill="var(--lg-navy)" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="payments">
             <AccordionTrigger className="py-5 text-base">Payment history</AccordionTrigger>
             <AccordionContent>
-              <p className="pt-2 leading-relaxed">
-                Every payment received against this system, with the reference from your bank.
+              <p className="pt-2 leading-relaxed text-ink-mute">
+                Payment history coming soon.
               </p>
             </AccordionContent>
           </AccordionItem>
@@ -203,7 +262,7 @@ export default function Asset() {
       <PaymentSheet
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
-        loanId={demoLoanId ?? ''}
+        loanId={effectiveLoanId ?? ''}
         assetId={id ?? ''}
         amountKobo={loan?.monthlyPaymentKobo ?? 0}
       />
