@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Wallet } from '@phosphor-icons/react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppShell } from '@/components/layout';
 import { GlassCard, GlassPanel } from '@/components/ui/glass';
 import { ImpactRing, Money, StatusPill } from '@/components/lastgen';
@@ -28,6 +29,7 @@ export default function Asset() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [meterData] = useState<{date:string;whGenerated:number}[]>([]);
   const prevStatus = useRef<AssetStatus | null>(null);
 
   useEffect(() => {
@@ -181,18 +183,29 @@ export default function Asset() {
           <AccordionItem value="history">
             <AccordionTrigger className="py-5 text-base">Generation history</AccordionTrigger>
             <AccordionContent>
-              <p className="pt-2 leading-relaxed">
-                Ninety days of readings, plotted by day. Wired to the meter endpoint in the next pass.
-              </p>
+              {meterData.length === 0 ? (
+                <p className="pt-2 text-ink-mute">No generation data yet. Readings appear once your system is installed.</p>
+              ) : (
+                <div className="pt-2">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={meterData}>
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} unit=" kWh" tickFormatter={(v) => (v / 1000).toFixed(1)} />
+                      <Tooltip formatter={(v) => [(Number(v) / 1000).toFixed(2) + " kWh", "Generated"]} />
+                      <Bar dataKey="whGenerated" fill="var(--lg-navy)" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="payments">
             <AccordionTrigger className="py-5 text-base">Payment history</AccordionTrigger>
             <AccordionContent>
-              <p className="pt-2 leading-relaxed">
-                Every payment received against this system, with the reference from your bank.
-              </p>
+              {/* TODO(BE): needs GET /loans/:id/payments
+                  Expected: ListEnvelope<Payment> */}
+              <p className="pt-2 text-ink-mute">Payment history coming soon.</p>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
