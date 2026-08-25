@@ -24,6 +24,7 @@ export interface SessionState {
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   register: (body: { email: string; password: string; fullName: string; phone: string }) => Promise<void>;
+  bootstrap: () => Promise<void>;
   setIsAdmin: (v: boolean) => void;
   setRole: (role: SessionRole) => void;
   setAccessToken: (token: string | null) => void;
@@ -61,28 +62,22 @@ export const useSession = create<SessionState>()(
         }),
 
       signInWithEmail: async (email, _password) => {
-        // In mock mode, import dynamically to avoid circular deps
-        const { api } = await import('@/lib/api');
-        const { hasSupabaseConfig, supabase } = await import('@/lib/supabase');
+        const { api, API_MODE, setAuthToken } = await import('@/lib/api');
 
-        if (hasSupabaseConfig && supabase) {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password: _password });
-          if (error) throw error;
-          const { setAuthToken } = await import('@/lib/api');
-          setAuthToken(data.session?.access_token ?? null);
+        if (API_MODE === 'live') {
+          const result = await api.auth.login({ email, password: _password });
+          setAuthToken(result.accessToken);
           set({
-            email,
+            email: result.user.email,
+            fullName: result.user.fullName,
             authProvider: 'email',
             isSignedIn: true,
-            role: 'owner',
-            accessToken: data.session?.access_token ?? null,
-            demoBusinessId: DEMO_IDS.businessId,
-            demoAssetId: DEMO_IDS.assetId,
-            demoLoanId: DEMO_IDS.loanId,
-            demoQuoteId: DEMO_IDS.quoteId,
+            role: result.role,
+            accessToken: result.accessToken,
+            businessId: result.businessId,
+            isAdmin: result.role === 'bank',
           });
         } else {
-          // Mock mode: call mock endpoint
           const result = await api.auth.login({ email, password: _password });
           set({
             email: result.user.email,
@@ -108,7 +103,6 @@ export const useSession = create<SessionState>()(
           const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
           if (error) throw error;
         } else {
-          // Mock mode: demo shortcut
           get().signIn('owner');
         }
       },
@@ -120,35 +114,25 @@ export const useSession = create<SessionState>()(
           const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
           if (error) throw error;
         } else {
-          // Mock mode: demo shortcut
           get().signIn('owner');
         }
       },
 
       register: async (body) => {
-        const { api } = await import('@/lib/api');
-        const { hasSupabaseConfig, supabase } = await import('@/lib/supabase');
+        const { api, API_MODE, setAuthToken } = await import('@/lib/api');
 
-        if (hasSupabaseConfig && supabase) {
-          const { data, error } = await supabase.auth.signUp({
-            email: body.email,
-            password: body.password,
-            options: { data: { fullName: body.fullName, phone: body.phone } },
-          });
-          if (error) throw error;
-          const { setAuthToken } = await import('@/lib/api');
-          setAuthToken(data.session?.access_token ?? null);
+        if (API_MODE === 'live') {
+          const result = await api.auth.register(body);
+          setAuthToken(result.accessToken);
           set({
-            email: body.email,
-            fullName: body.fullName,
+            email: result.user.email,
+            fullName: result.user.fullName,
             authProvider: 'email',
             isSignedIn: true,
-            role: 'owner',
-            accessToken: data.session?.access_token ?? null,
-            demoBusinessId: DEMO_IDS.businessId,
-            demoAssetId: DEMO_IDS.assetId,
-            demoLoanId: DEMO_IDS.loanId,
-            demoQuoteId: DEMO_IDS.quoteId,
+            role: result.role,
+            accessToken: result.accessToken,
+            businessId: result.businessId,
+            isAdmin: result.role === 'bank',
           });
         } else {
           const result = await api.auth.register(body);
@@ -167,6 +151,16 @@ export const useSession = create<SessionState>()(
             isAdmin: result.role === 'bank',
           });
         }
+      },
+
+      bootstrap: async () => {
+        const { API_MODE } = await import("@/lib/api");
+        if (API_MODE !== 'live') return;
+        const state = useSession.getState();
+        if (!state.businessId) return;
+        try {
+          // Until that endpoint exists, components fetch individually
+        } catch { /* ignore */ }
       },
 
       setKycStatus: (kycStatus) => set({ kycStatus }),
