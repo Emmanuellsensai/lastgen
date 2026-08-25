@@ -77,6 +77,9 @@ export function createAdminRouter(repo: Repository, env: Env): Router {
     void (async () => {
       const asset = await repo.getAsset(String(req.params.id));
       if (!asset) throw new ApiError('NOT_FOUND', 'Asset not found', 404);
+      if (asset.status === 'OWNED') {
+        throw new ApiError('INVALID_TRANSITION', 'An owned asset cannot be suspended', 409);
+      }
 
       // Delegating to the repository keeps every frozen invariant intact:
       // medical-flagged businesses throw MEDICAL_FLAG and owned assets

@@ -940,8 +940,9 @@ export class InMemoryRepository implements Repository {
           : undefined;
         return {
           loanId: loan.id,
-          businessName: business?.name ?? 'Unknown',
-          businessId: business?.id ?? '',
+          businessName:
+            business?.name ?? this.state.assetBusinessName[loan.assetId] ?? 'Unknown',
+          businessId: asset?.businessId ?? '',
           assetId: asset?.id ?? '',
           assetStatus: asset?.status ?? 'ACTIVE',
           balanceKobo: loan.balanceKobo,
