@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
-import { AppShell, DeviceFrame, DEMO_IDS } from '@/components/layout';
+import { AppShell, DeviceFrame } from '@/components/layout';
 import { Logo } from '@/components/layout/Logo';
 import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
 import { BurnCounter, Money, PhotoStrip, StatusPill } from '@/components/lastgen';
@@ -553,7 +553,7 @@ export default function Landing() {
                     </Link>
                   </li>
                   <li>
-                    <Link to={`/quote/${DEMO_IDS.quoteId}`} className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Quote
                     </Link>
                   </li>
