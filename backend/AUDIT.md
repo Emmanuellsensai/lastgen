@@ -1093,3 +1093,34 @@ Comprehensive remediation pass completed on `feat/backend`:
 - **T10 — Test Suite Hygiene**: Deleted obsolete root `it.todo` stub files (`tests/contract/*`), re-pointed root `vitest.config.ts` to `backend/test/`, and updated `QA_REPORT.md`.
 - **T11 — Verification Gate**: `pnpm typecheck` ✅ (0 errors), `pnpm lint` ✅ (0 errors), `pnpm test` ✅ (20/20 files passed, 161 tests passed).
 
+
+## 22. Phases 8–10 — RBAC, bank identity, KYC and the admin surface (done)
+
+Admin-sprint implementation recorded here after the fact (commit messages for
+Phases 8–9 referenced this file; the entries below close that gap):
+
+- **Phase 8 — Role-aware auth + bank identities**: `makeRequireRole(env, ...allowed)`
+  reads the server-only `app_metadata.role` claim in live mode and answers the new
+  additive `FORBIDDEN` 403 (demo mode permits all, matching every other demo
+  surface). Bank operators register/login via `POST /auth/bank/{register,login}`
+  mounted before the auth boundary; GoTrue accounts use synthesized
+  `<bankId>@banks.lastgen.local` emails with a single `UNAUTHORIZED` failure shape;
+  `bank_users` mirror table + `kyc_records` + private `kyc-docs` bucket ship in
+  additive `migrations/rbac-kyc.sql`.
+- **Phase 9 — KYC lifecycle**: `GET /businesses/:id/kyc` synthesizes `unverified`
+  before first submission; multipart submit validates documents and NIN through an
+  injectable provider seam (`simulated` format-check / `nimc` fails closed 503),
+  stores to demo data-URLs or live signed URLs with the Supabase client resolved
+  lazily per upload. Approved records are immutable (409); live submissions check
+  ownership (403).
+- **Phase 10 — Admin surface**: one router behind `makeRequireRole('bank','admin')`
+  serving users/KYC-review/power/orders tabs plus manual payment approval. Power
+  control reuses `suspendAsset`/`restoreAsset` so `MEDICAL_FLAG` and OWNED-asset
+  invariants hold on the admin path too; approval settles through atomic `payLoan`
+  (`SIMULATED`, `ADMIN-<ts>` references) — no side-door ledger writes; reviews
+  broadcast best-effort `kyc_reviewed` notifications.
+
+Verification at close of Phase 10: typecheck ✅, lint ✅ (0 errors, 3 pre-existing
+warnings), **223/223 tests across 25 suites** ✅ (incl. 10 bank-auth, 9 kyc,
+15 admin contract tests), boot smoke ✅ (Phase 8). Scope held to `backend/**`;
+`docs/CONTRACT.md` amendment for `FORBIDDEN` remains flagged for the docs owner.
