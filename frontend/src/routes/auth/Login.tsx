@@ -40,7 +40,7 @@ export default function Login() {
       await useSession.getState().signInWithGoogle();
       const state = useSession.getState();
       if (state.isSignedIn) {
-        navigate(state.role === 'bank' ? '/bank' : '/app');
+        navigate(state.role === 'bank' ? '/admin' : '/app');
       }
     } catch {
       setError('Google sign-in failed');
@@ -55,7 +55,7 @@ export default function Login() {
       await useSession.getState().signInWithApple();
       const state = useSession.getState();
       if (state.isSignedIn) {
-        navigate(state.role === 'bank' ? '/bank' : '/app');
+        navigate(state.role === 'bank' ? '/admin' : '/app');
       }
     } catch {
       setError('Apple sign-in failed');

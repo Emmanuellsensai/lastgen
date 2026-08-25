@@ -342,6 +342,7 @@ export interface PortfolioAssetsQuery {
   status?: AssetStatus;
   city?: string;
   page?: number;
+  businessId?: string;
 }
 
 export interface AdminUser {
