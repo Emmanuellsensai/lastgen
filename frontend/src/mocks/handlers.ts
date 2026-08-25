@@ -280,6 +280,41 @@ const businessHandlers: HttpHandler[] = [
     return ok({ items: logs, total });
   }),
 
+  http.delete(`${BASE}/businesses/:id/fuel-logs/:logId`, async ({ params }) => {
+    await lag();
+    const businessId = String(params.id);
+    if (!businessById(businessId)) return notFound('Business');
+    const index = db.fuelLogs.findIndex(
+      (fl) => fl.id === String(params.logId) && fl.businessId === businessId,
+    );
+    if (index === -1) return notFound('Fuel log');
+    db.fuelLogs.splice(index, 1);
+    recomputeBurn(businessId);
+    return ok({ ok: true });
+  }),
+
+  http.get(`${BASE}/businesses/:id/summary`, async ({ params }) => {
+    await lag();
+    const businessId = String(params.id);
+    if (!businessById(businessId)) return notFound('Business');
+    const asset = db.assets.find((a) => a.businessId === businessId);
+    const loan = asset ? db.loans.find((l) => l.assetId === asset.id) : undefined;
+    const quotes = db.quotes.filter((q) => q.businessId === businessId);
+    return ok({
+      assetId: asset?.id ?? null,
+      loanId: loan?.id ?? null,
+      quoteId: quotes[quotes.length - 1]?.id ?? null,
+    });
+  }),
+
+  http.get(`${BASE}/businesses/:id/application`, async ({ params }) => {
+    await lag();
+    const businessId = String(params.id);
+    if (!businessById(businessId)) return notFound('Business');
+    const files = db.creditFiles.filter((f) => f.businessId === businessId);
+    return ok(files[files.length - 1] ?? null);
+  }),
+
   http.get(`${BASE}/businesses/:id/burn`, async ({ params }) => {
     await lag();
     const profile = db.burnProfiles.find((p) => p.businessId === String(params.id));
@@ -340,12 +375,30 @@ const quoteHandlers: HttpHandler[] = [
       depositKobo,
       monthlyPaymentKobo: payment,
       aprBps,
-      totalPayableKobo: payment * body.tenorMonths + depositKobo,
+      totalPayableKobo:
+        depositKobo +
+        buildSchedule(principal, aprBps, body.tenorMonths, new Date()).reduce(
+          (sum, row) => sum + row.principalKobo + row.interestKobo,
+          0,
+        ),
       monthlySavingsKobo,
       savingsPct: Number(((monthlySavingsKobo / burn.monthlyKobo) * 100).toFixed(1)),
       breakEvenMonth: breakEvenMonth(depositKobo, monthlySavingsKobo),
     };
     db.quotes.push(quote);
+    // Opening a quote opens the underwriting file too, matching the backend.
+    db.creditFiles.push({
+      id: nextId('cf'),
+      businessId,
+      business: businessById(businessId) as Business,
+      burn,
+      quote,
+      affordabilityRatio: Number((payment / burn.monthlyKobo).toFixed(2)),
+      loadProfileScore: 74,
+      verifiedMonths: burn.daysObserved >= 30 ? Math.floor(burn.daysObserved / 30) : 0,
+      status: 'PENDING',
+      createdAt: db.now.toISOString(),
+    });
     return ok(quote, 201);
   }),
 
@@ -353,6 +406,18 @@ const quoteHandlers: HttpHandler[] = [
     await lag();
     const quote = db.quotes.find((q) => q.id === String(params.id));
     return quote ? ok(quote) : notFound('Quote');
+  }),
+
+  http.post(`${BASE}/quotes/:id/accept`, async ({ params }) => {
+    await lag();
+    const quoteId = String(params.id);
+    const quote = db.quotes.find((q) => q.id === quoteId);
+    if (!quote) return notFound('Quote');
+    const file = db.creditFiles.find((f) => f.quote.id === quoteId);
+    if (!file) return notFound('Credit file');
+    // Idempotent: a repeat accept resolves to the same credit file.
+    file.submittedAt ??= db.now.toISOString();
+    return ok({ creditFileId: file.id, status: file.status }, 201);
   }),
 ];
 
@@ -566,6 +631,16 @@ const loanHandlers: HttpHandler[] = [
     await lag();
     const items = db.installments[String(params.id)];
     return items ? ok({ items }) : notFound('Schedule');
+  }),
+
+  http.get(`${BASE}/loans/:id/payments`, async ({ params }) => {
+    await lag();
+    const loanId = String(params.id);
+    if (!db.loans.some((l) => l.id === loanId)) return notFound('Loan');
+    const items = db.payments
+      .filter((p) => p.loanId === loanId)
+      .sort((a, b) => b.paidAt.localeCompare(a.paidAt));
+    return ok({ items });
   }),
 ];
 

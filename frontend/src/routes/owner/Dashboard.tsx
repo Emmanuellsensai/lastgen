@@ -21,6 +21,7 @@ import type {
   Asset,
   Business,
   BurnProfile,
+  CreditFile,
   FuelLog,
   Loan,
   Quote,
@@ -31,9 +32,11 @@ export default function Dashboard() {
   const { businessId, demoBusinessId, demoLoanId, demoQuoteId, demoAssetId } = useSession();
 
   const effectiveBusinessId = API_MODE === 'live' ? businessId : demoBusinessId;
-  const [assetId] = useState<string | null>(API_MODE === 'live' ? null : demoAssetId);
-  const [loanId] = useState<string | null>(API_MODE === 'live' ? null : demoLoanId);
-  const [quoteId] = useState<string | null>(API_MODE === 'live' ? null : demoQuoteId);
+  // The live ids come from GET /businesses/:id/summary. The demo ids seed the
+  // first paint so mock mode renders before the summary resolves.
+  const [assetId, setAssetId] = useState<string | null>(API_MODE === 'live' ? null : demoAssetId);
+  const [loanId, setLoanId] = useState<string | null>(API_MODE === 'live' ? null : demoLoanId);
+  const [quoteId, setQuoteId] = useState<string | null>(API_MODE === 'live' ? null : demoQuoteId);
 
   const [business, setBusiness] = useState<Business | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -41,6 +44,7 @@ export default function Dashboard() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [burn, setBurn] = useState<BurnProfile | null>(null);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [application, setApplication] = useState<CreditFile | null>(null);
   const [hasLogs, setHasLogs] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -59,8 +63,8 @@ export default function Dashboard() {
   // Application status stepper steps
   const stepFuel = !!burn && burn.daysObserved > 0;
   const stepQuote = hasQuote;
-  const stepApplication = false; // TODO(BE): needs GET /businesses/:id/application
-  const stepInstalled = hasAsset && asset?.status !== undefined;
+  const stepApplication = !!application?.submittedAt || application?.status === 'APPROVED';
+  const stepInstalled = hasAsset;
   const steps = [
     { label: 'Fuel logged', done: stepFuel },
     { label: 'Quote reviewed', done: stepQuote },
@@ -74,37 +78,47 @@ export default function Dashboard() {
     if (!effectiveBusinessId) return;
     let cancelled = false;
     async function load() {
+      const id = effectiveBusinessId!;
       try {
-        const [b, a, l, q, fl] = await Promise.all([
-          api.businesses.get(effectiveBusinessId!),
-          api.assets.get(assetId!),
-          api.loans.get(loanId!),
-          api.quotes.get(quoteId!),
-          api.fuelLogs.list(effectiveBusinessId!, 5),
+        const [b, summary] = await Promise.all([
+          api.businesses.get(id),
+          api.businesses.summary(id),
         ]);
-        if (!cancelled) {
-          setBusiness(b);
-          setAsset(a);
-          setLoan(l);
-          setQuote(q);
+        if (cancelled) return;
+        setBusiness(b);
+        setAssetId(summary.assetId);
+        setLoanId(summary.loanId);
+        setQuoteId(summary.quoteId);
+
+        // Everything below is optional: a business with no quote, no asset or
+        // no loan still renders the parts of the dashboard it does have.
+        const [a, l, q, fl, br, app] = await Promise.all([
+          summary.assetId ? api.assets.get(summary.assetId).catch(() => null) : null,
+          summary.loanId ? api.loans.get(summary.loanId).catch(() => null) : null,
+          summary.quoteId ? api.quotes.get(summary.quoteId).catch(() => null) : null,
+          api.fuelLogs.list(id, 5).catch(() => null),
+          api.businesses.burn(id).catch(() => null),
+          api.businesses.application(id).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setAsset(a);
+        setLoan(l);
+        setQuote(q);
+        setBurn(br);
+        setApplication(app);
+        if (fl) {
           setFuelLogs(fl.items);
           setHasLogs(fl.items.length > 0);
-          try {
-            const br = await api.businesses.burn(effectiveBusinessId!);
-            if (!cancelled) setBurn(br);
-          } catch {
-            // burn may not exist yet
-          }
         }
       } catch {
-        // ignore
+        // The business itself could not be read; the empty state covers it.
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [effectiveBusinessId, demoAssetId, demoLoanId, demoQuoteId]);
+  }, [effectiveBusinessId]);
 
   // Poll asset status every 5 seconds for suspension banner
   useEffect(() => {
@@ -130,14 +144,14 @@ export default function Dashboard() {
   }, [assetId]);
 
   async function handlePay() {
-    if (!demoLoanId) return;
+    if (!loanId) return;
     setPaying(true);
     try {
-      await api.loans.pay(demoLoanId, { source: 'wallet' });
+      await api.loans.pay(loanId, { source: 'wallet' });
       setPayOpen(false);
       setToastOpen(true);
       // Refresh loan
-      const updated = await api.loans.get(demoLoanId);
+      const updated = await api.loans.get(loanId);
       setLoan(updated);
     } catch {
       // ignore
@@ -161,6 +175,14 @@ export default function Dashboard() {
   }
 
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper-2">
+        <p className="text-ink-mute">Loading your dashboard...</p>
+      </div>
+    );
+  }
+
   // New user state
   if (isNewUser) {
     return (
@@ -176,14 +198,6 @@ export default function Dashboard() {
           </GlassCard>
         </div>
       </AppShell>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-paper-2">
-        <p className="text-ink-mute">Loading your dashboard...</p>
-      </div>
     );
   }
 

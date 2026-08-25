@@ -12,6 +12,7 @@
 // the payment ledger and the audit history together — or nothing at all.
 
 import type {
+  AcceptQuoteResult,
   Asset,
   AssetStatus,
   AdminOrder,
@@ -19,6 +20,7 @@ import type {
   BankUser,
   Business,
   BurnProfile,
+  BusinessSummary,
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
@@ -112,6 +114,17 @@ export interface Repository {
   /* Businesses ----------------------------------------------------- */
   createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business>;
   getBusiness(id: string): Promise<Business | undefined>;
+  /**
+   * The live ids the owner dashboard resolves after login: newest quote, and
+   * the asset/loan pair once a credit file has been approved. Fields are null
+   * while the record does not exist yet. Unknown business throws NOT_FOUND.
+   */
+  businessSummary(id: string): Promise<BusinessSummary>;
+  /**
+   * The business's most recent credit file, or null before the first quote.
+   * Drives the application-status stepper on the dashboard.
+   */
+  applicationFor(businessId: string): Promise<CreditFile | null>;
 
   /* Banks ---------------------------------------------------------- */
   /**
@@ -156,6 +169,12 @@ export interface Repository {
     receiptUrl: string,
   ): Promise<FuelLog>;
   fuelLogsFor(businessId: string, limit?: number): Promise<FuelLog[]>;
+  /**
+   * Remove one of the business's own fuel logs and recompute the burn profile.
+   * Unknown business or log throws NOT_FOUND; a log belonging to another
+   * business is treated as not found rather than leaking its existence.
+   */
+  deleteFuelLog(businessId: string, logId: string): Promise<void>;
   burnProfileFor(businessId: string): Promise<BurnProfile | undefined>;
   recomputeBurn(businessId: string): Promise<BurnProfile | undefined>;
 
@@ -165,6 +184,12 @@ export interface Repository {
   /* Quotes --------------------------------------------------------- */
   createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote>;
   getQuote(id: string): Promise<Quote | undefined>;
+  /**
+   * Submit a quote for underwriting. Idempotent: the credit file created
+   * alongside the quote is stamped with submittedAt and returned, so a repeat
+   * accept resolves to the same file. Unknown quote throws NOT_FOUND.
+   */
+  acceptQuote(quoteId: string): Promise<AcceptQuoteResult>;
 
   /* Credit --------------------------------------------------------- */
   listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]>;
@@ -183,6 +208,8 @@ export interface Repository {
   getLoan(id: string): Promise<Loan | undefined>;
   loanByAsset(assetId: string): Promise<Loan | undefined>;
   scheduleFor(loanId: string): Promise<Installment[]>;
+  /** Settled payments against a loan, newest first. Unknown loan throws NOT_FOUND. */
+  paymentsFor(loanId: string): Promise<Payment[]>;
   /**
    * Settlement primitive shared by every entry path (simulated consent, ALAT
    * webhook, wallet debit): applies the PAY transition to loan + asset + next

@@ -354,7 +354,12 @@ function buildQuote(spec: BusinessSpec, burn: BurnProfile): Quote {
     depositKobo,
     monthlyPaymentKobo: payment,
     aprBps: spec.aprBps,
-    totalPayableKobo: payment * spec.tenorMonths + depositKobo,
+    totalPayableKobo:
+      depositKobo +
+      buildSchedule(principal, spec.aprBps, spec.tenorMonths, new Date()).reduce(
+        (sum, row) => sum + row.principalKobo + row.interestKobo,
+        0,
+      ),
     monthlySavingsKobo: savings,
     savingsPct: Number(((savings / burn.monthlyKobo) * 100).toFixed(1)),
     breakEvenMonth: breakEvenMonth(depositKobo, savings),
