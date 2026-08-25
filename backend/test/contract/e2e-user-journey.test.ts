@@ -29,7 +29,6 @@ describe('E2E: First-time user journey', () => {
   let creditFileId: string;
   let assetId: string;
   let loanId: string;
-  let walletBalance: number;
 
   /* ------------------------------------------------------------------ */
   /* Step 1: Create a new business                                       */
@@ -241,7 +240,6 @@ describe('E2E: First-time user journey', () => {
     expect(wallet).toHaveProperty('accountNumber');
     expect(wallet.bankCode).toBe('035');
     expect(wallet.balanceKobo).toBeGreaterThan(0);
-    walletBalance = wallet.balanceKobo;
   });
 
   it('GET /api/loans/:id — owner checks loan before payment', async () => {

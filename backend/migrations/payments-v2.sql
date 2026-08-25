@@ -120,7 +120,7 @@ begin
     foreach t in array array['payments', 'wallets', 'wallet_transactions']
     loop
       begin
-        alter publication supabase_realtime add table t;
+        execute format('alter publication supabase_realtime add table %I', t);
       exception when duplicate_object then
         null;
       end;
