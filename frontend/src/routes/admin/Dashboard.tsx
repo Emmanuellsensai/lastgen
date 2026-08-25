@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  ArrowRight,
   Power,
   SignOut,
 } from '@phosphor-icons/react';
@@ -82,6 +83,12 @@ export default function AdminDashboard() {
             >
               Orders
             </Tabs.Trigger>
+            <Tabs.Trigger
+              value="portfolio"
+              className="px-4 py-3 text-sm font-medium text-ink-mute transition-colors data-[state=active]:text-ink data-[state=active]:border-b-2 data-[state=active]:border-navy"
+            >
+              Portfolio
+            </Tabs.Trigger>
           </Tabs.List>
 
           <Tabs.Content value="users" className="p-6">
@@ -95,6 +102,19 @@ export default function AdminDashboard() {
           </Tabs.Content>
           <Tabs.Content value="orders" className="p-6">
             <OrdersTab onToast={showToast} />
+          </Tabs.Content>
+          <Tabs.Content value="portfolio" className="p-6">
+            <Link to="/bank/portfolio">
+              <GlassCard elevation={2} hoverable padding="lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-display text-xl text-ink">View full portfolio</p>
+                    <p className="mt-2 text-sm text-ink-mute">See all assets, balances, and city-level breakdowns.</p>
+                  </div>
+                  <ArrowRight size={24} weight="regular" className="text-navy" />
+                </div>
+              </GlassCard>
+            </Link>
           </Tabs.Content>
         </Tabs.Root>
       </div>
