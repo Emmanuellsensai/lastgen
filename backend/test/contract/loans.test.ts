@@ -49,7 +49,7 @@ describe('loans contract', () => {
   });
 
   it('returns the contract 404 for a loan without a schedule', async () => {
-    const res = await request(app).get('/api/loans/loan_p000/schedule');
+    const res = await request(app).get('/api/loans/loan_nonexistent/schedule');
     expect(res.status).toBe(404);
     expect(res.body.error).toEqual({ code: 'NOT_FOUND', message: 'Schedule not found' });
   });

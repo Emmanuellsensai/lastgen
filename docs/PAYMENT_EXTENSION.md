@@ -8,10 +8,23 @@ not against `docs/CONTRACT.md`.
 
 ## 1. The spec (verbatim from the team lead)
 
+### Auth
+
+```
+POST /auth/login       { email, password }                -> { user, role, businessId, accessToken }
+POST /auth/register    { email, password, fullName, phone } -> { user, role, businessId, accessToken }
+POST /auth/verify-nin  { nin }                            -> { verified, owner }
+GET  /me/session                                              -> { role, businessId, name }
+```
+
+- `POST /auth/*` — demo-only shims. In live mode, use Supabase directly.
+- `GET /me/session` — resolves the authenticated user to their business via `owner_id`.
+
 ### Wallets
 
 ```
-POST /wallets/create  { businessId, nin, firstName, lastName, phone } -> { wallet }
+POST /wallets/create  { businessId, nin, firstName, lastName, phone } -> Wallet
+POST /wallets/fund    { amountKobo }                             -> Wallet
 GET  /wallets/balance                                           -> Wallet
 GET  /wallets/statement  ?limit & before                        -> { items }
 ```

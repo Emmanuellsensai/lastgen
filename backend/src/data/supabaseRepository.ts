@@ -49,8 +49,11 @@ import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
+  AdminOrder,
+  AdminUser,
   Asset,
   AssetStatus,
+  BankUser,
   Business,
   BurnProfile,
   CreateBusinessBody,
@@ -65,7 +68,10 @@ import type {
   ImpactPeriod,
   ImpactSummary,
   Installment,
+  KycRecord,
+  KycStatus,
   Loan,
+  LoanStatus,
   MeterReading,
   PagedEnvelope,
   Payment,
@@ -80,14 +86,52 @@ import type {
 } from '../types/api.js';
 import type { AssetStatusHistoryEntry } from './seed.js';
 import type {
+  BankSession,
+  KycReviewResult,
+  KycSubmission,
   PaySettlement,
   ReceiptExtraction,
+  RegisterBankInput,
   Repository,
+  SubmitKycInput,
   WalletStatementQuery,
 } from './repository.js';
 
 const PAGE_SIZE = 25;
 const DAY_MS = 86_400_000;
+
+/**
+ * Banks authenticate by bankId, GoTrue by email; this deterministic mapping
+ * bridges the two without exposing emails as login identifiers.
+ */
+const BANK_EMAIL_DOMAIN = 'banks.lastgen.local';
+
+function bankEmail(bankId: string): string {
+  return `${bankId.toLowerCase()}@${BANK_EMAIL_DOMAIN}`;
+}
+
+/** bank_users mirror row (snake_case, as PostgREST returns it). */
+interface BankUserRow {
+  id: string;
+  bank_id: string;
+  bank_name: string;
+  created_at: string;
+}
+
+/** kyc_records row (snake_case, as PostgREST returns it). */
+interface KycRecordRow {
+  id: string;
+  business_id: string;
+  user_id: string | null;
+  status: 'unverified' | 'pending' | 'approved' | 'rejected';
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  selfie_url: string | null;
+  bank_slip_url: string | null;
+  nin_number: string | null;
+  nin_verified: boolean;
+}
 
 /* ------------------------------------------------------------------ */
 /* Row shapes (snake_case, as PostgREST returns them)                  */
@@ -290,6 +334,269 @@ export class SupabaseRepository implements Repository {
 
   businessForOwner(ownerId: string): Promise<Business | undefined> {
     return this.loadBusinessForOwner(ownerId);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Banks                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async registerBank(input: RegisterBankInput): Promise<BankSession> {
+    const bankId = input.bankId.trim();
+    if (!bankId) {
+      throw new ApiError('VALIDATION', 'Bank name, bank ID and password are required', 400);
+    }
+    // Pre-check the mirror so a duplicate surfaces as contract VALIDATION
+    // instead of GoTrue's generic 422.
+    const existing = await this.findBankUserByBankId(bankId);
+    if (existing) {
+      throw new ApiError('VALIDATION', 'Bank ID already registered', 400);
+    }
+
+    const { data, error } = await this.db.auth.admin.createUser({
+      email: bankEmail(bankId),
+      password: input.password,
+      email_confirm: true,
+      app_metadata: { role: 'bank' },
+      user_metadata: { bankId, bankName: input.bankName.trim() },
+    });
+    if (error || !data.user) {
+      throw new ApiError('DATABASE_ERROR', error?.message ?? 'Bank registration failed', 500);
+    }
+
+    await this.run(
+      this.db.from('bank_users').insert({
+        id: data.user.id,
+        bank_id: bankId,
+        bank_name: input.bankName.trim(),
+      }),
+    );
+
+    const { accessToken } = await this.signInBank(bankId, input.password);
+    return {
+      user: {
+        id: data.user.id,
+        bankId,
+        bankName: input.bankName.trim(),
+        createdAt: data.user.created_at ?? new Date().toISOString(),
+      },
+      accessToken,
+    };
+  }
+
+  async authenticateBank(bankId: string, password: string): Promise<BankSession> {
+    const trimmed = bankId.trim();
+    const record = await this.findBankUserByBankId(trimmed);
+    if (!record) {
+      throw new ApiError('UNAUTHORIZED', 'Invalid bank ID or password', 401);
+    }
+    return this.signInBank(trimmed, password, record);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* KYC                                                                 */
+  /* ------------------------------------------------------------------ */
+
+  private mapKycRecord(row: KycRecordRow): KycRecord {
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      userId: row.user_id ?? '',
+      status: row.status,
+      submittedAt: row.submitted_at,
+      reviewedAt: row.reviewed_at,
+      rejectionReason: row.rejection_reason,
+      selfieUrl: row.selfie_url,
+      bankSlipUrl: row.bank_slip_url,
+      ninNumber: row.nin_number,
+      ninVerified: row.nin_verified,
+    };
+  }
+
+  async kycRecordFor(businessId: string): Promise<KycRecord | undefined> {
+    await this.findBusinessOrThrow(businessId);
+    const row = await this.run(
+      this.db.from('kyc_records').select('*').eq('business_id', businessId).maybeSingle(),
+    );
+    return row ? this.mapKycRecord(row as KycRecordRow) : undefined;
+  }
+
+  async submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord> {
+    const business = await this.loadBusiness(businessId);
+    if (!business) throw new ApiError('NOT_FOUND', 'Business not found', 404);
+
+    // An approved record is immutable — resubmission would silently reopen a
+    // reviewed identity, so it is an invalid transition like any other.
+    const existingRow = await this.run(
+      this.db.from('kyc_records').select('status').eq('business_id', businessId).maybeSingle(),
+    );
+    if ((existingRow as { status: string } | null)?.status === 'approved') {
+      throw new ApiError('INVALID_TRANSITION', 'KYC is already approved', 409);
+    }
+
+    const nowIso = new Date().toISOString();
+    const values = {
+      id: `kyc_${businessId}`,
+      business_id: businessId,
+      user_id: input.userId ?? null,
+      status: 'pending' as const,
+      submitted_at: nowIso,
+      reviewed_at: null,
+      rejection_reason: null,
+      selfie_url: input.selfieUrl,
+      bank_slip_url: input.bankSlipUrl,
+      nin_number: input.ninNumber,
+      nin_verified: input.ninVerified,
+      updated_at: nowIso,
+    };
+    const row = await this.run(
+      this.db
+        .from('kyc_records')
+        .upsert(values, { onConflict: 'business_id' })
+        .select('*')
+        .single(),
+    );
+    return this.mapKycRecord(row as KycRecordRow);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Admin                                                               */
+  /* ------------------------------------------------------------------ */
+
+  async listAdminUsers(): Promise<AdminUser[]> {
+    const businesses = (await this.run(this.db.from('businesses').select('*'))) ?? [];
+    const assets = (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
+    const loans =
+      (await this.run(this.db.from('loans').select('id,asset_id,balance_kobo'))) ?? [];
+    const kycs = (await this.run(this.db.from('kyc_records').select('business_id,status'))) ?? [];
+
+    return businesses.map((row) => {
+      const b = row as BusinessRow;
+      const asset = assets.find((a) => a.business_id === b.id);
+      const loan = asset ? loans.find((l) => l.asset_id === asset.id) : undefined;
+      const kyc = kycs.find((k) => k.business_id === b.id);
+      return {
+        id: b.id,
+        name: b.name,
+        city: b.city,
+        type: b.type,
+        createdAt: b.created_at,
+        kycStatus: (kyc?.status as KycStatus | undefined) ?? 'unverified',
+        assetStatus: (asset?.status as AssetStatus | undefined) ?? null,
+        assetId: asset?.id ?? null,
+        loanId: loan?.id ?? null,
+        loanBalanceKobo: loan ? Number(loan.balance_kobo) : null,
+      };
+    });
+  }
+
+  async listKycSubmissions(status?: KycStatus): Promise<KycSubmission[]> {
+    let query = this.db.from('kyc_records').select('*');
+    if (status) {
+      query = query.eq('status', status);
+    }
+    const records = (await this.run(query)) ?? [];
+    const businesses =
+      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+    const nameOf = (id: string): string =>
+      businesses.find((b) => b.id === id)?.name ?? 'Unknown';
+
+    return records.map((row) => ({
+      ...this.mapKycRecord(row as KycRecordRow),
+      businessName: nameOf((row as KycRecordRow).business_id),
+    }));
+  }
+
+  async reviewKyc(
+    id: string,
+    action: 'approve' | 'reject',
+    reason?: string,
+  ): Promise<KycReviewResult> {
+    if (action === 'reject' && !reason?.trim()) {
+      throw new ApiError('VALIDATION', 'reason is required to reject a submission', 400);
+    }
+
+    const existing = await this.run(
+      this.db.from('kyc_records').select('*').eq('id', id).maybeSingle(),
+    );
+    if (!existing) {
+      throw new ApiError('NOT_FOUND', 'KYC submission not found', 404);
+    }
+    const current = existing as KycRecordRow;
+    if (current.status !== 'pending') {
+      throw new ApiError(
+        'INVALID_TRANSITION',
+        `KYC is ${current.status}; only pending submissions can be reviewed`,
+        409,
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+    await this.run(
+      this.db
+        .from('kyc_records')
+        .update({
+          status: nextStatus,
+          reviewed_at: nowIso,
+          rejection_reason: action === 'reject' ? (reason as string).trim() : null,
+          updated_at: nowIso,
+        })
+        .eq('id', id),
+    );
+
+    // Best-effort owner notification over the same realtime posture as
+    // payment settlement — a broadcast failure never aborts the review.
+    try {
+      const channel = this.db.channel('notifications');
+      void channel.send({
+        type: 'broadcast',
+        event: 'kyc_reviewed',
+        payload: { kycId: id, businessId: current.business_id, status: nextStatus },
+      });
+    } catch {
+      // ignore
+    }
+
+    const result: KycReviewResult = {
+      id,
+      status: nextStatus,
+      reviewedAt: nowIso,
+    };
+    if (action === 'reject') result.rejectionReason = (reason as string).trim();
+    return result;
+  }
+
+  async listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]> {
+    let query = this.db.from('loans').select('*');
+    if (status) {
+      query = query.eq('status', status);
+    } else {
+      query = query.neq('status', 'CLOSED');
+    }
+    const loans = (await this.run(query)) ?? [];
+    const assets =
+      (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
+    const businesses =
+      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+
+    return loans.map((raw) => {
+      const loan = raw as LoanRow;
+      const asset = assets.find((a) => a.id === loan.asset_id);
+      const business = asset
+        ? businesses.find((b) => b.id === asset.business_id)
+        : undefined;
+      return {
+        loanId: loan.id,
+        businessName: business?.name ?? 'Unknown',
+        businessId: business?.id ?? '',
+        assetId: asset?.id ?? '',
+        assetStatus: (asset?.status as AssetStatus | undefined) ?? 'ACTIVE',
+        balanceKobo: Number(loan.balance_kobo),
+        monthlyPaymentKobo: Number(loan.monthly_payment_kobo),
+        nextDueAt: loan.next_due_at,
+        status: loan.status as LoanStatus,
+      };
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -546,6 +853,54 @@ export class SupabaseRepository implements Repository {
       throw new ApiError('DATABASE_ERROR', message, 500);
     }
     return data ?? null;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Bank internals                                                      */
+  /* ------------------------------------------------------------------ */
+
+  private mapBankUser(row: BankUserRow): BankUser {
+    return {
+      id: row.id,
+      bankId: row.bank_id,
+      bankName: row.bank_name,
+      createdAt: row.created_at,
+    };
+  }
+
+  /** Load the bank_users mirror row for a bankId (null when unregistered). */
+  private async findBankUserByBankId(bankId: string): Promise<BankUser | null> {
+    const row = await this.run(
+      this.db.from('bank_users').select('*').eq('bank_id', bankId).maybeSingle(),
+    );
+    return row ? this.mapBankUser(row as BankUserRow) : null;
+  }
+
+  /**
+   * Mint an access token by signing into GoTrue with the synthesized email.
+   * Any credential rejection maps to the contract's UNAUTHORIZED shape —
+   * never leak whether the bankId or the password was wrong.
+   */
+  private async signInBank(
+    bankId: string,
+    password: string,
+    known?: BankUser | null,
+  ): Promise<BankSession> {
+    const { data, error } = await this.db.auth.signInWithPassword({
+      email: bankEmail(bankId),
+      password,
+    });
+    if (error || !data.session) {
+      throw new ApiError('UNAUTHORIZED', 'Invalid bank ID or password', 401);
+    }
+    let user = known;
+    if (!user) {
+      user = (await this.findBankUserByBankId(bankId)) ?? undefined;
+    }
+    if (!user) {
+      throw new ApiError('NOT_FOUND', 'Bank not found', 404);
+    }
+    return { user, accessToken: data.session.access_token };
   }
 
   /* ------------------------------------------------------------------ */

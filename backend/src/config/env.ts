@@ -21,6 +21,10 @@ export interface Env {
   alatAmountUnit: 'kobo' | 'naira';
   /** Simulated adapter auto-settle delay (ms). 0 settles synchronously; the demo sets 3000 to show the authorisation wait. */
   settleAfterMs: number;
+  /** NIN verification provider: 'simulated' (default) or 'nimc'. */
+  ninProvider: string;
+  /** Private Supabase Storage bucket for KYC documents. */
+  kycBucket: string;
   demoMode: boolean;
 }
 
@@ -53,6 +57,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     alatSourceAccount: source.ALAT_SOURCE_ACCOUNT || undefined,
     alatAmountUnit: source.ALAT_AMOUNT_UNIT === 'naira' ? 'naira' : 'kobo',
     settleAfterMs: Number(source.SETTLE_AFTER_MS ?? 0),
+    ninProvider: source.NIN_PROVIDER ?? 'simulated',
+    kycBucket: source.KYC_BUCKET ?? 'kyc-docs',
     demoMode: bool(source.DEMO_MODE),
   };
 }

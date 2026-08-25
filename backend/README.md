@@ -2,7 +2,7 @@
 
 > **Wema Hackaholics 7.0 · Hackathon Track · Team Ryzen**  
 > **Architecture:** Express + TypeScript · Strict Envelope API · Dual-Seam Persistence (In-Memory Seed & Supabase) · Wema ALAT Rails  
-> **Status:** 166/166 Tests Passing (21 test files) · 0 Type Errors · 0 Lint Warnings  
+> **Status:** 223/223 Tests Passing (25 suites) · 0 Type Errors · 0 Lint Errors  
 
 ---
 
@@ -22,6 +22,7 @@ For quick navigation across the Lastgen documentation suite, use the directory b
 
 | Document | Location | Purpose & Audience |
 | :--- | :--- | :--- |
+| **Admin Sprint Handoff** | [`backend/HANDOFF.md`](HANDOFF.md) | **Start here if wiring the admin/KYC/bank-auth UI.** Endpoint contract for the 11 sprint endpoints, RBAC model, `FORBIDDEN` 403 note, realtime events, and a map of every doc. |
 | **Frontend Integration Masterplan** | [`docs/FRONTEND_INTEGRATION_MASTERPLAN.md`](../docs/FRONTEND_INTEGRATION_MASTERPLAN.md) | **Essential for Frontend Devs & AI Agents.** Screen-by-screen linking blueprint, UI data bindings, and copy-paste AI agent prompt. |
 | **Base API Contract** | [`docs/CONTRACT.md`](../docs/CONTRACT.md) | The frozen baseline specification: standard constants, base REST routes, and entity data shapes. |
 | **Payment & Wallet Extension** | [`docs/PAYMENT_EXTENSION.md`](../docs/PAYMENT_EXTENSION.md) | The authoritative specification for 035 Wema virtual cash wallets, two-channel repayment lifecycle, and ALAT consent polling. |
@@ -29,7 +30,7 @@ For quick navigation across the Lastgen documentation suite, use the directory b
 | **Backend Implementation Audit** | [`backend/AUDIT.md`](AUDIT.md) | Exhaustive test coverage audit, security analysis, domain invariant checks, and architectural review. |
 | **Backend Progression Log** | [`backend/BACKEND_PROGRESS.md`](BACKEND_PROGRESS.md) | Complete engineering journal detailing Phases 0 through 5, refactorings, and milestone deliverables. |
 | **Backend Roadmap** | [`backend/ROADMAP.md`](ROADMAP.md) | Post-hackathon production hardening, real webhook retries, and high-frequency IoT streaming. |
-| **SQL Migrations** | [`backend/migrations/`](migrations/) | Idempotent PostgreSQL migrations: `audit.sql`, `payments-v2.sql`, and `payments-v3-atomic.sql`. |
+| **SQL Migrations** | [`backend/migrations/`](migrations/) | Idempotent PostgreSQL migrations: `audit.sql`, `payments-v2.sql`, `payments-v3-atomic.sql`, `rbac-kyc.sql`. |
 
 ---
 
@@ -75,6 +76,8 @@ All environment variables are validated and strongly typed at startup in `src/co
 | `SETTLE_AFTER_MS` | `number` | `3000` | Delay before simulated ALAT consent flips to `SUCCESS`. Set to `0` in tests for instant settlement. |
 | `SUPABASE_URL` | `string` | `""` | Supabase project URL (required when `DEMO_MODE=false`). |
 | `SUPABASE_SERVICE_KEY` | `string` | `""` | Supabase service-role key for backend database access. |
+| `NIN_PROVIDER` | `string` | `simulated` | KYC NIN verification provider: `simulated` (11-digit format check) or `nimc` (fails closed with `503 UNAVAILABLE` until real credentials are wired). |
+| `KYC_BUCKET` | `string` | `kyc-docs` | Private Supabase storage bucket holding submitted KYC documents (created by `migrations/rbac-kyc.sql`). |
 | `ALAT_BASE_URL` | `string` | `""` | Base URL for Wema ALAT sandbox or production API. |
 | `ALAT_CHANNEL_ID` | `string` | `""` | Channel identifier for Wema API authentication. |
 | `ALAT_API_KEY` | `string` | `""` | Subscription key (`Ocp-Apim-Subscription-Key`) for ALAT gateway. |
@@ -152,6 +155,17 @@ Every endpoint (except `/health`) is mounted under the `/api` prefix and adheres
 | | `POST /api/portfolio/export` | Bearer | None | Generate securitisation CSV export download URL. |
 | **Impact** | `GET /api/businesses/:id/impact` | Bearer | `?period=month\|year\|all` | Litres displaced, CO₂ avoided, and naira saved. |
 | | `GET /api/businesses/:id/wrapped` | Bearer | `?year` | Spotify-Wrapped style year-in-review metrics. |
+| **Bank Identity** | `POST /api/auth/bank/register` | None | `{ bankId, bankName, password }` | Provision a credit-desk operator (Supabase Auth user + `bank_users` mirror). |
+| | `POST /api/auth/bank/login` | None | `{ bankId, password }` | Exchange credentials for a bearer token (single `UNAUTHORIZED` shape on failure). |
+| **KYC** | `GET /api/businesses/:id/kyc` | Bearer | None | Verification record; synthesized as `unverified` before the first submission. |
+| | `POST /api/businesses/:id/kyc/submit` | Bearer | `multipart/form-data` (`ninNumber`, `bankSlip`, `selfie`) | Verify NIN via provider seam, store documents in the private bucket, park record in `pending`. |
+| **Admin Desk** | `GET /api/admin/users` | Bank/Admin role | None | Users tab: businesses joined with asset, loan and KYC state. |
+| | `GET /api/admin/kyc` | Bank/Admin role | `?status=` | Review queue submissions joined with business names. |
+| | `POST /api/admin/kyc/:id/approve` | Bank/Admin role | None | Clear a pending submission (409 once already reviewed). |
+| | `POST /api/admin/kyc/:id/reject` | Bank/Admin role | `{ reason }` | Reject a pending submission; reason is mandatory. |
+| | `POST /api/admin/assets/:id/toggle-power` | Bank/Admin role | None | Suspend/restore through the asset state machine (medical-flag guard holds). |
+| | `GET /api/admin/orders` | Bank/Admin role | `?status=ACTIVE\|DELINQUENT` | Fleet-wide active receivables projection. |
+| | `POST /api/admin/loans/:id/approve-payment` | Bank/Admin role | None | Manually settle one installment through the atomic payment path. |
 | **Webhooks** | `POST /api/webhooks/alat` | None | ALAT notification payload (HMAC signed) | Replay-safe webhook handler settling loans atomically. |
 | **Demo Control** | `POST /api/demo/reset` | None | None | Reset database to initial deterministic seed state. |
 | | `POST /api/demo/advance-time` | None | `{ days }` | Advance clock and trigger automated arrears sweeps. |

@@ -14,6 +14,9 @@
 import type {
   Asset,
   AssetStatus,
+  AdminOrder,
+  AdminUser,
+  BankUser,
   Business,
   BurnProfile,
   CreateBusinessBody,
@@ -28,7 +31,10 @@ import type {
   ImpactPeriod,
   ImpactSummary,
   Installment,
+  KycRecord,
+  KycStatus,
   Loan,
+  LoanStatus,
   MeterReading,
   PagedEnvelope,
   Payment,
@@ -47,6 +53,39 @@ export interface ReceiptExtraction {
   litres: number;
   pricePerLitreKobo: number;
   confidence?: number;
+}
+
+/** Registration payload for a credit-desk identity (password handled by the store). */
+export interface RegisterBankInput {
+  bankName: string;
+  bankId: string;
+  password: string;
+}
+
+/** Result of a successful bank register/login: identity plus a fresh token. */
+export interface BankSession {
+  user: BankUser;
+  accessToken: string;
+}
+
+/** Verified KYC submission payload; URLs come from the storage service. */
+export interface SubmitKycInput {
+  userId?: string | null;
+  ninNumber: string;
+  ninVerified: boolean;
+  selfieUrl: string;
+  bankSlipUrl: string;
+}
+
+/** KYC submission as the review queue renders it. */
+export type KycSubmission = KycRecord & { businessName: string };
+
+/** Outcome of reviewing a pending submission (MSW approve/reject shape). */
+export interface KycReviewResult {
+  id: string;
+  status: Extract<KycStatus, 'approved' | 'rejected'>;
+  rejectionReason?: string;
+  reviewedAt: string;
 }
 
 /** Internal full settlement result; the HTTP layer maps it to the slim PayResult. */
@@ -73,6 +112,41 @@ export interface Repository {
   /* Businesses ----------------------------------------------------- */
   createBusiness(input: CreateBusinessBody, ownerId?: string | null): Promise<Business>;
   getBusiness(id: string): Promise<Business | undefined>;
+
+  /* Banks ---------------------------------------------------------- */
+  /**
+   * Register a credit-desk identity. Duplicate bankId throws VALIDATION;
+   * credential storage is delegated to the identity store (Supabase Auth in
+   * live mode, in-memory map in demo).
+   */
+  registerBank(input: RegisterBankInput): Promise<BankSession>;
+  /** Verify bankId + password. Unknown id or wrong password throws UNAUTHORIZED. */
+  authenticateBank(bankId: string, password: string): Promise<BankSession>;
+
+  /* KYC ------------------------------------------------------------ */
+  /** The business's KYC record, or undefined before the first submission. */
+  kycRecordFor(businessId: string): Promise<KycRecord | undefined>;
+  /**
+   * Record a verified submission: status becomes pending with fresh document
+   * URLs and timestamps. Unknown business throws NOT_FOUND; an approved
+   * record is immutable and throws INVALID_TRANSITION.
+   */
+  submitKyc(businessId: string, input: SubmitKycInput): Promise<KycRecord>;
+
+  /* Admin ---------------------------------------------------------- */
+  /** Users tab projection: every business with its asset/loan/KYC state. */
+  listAdminUsers(): Promise<AdminUser[]>;
+  /** KYC review queue joined with business names, optionally by status. */
+  listKycSubmissions(status?: KycStatus): Promise<KycSubmission[]>;
+  /**
+   * Transition a pending submission: approve clears it, reject records the
+   * reason. Unknown id throws NOT_FOUND; a non-pending record throws
+   * INVALID_TRANSITION. Live implementations emit a best-effort realtime
+   * notification so the owner's device can react.
+   */
+  reviewKyc(id: string, action: 'approve' | 'reject', reason?: string): Promise<KycReviewResult>;
+  /** Orders tab projection: active (non-closed) loans with full context. */
+  listAdminOrders(status?: LoanStatus): Promise<AdminOrder[]>;
 
   /* Fuel logs and burn --------------------------------------------- */
   addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog>;

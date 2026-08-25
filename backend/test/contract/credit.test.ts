@@ -19,14 +19,14 @@ describe('credit contract', () => {
   it('lists all applications and filters by status', async () => {
     const all = await request(app).get('/api/credit/applications');
     expect(all.status).toBe(200);
-    expect(all.body.data.items).toHaveLength(6);
+    expect(all.body.data.items).toHaveLength(9);
 
     const approved = await request(app).get('/api/credit/applications?status=APPROVED');
-    expect(approved.body.data.items).toHaveLength(3);
+    expect(approved.body.data.items).toHaveLength(4);
     for (const item of approved.body.data.items) expect(item.status).toBe('APPROVED');
 
     const pending = await request(app).get('/api/credit/applications?status=PENDING');
-    expect(pending.body.data.items).toHaveLength(3);
+    expect(pending.body.data.items).toHaveLength(4);
   });
 
   it('returns the detail projection (recent fuel logs + schedule preview)', async () => {
