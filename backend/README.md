@@ -76,6 +76,8 @@ All environment variables are validated and strongly typed at startup in `src/co
 | `SETTLE_AFTER_MS` | `number` | `3000` | Delay before simulated ALAT consent flips to `SUCCESS`. Set to `0` in tests for instant settlement. |
 | `SUPABASE_URL` | `string` | `""` | Supabase project URL (required when `DEMO_MODE=false`). |
 | `SUPABASE_SERVICE_KEY` | `string` | `""` | Supabase service-role key for backend database access. |
+| `SUPABASE_DB_URL` | `string` | `""` | Direct Postgres connection string, used only by the local `pnpm db:apply` tooling (schema/policies/migrations/seed); never read by the server. |
+| `RUN_LIVE_E2E` | `boolean` | unset | Test-only gate: set to `true` to execute `test/live/live-e2e.test.ts` against a real Supabase project. The hermetic suite skips it unless this is set. |
 | `NIN_PROVIDER` | `string` | `simulated` | KYC NIN verification provider: `simulated` (11-digit format check) or `nimc` (fails closed with `503 UNAVAILABLE` until real credentials are wired). |
 | `KYC_BUCKET` | `string` | `kyc-docs` | Private Supabase storage bucket holding submitted KYC documents (created by `migrations/rbac-kyc.sql`). |
 | `ALAT_BASE_URL` | `string` | `""` | Base URL for Wema ALAT sandbox or production API. |

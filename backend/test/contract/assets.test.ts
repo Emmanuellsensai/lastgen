@@ -99,7 +99,9 @@ describe('assets contract', () => {
     const seed = buildSeed();
     const owned = seed.assets.find((a) => a.status === 'OWNED');
     expect(owned).toBeDefined();
-    const res = await request(app).post(`/api/assets/${owned!.id}/suspend`).send({ reason: 'Overdue' });
+    const res = await request(app)
+      .post(`/api/assets/${owned!.id}/suspend`)
+      .send({ reason: 'Overdue' });
 
     expect(res.status).toBe(409);
     expect(res.body.error).toEqual({

@@ -41,9 +41,7 @@ export function singleFile(field: string): RequestHandler {
  * bankSlip + selfie). Same failure mapping as singleFile; files arrive on
  * req.files keyed by field name.
  */
-export function fileFields(
-  fields: { name: string; maxCount: number }[],
-): RequestHandler {
+export function fileFields(fields: { name: string; maxCount: number }[]): RequestHandler {
   const middleware = upload.fields(fields);
   return (req, res, next) => {
     middleware(req, res, (err) => {

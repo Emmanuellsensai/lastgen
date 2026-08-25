@@ -33,6 +33,7 @@
 // late errors to the caller instead of swallowing them.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseAuthOnly } from '../lib/supabase.js';
 import {
   CO2_KG_PER_LITRE_PETROL,
   DAYS_PER_MONTH,
@@ -465,8 +466,7 @@ export class SupabaseRepository implements Repository {
   async listAdminUsers(): Promise<AdminUser[]> {
     const businesses = (await this.run(this.db.from('businesses').select('*'))) ?? [];
     const assets = (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
-    const loans =
-      (await this.run(this.db.from('loans').select('id,asset_id,balance_kobo'))) ?? [];
+    const loans = (await this.run(this.db.from('loans').select('id,asset_id,balance_kobo'))) ?? [];
     const kycs = (await this.run(this.db.from('kyc_records').select('business_id,status'))) ?? [];
 
     return businesses.map((row) => {
@@ -495,10 +495,8 @@ export class SupabaseRepository implements Repository {
       query = query.eq('status', status);
     }
     const records = (await this.run(query)) ?? [];
-    const businesses =
-      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
-    const nameOf = (id: string): string =>
-      businesses.find((b) => b.id === id)?.name ?? 'Unknown';
+    const businesses = (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+    const nameOf = (id: string): string => businesses.find((b) => b.id === id)?.name ?? 'Unknown';
 
     return records.map((row) => ({
       ...this.mapKycRecord(row as KycRecordRow),
@@ -574,17 +572,13 @@ export class SupabaseRepository implements Repository {
       query = query.neq('status', 'CLOSED');
     }
     const loans = (await this.run(query)) ?? [];
-    const assets =
-      (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
-    const businesses =
-      (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
+    const assets = (await this.run(this.db.from('assets').select('id,business_id,status'))) ?? [];
+    const businesses = (await this.run(this.db.from('businesses').select('id,name'))) ?? [];
 
     return loans.map((raw) => {
       const loan = raw as LoanRow;
       const asset = assets.find((a) => a.id === loan.asset_id);
-      const business = asset
-        ? businesses.find((b) => b.id === asset.business_id)
-        : undefined;
+      const business = asset ? businesses.find((b) => b.id === asset.business_id) : undefined;
       return {
         loanId: loan.id,
         businessName: business?.name ?? 'Unknown',
@@ -886,7 +880,8 @@ export class SupabaseRepository implements Repository {
     password: string,
     known?: BankUser | null,
   ): Promise<BankSession> {
-    const { data, error } = await this.db.auth.signInWithPassword({
+    // Password grants must not touch this.db — see getSupabaseAuthOnly().
+    const { data, error } = await getSupabaseAuthOnly().auth.signInWithPassword({
       email: bankEmail(bankId),
       password,
     });
@@ -1579,6 +1574,21 @@ export class SupabaseRepository implements Repository {
         created_at: (await this.now()).toISOString(),
       }),
     );
+
+    // Auto-create a credit file for underwriting (matches in-memory behaviour).
+    await this.run(
+      this.db.from('credit_files').insert({
+        id: this.nextId('cf'),
+        business_id: businessId,
+        quote_id: quote.id,
+        affordability_ratio: Math.round((payment / burn.monthlyKobo) * 100) / 100,
+        load_profile_score: 74,
+        verified_months: burn.daysObserved >= 30 ? Math.floor(burn.daysObserved / 30) : 0,
+        status: 'PENDING',
+        created_at: (await this.now()).toISOString(),
+      }),
+    );
+
     return quote;
   }
 
