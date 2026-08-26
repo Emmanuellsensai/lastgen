@@ -192,6 +192,9 @@ export class InMemoryRepository implements Repository {
     return files[files.length - 1] ?? null;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Fuel logs and burn                                                  */
+  /* ------------------------------------------------------------------ */
 
   async addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog> {
     await this.findBusinessOrThrow(businessId);
@@ -239,11 +242,11 @@ export class InMemoryRepository implements Repository {
 
   async deleteFuelLog(businessId: string, logId: string): Promise<void> {
     await this.findBusinessOrThrow(businessId);
-    const idx = this.state.fuelLogs.findIndex(
+    const index = this.state.fuelLogs.findIndex(
       (l) => l.id === logId && l.businessId === businessId,
     );
-    if (idx === -1) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
-    this.state.fuelLogs.splice(idx, 1);
+    if (index === -1) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
+    this.state.fuelLogs.splice(index, 1);
     await this.recomputeBurn(businessId);
   }
 
@@ -380,11 +383,6 @@ export class InMemoryRepository implements Repository {
   /* ------------------------------------------------------------------ */
   /* Credit                                                              */
   /* ------------------------------------------------------------------ */
-
-  async creditFileForBusiness(businessId: string): Promise<CreditFile | null> {
-    const cf = this.state.creditFiles.find((f) => f.businessId === businessId);
-    return cf ?? null;
-  }
 
   async listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]> {
     return status

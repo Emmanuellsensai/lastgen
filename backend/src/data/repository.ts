@@ -192,7 +192,6 @@ export interface Repository {
   acceptQuote(quoteId: string): Promise<AcceptQuoteResult>;
 
   /* Credit --------------------------------------------------------- */
-  creditFileForBusiness(businessId: string): Promise<CreditFile | null>;
   listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]>;
   getCreditFile(id: string): Promise<CreditFileDetail | undefined>;
   approveCreditFile(id: string): Promise<{ loan: Loan; asset: Asset }>;

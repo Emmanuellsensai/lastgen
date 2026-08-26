@@ -154,13 +154,13 @@ export const useSession = create<SessionState>()(
       },
 
       bootstrap: async () => {
-        const { API_MODE, setAuthToken } = await import("@/lib/api");
+        const { API_MODE } = await import("@/lib/api");
         if (API_MODE !== 'live') return;
         const state = useSession.getState();
-        if (!state.accessToken) return;
-        // Re-hydrate the module-level auth token from the persisted session
-        // so that requests carry the bearer token after a page refresh.
-        setAuthToken(state.accessToken);
+        if (!state.businessId) return;
+        try {
+          // Until that endpoint exists, components fetch individually
+        } catch { /* ignore */ }
       },
 
       setKycStatus: (kycStatus) => set({ kycStatus }),

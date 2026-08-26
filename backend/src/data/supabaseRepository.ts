@@ -664,13 +664,6 @@ export class SupabaseRepository implements Repository {
   /* Credit                                                              */
   /* ------------------------------------------------------------------ */
 
-  async creditFileForBusiness(businessId: string): Promise<CreditFile | null> {
-    const row = await this.run(
-      this.db.from('credit_files').select('*').eq('business_id', businessId).maybeSingle(),
-    );
-    return row ? this.loadCreditFile(row) : null;
-  }
-
   listCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]> {
     return this.loadCreditFiles(status);
   }
