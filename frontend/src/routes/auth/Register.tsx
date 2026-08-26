@@ -58,6 +58,14 @@ export default function Register() {
     setError('');
     try {
       await useSession.getState().register({ email, password, fullName, phone });
+      // If the backend returned an empty token (e.g. signIn failed after
+      // user creation), redirect to login so the user can sign in with
+      // their newly created credentials.
+      const { accessToken } = useSession.getState();
+      if (!accessToken) {
+        navigate('/login');
+        return;
+      }
       setPhase('setup');
     } catch {
       setError('Registration failed. Please try again.');
