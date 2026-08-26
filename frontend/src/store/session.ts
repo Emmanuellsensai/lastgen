@@ -21,6 +21,8 @@ export interface SessionState {
   kycStatus: KycStatus;
   signIn: (role: 'owner' | 'bank') => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   register: (body: { email: string; password: string; fullName: string; phone: string }) => Promise<void>;
   bootstrap: () => Promise<void>;
   setIsAdmin: (v: boolean) => void;
@@ -33,7 +35,7 @@ export interface SessionState {
 
 export const useSession = create<SessionState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       role: 'guest',
       accessToken: null,
       businessId: null,

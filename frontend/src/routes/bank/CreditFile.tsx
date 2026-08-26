@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { AppShell } from '@/components/layout';
 import { GlassCard, GlassSheet } from '@/components/ui/glass';
 import { Money, StatusPill } from '@/components/lastgen';
@@ -13,7 +13,6 @@ import type { PillStatus } from '@/components/lastgen/StatusPill';
 import type { Asset } from '@/types/api';
 import { api } from '@/lib/api';
 import type { CreditFileDetail } from '@/types/api';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 function getRecommendation(file: CreditFileDetail): { label: string; tone: 'success' | 'warning' | 'burn' } {
   if (file.affordabilityRatio >= 1.4 && file.verifiedMonths >= 3) {
