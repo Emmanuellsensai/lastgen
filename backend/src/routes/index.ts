@@ -7,7 +7,7 @@ import { makeRequireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { kycStorageFor } from '../services/kycStorage.js';
 import { ninProviderFor } from '../services/ninVerification.js';
-import { createAuthRouter } from './authRoutes.js';
+import { createAuthRouter, createPublicAuthRouter } from './authRoutes.js';
 import { createAdminRouter } from './adminRoutes.js';
 import { createAssetRouter } from './assetRoutes.js';
 import { createBankAuthRouter } from './bankAuthRoutes.js';
@@ -44,6 +44,10 @@ export function apiRouter(repo: Repository, env: Env): Router {
   // Bank registration and login also run BEFORE the auth boundary: a caller
   // cannot present a bearer token it does not have yet.
   router.use(createBankAuthRouter(repo, env));
+
+  // Owner login and register run BEFORE the auth boundary for the same reason:
+  // unauthenticated callers cannot present a token they don't have yet.
+  router.use(createPublicAuthRouter(repo, env));
 
   // Demo controls are unauthenticated (per the contract) but only exist in
   // demo mode; live deployments simply never mount this router.
