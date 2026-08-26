@@ -129,6 +129,7 @@ export default function SolarOptions() {
   const [applied, setApplied] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [toastTone, setToastTone] = useState<'success' | 'warning' | 'danger'>('warning');
 
   useEffect(() => {
     if (!effectiveBusinessId) { setLoading(false); return; }
@@ -148,7 +149,12 @@ export default function SolarOptions() {
   }, [burn, selected]);
 
   async function handleApply(tier: Tier) {
-    if (!effectiveBusinessId) return;
+    if (!effectiveBusinessId) {
+      setToastMsg('Could not find your business profile. Please refresh and try again.');
+      setToastTone('warning');
+      setToastOpen(true);
+      return;
+    }
     setApplying(true);
     try {
       const deposit = Math.round(tier.priceKobo * 0.1);
@@ -159,9 +165,12 @@ export default function SolarOptions() {
       });
       await api.quotes.accept(quote.id);
       setApplied(true);
+      // Redirect to dashboard after a brief delay so the user sees the success state
+      setTimeout(() => navigate('/app'), 1500);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Application failed. Please try again.';
       setToastMsg(msg);
+      setToastTone('danger');
       setToastOpen(true);
     } finally {
       setApplying(false);
@@ -373,7 +382,7 @@ export default function SolarOptions() {
         })()}
       </GlassSheet>
 
-      <Toast open={toastOpen} onOpenChange={setToastOpen} tone="warning">
+      <Toast open={toastOpen} onOpenChange={setToastOpen} tone={toastTone}>
         <ToastTitle>{toastMsg}</ToastTitle>
       </Toast>
     </AppShell>

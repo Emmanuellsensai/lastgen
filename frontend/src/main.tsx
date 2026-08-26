@@ -20,8 +20,41 @@ async function startMocks() {
   }
 }
 
+/**
+ * Bridge the Supabase auth session to the API client's bearer token.
+ * This must run on every app startup and listen for session changes so that:
+ *   1. A page refresh preserves the auth token (Supabase persists the session
+ *      in localStorage; we read it once on boot).
+ *   2. Google / Apple OAuth redirects land with a fresh session that needs to
+ *      be forwarded to the API client.
+ *   3. Token refreshes (Supabase auto-refresh) keep the API client current.
+ */
+async function initAuth() {
+  try {
+    const { hasSupabaseConfig, supabase } = await import('@/lib/supabase');
+    if (!hasSupabaseConfig || !supabase) return;
+
+    const { setAuthToken } = await import('@/lib/api');
+
+    // 1. Seed the token from the current session (handles page refresh).
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      setAuthToken(session.access_token);
+    }
+
+    // 2. Listen for future sign-in / sign-out / token-refresh events.
+    supabase.auth.onAuthStateChange((_event, newSession) => {
+      setAuthToken(newSession?.access_token ?? null);
+    });
+  } catch {
+    // Non-critical: if Supabase isn't configured the app runs in mock mode.
+  }
+}
+
 async function bootstrap() {
   await startMocks();
+  // Bridge Supabase session → API bearer token before any component renders.
+  await initAuth();
 
   createRoot(document.getElementById('root') as HTMLElement).render(
     <StrictMode>
