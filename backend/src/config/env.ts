@@ -6,7 +6,11 @@
 
 export interface Env {
   port: number;
-  corsOrigins: string[];
+  /**
+   * Allowed browser origins. An entry containing '*' becomes an anchored
+   * regex, so one wildcard covers every preview deployment.
+   */
+  corsOrigins: (string | RegExp)[];
   logLevel: string;
   supabaseUrl?: string;
   supabaseServiceKey?: string;
@@ -37,6 +41,22 @@ function paymentAdapter(value: string | undefined): 'simulated' | 'alat' {
   return 'simulated';
 }
 
+/**
+ * A CORS origin entry. A plain origin is matched literally; an entry
+ * containing '*' becomes an anchored regex, so preview deployments on a
+ * generated subdomain ('https://*.vercel.app') are allowed without
+ * redeploying the API for every new URL. The wildcard matches within a
+ * single label only, so it can never widen to a different domain.
+ */
+function toOrigin(entry: string): string | RegExp {
+  if (!entry.includes('*')) return entry;
+  const pattern = entry
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`))
+    .join('[^./]*');
+  return new RegExp(`^${pattern}$`);
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const port = Number(source.PORT ?? 8080);
 
@@ -45,7 +65,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     corsOrigins: (source.CORS_ORIGIN ?? 'http://localhost:5173')
       .split(',')
       .map((origin) => origin.trim())
-      .filter(Boolean),
+      .filter(Boolean)
+      .map(toOrigin),
     logLevel: source.LOG_LEVEL ?? 'info',
     supabaseUrl: source.SUPABASE_URL || undefined,
     supabaseServiceKey: source.SUPABASE_SERVICE_KEY || undefined,
