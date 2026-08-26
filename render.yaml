@@ -30,5 +30,10 @@ services:
         sync: false
       - key: DEMO_MODE
         value: 'true'
+      # Browser origins allowed to call this API. It is not a secret, so it
+      # lives here rather than as a dashboard-only value: an unset CORS_ORIGIN
+      # silently falls back to localhost and every request from the deployed
+      # frontend fails preflight. The wildcard covers Vercel preview URLs,
+      # which get a fresh subdomain per deployment.
       - key: CORS_ORIGIN
-        sync: false
+        value: https://lastgen-frontend.vercel.app,https://*.vercel.app,http://localhost:5173
