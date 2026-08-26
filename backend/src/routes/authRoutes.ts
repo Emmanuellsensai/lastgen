@@ -53,10 +53,12 @@ export function createPublicAuthRouter(repo: Repository, env: Env): Router {
       // silently so the owner can continue instead of landing on a blank dashboard.
       if (!business) {
         const fullName = (data.user.user_metadata?.fullName as string) ?? data.user.email ?? '';
-        business = await repo.createBusiness(
-          { name: `${fullName}'s Business`, type: 'Business', city: 'Lagos' },
-          data.user.id,
-        ).catch(() => undefined);
+        business = await repo
+          .createBusiness(
+            { name: `${fullName}'s Business`, type: 'Business', city: 'Lagos' },
+            data.user.id,
+          )
+          .catch(() => undefined);
       }
 
       res.json(
