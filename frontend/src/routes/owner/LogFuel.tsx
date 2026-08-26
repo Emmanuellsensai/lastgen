@@ -47,13 +47,12 @@ interface WindowOption {
 /* ------------------------------------------------------------------ */
 
 const WINDOW_OPTIONS: WindowOption[] = [
+  { icon: CalendarBlank, label: 'Last 1 day', subLabel: 'Quick estimate', value: { unit: 'days', count: 1, days: 1 } },
+  { icon: CalendarBlank, label: 'Last week', subLabel: 'A few entries', value: { unit: 'weeks', count: 1, days: 7 } },
   { icon: CalendarBlank, label: 'Last 2 weeks', subLabel: 'A few entries', value: { unit: 'weeks', count: 2, days: 14 } },
   { icon: CalendarBlank, label: 'Last month', subLabel: 'Around 4 to 8 entries', value: { unit: 'months', count: 1, days: 30 } },
   { icon: CalendarBlank, label: 'Last 3 months', subLabel: 'Around 12 to 24 entries', value: { unit: 'months', count: 3, days: 90 } },
   { icon: CalendarBlank, label: 'Last 6 months', subLabel: 'Around 24 to 48 entries', value: { unit: 'months', count: 6, days: 180 } },
-  { icon: CalendarBlank, label: 'Last year', subLabel: 'Around 48 to 96 entries', value: { unit: 'years', count: 1, days: 365 } },
-  { icon: CalendarBlank, label: 'Last 2 years', subLabel: 'Around 96 to 192 entries', value: { unit: 'years', count: 2, days: 730 } },
-  { icon: CalendarBlank, label: 'Last 3 years', subLabel: 'Around 144 to 288 entries', value: { unit: 'years', count: 3, days: 1095 } },
 ];
 
 const DEFAULT_PRICE_PER_LITRE = 950;
@@ -278,13 +277,14 @@ export default function LogFuel() {
               </div>
 
               {/* Average daily spend preview */}
-              {entries.filter(e => !e.label && e.amountNaira > 0).length >= 2 && selectedWindow && (
+              {entries.filter(e => !e.label && e.amountNaira > 0).length >= 1 && selectedWindow && (
                 <div className="mt-4 rounded-xl bg-navy/5 border border-navy/20 px-4 py-3">
-                  <p className="text-xs text-ink-mute">Estimated average daily spend</p>
+                  <p className="text-xs text-ink-mute">Estimated fuel spend</p>
                   {(() => {
                     const real = entries.filter(e => !e.label && e.amountNaira > 0);
                     const totalNaira = real.reduce((s, e) => s + e.amountNaira, 0);
                     const dailyNaira = totalNaira / selectedWindow.days;
+                    const weeklyNaira = dailyNaira * 7;
                     const monthlyNaira = dailyNaira * 30;
                     return (
                       <div className="mt-1 flex items-end gap-4">
@@ -292,12 +292,15 @@ export default function LogFuel() {
                           <p className="font-display text-xl text-ink">₦{Math.round(dailyNaira).toLocaleString()}<span className="text-sm text-ink-mute font-normal">/day</span></p>
                         </div>
                         <div>
+                          <p className="text-sm text-ink-soft">₦{Math.round(weeklyNaira).toLocaleString()}<span className="text-xs text-ink-mute">/week</span></p>
+                        </div>
+                        <div>
                           <p className="text-sm text-ink-soft">₦{Math.round(monthlyNaira).toLocaleString()}<span className="text-xs text-ink-mute">/month</span></p>
                         </div>
                       </div>
                     );
                   })()}
-                  <p className="mt-1 text-xs text-ink-mute">Based on {entries.filter(e => !e.label).length} entries over {selectedWindow.days} days</p>
+                  <p className="mt-1 text-xs text-ink-mute">Based on {entries.filter(e => !e.label).length} entr{entries.filter(e => !e.label).length === 1 ? 'y' : 'ies'} over {selectedWindow.days} day{selectedWindow.days === 1 ? '' : 's'}</p>
                 </div>
               )}
 
@@ -444,16 +447,13 @@ export default function LogFuel() {
               </div>
 
               {/* Save all button */}
-              {entries.length < 2 && entries.length > 0 && (
-                <p className="mt-4 text-sm text-ink-mute">Add at least one more entry so we can calculate your average daily spend.</p>
-              )}
               {entries.length === 0 && (
-                <p className="mt-4 text-sm text-ink-mute">Add at least 2 entries to calculate your average daily fuel spend.</p>
+                <p className="mt-4 text-sm text-ink-mute">Add at least one entry to get started.</p>
               )}
               <button
                 type="button"
                 onClick={handleSaveAll}
-                disabled={entries.length < 2 || saving || !effectiveBusinessId}
+                disabled={entries.length < 1 || saving || !effectiveBusinessId}
                 className="mt-3 w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
               >
                 {saving ? (
@@ -462,7 +462,7 @@ export default function LogFuel() {
                     Saving your entries...
                   </span>
                 ) : (
-                  `Save ${entries.length} entries and continue`
+                  `Save ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} and continue`
                 )}
               </button>
             </GlassCard>
