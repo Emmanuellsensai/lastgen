@@ -192,7 +192,6 @@ export class InMemoryRepository implements Repository {
     return files[files.length - 1] ?? null;
   }
 
-
   async addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog> {
     await this.findBusinessOrThrow(businessId);
     if (!input || input.litres <= 0 || input.amountKobo <= 0) {
@@ -239,9 +238,7 @@ export class InMemoryRepository implements Repository {
 
   async deleteFuelLog(businessId: string, logId: string): Promise<void> {
     await this.findBusinessOrThrow(businessId);
-    const idx = this.state.fuelLogs.findIndex(
-      (l) => l.id === logId && l.businessId === businessId,
-    );
+    const idx = this.state.fuelLogs.findIndex((l) => l.id === logId && l.businessId === businessId);
     if (idx === -1) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
     this.state.fuelLogs.splice(idx, 1);
     await this.recomputeBurn(businessId);

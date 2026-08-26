@@ -73,9 +73,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/summary — returns null asset/loan/quote ids', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/summary`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/summary`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.assetId).toBeNull();
@@ -84,9 +82,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   });
 
   it('GET /api/businesses/:id/application — returns null before first quote', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/application`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/application`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data).toBeNull();
@@ -139,9 +135,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   });
 
   it('GET /api/businesses/:id/fuel-logs — only the remaining log shows', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/fuel-logs`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/fuel-logs`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.items.length).toBe(1);
@@ -184,9 +178,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/summary — now includes quoteId', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/summary`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/summary`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.quoteId).toBe(quoteId);
@@ -199,9 +191,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('POST /api/quotes/:id/accept — owner accepts quote', async () => {
-    const res = await agent
-      .post(`/api/quotes/${quoteId}/accept`)
-      .expect(201);
+    const res = await agent.post(`/api/quotes/${quoteId}/accept`).expect(201);
 
     expect(res.body.ok).toBe(true);
     creditFileId = res.body.data.creditFileId;
@@ -214,9 +204,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/application — returns credit file', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/application`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/application`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data).not.toBeNull();
@@ -229,9 +217,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('POST /api/credit/applications/:id/approve — bank approves', async () => {
-    const res = await agent
-      .post(`/api/credit/applications/${creditFileId}/approve`)
-      .expect(201);
+    const res = await agent.post(`/api/credit/applications/${creditFileId}/approve`).expect(201);
 
     expect(res.body.ok).toBe(true);
     loanId = res.body.data.loan.id;
@@ -247,9 +233,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/summary — shows asset and loan after approval', async () => {
-    const res = await agent
-      .get(`/api/businesses/${businessId}/summary`)
-      .expect(200);
+    const res = await agent.get(`/api/businesses/${businessId}/summary`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.assetId).not.toBeNull();
@@ -262,9 +246,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/loans/:id/payments — returns empty before first payment', async () => {
-    const res = await agent
-      .get(`/api/loans/${loanId}/payments`)
-      .expect(200);
+    const res = await agent.get(`/api/loans/${loanId}/payments`).expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.items).toEqual([]);
@@ -275,9 +257,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('POST /api/quotes/:id/accept — accept again is idempotent', async () => {
-    const res = await agent
-      .post(`/api/quotes/${quoteId}/accept`)
-      .expect(201);
+    const res = await agent.post(`/api/quotes/${quoteId}/accept`).expect(201);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.data.creditFileId).toBe(creditFileId);
@@ -288,36 +268,28 @@ describe('E2E: Registration journey (new endpoints)', () => {
   /* ------------------------------------------------------------------ */
 
   it('GET /api/businesses/:id/summary — 404 for unknown business', async () => {
-    const res = await agent
-      .get('/api/businesses/biz_nonexistent/summary')
-      .expect(404);
+    const res = await agent.get('/api/businesses/biz_nonexistent/summary').expect(404);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
 
   it('GET /api/businesses/:id/application — 404 for unknown business', async () => {
-    const res = await agent
-      .get('/api/businesses/biz_nonexistent/application')
-      .expect(404);
+    const res = await agent.get('/api/businesses/biz_nonexistent/application').expect(404);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
 
   it('POST /api/quotes/:id/accept — 404 for unknown quote', async () => {
-    const res = await agent
-      .post('/api/quotes/q_nonexistent/accept')
-      .expect(404);
+    const res = await agent.post('/api/quotes/q_nonexistent/accept').expect(404);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
 
   it('GET /api/loans/:id/payments — 404 for unknown loan', async () => {
-    const res = await agent
-      .get('/api/loans/loan_nonexistent/payments')
-      .expect(404);
+    const res = await agent.get('/api/loans/loan_nonexistent/payments').expect(404);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('NOT_FOUND');
@@ -338,10 +310,7 @@ describe('E2E: Registration journey (new endpoints)', () => {
   });
 
   it('POST /api/auth/login — validates required fields', async () => {
-    const res = await agent
-      .post('/api/auth/login')
-      .send({ email: '' })
-      .expect(400);
+    const res = await agent.post('/api/auth/login').send({ email: '' }).expect(400);
 
     expect(res.body.ok).toBe(false);
     expect(res.body.error.code).toBe('VALIDATION');
