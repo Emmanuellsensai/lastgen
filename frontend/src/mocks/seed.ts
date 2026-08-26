@@ -600,6 +600,8 @@ export interface Db {
   assetBusinessName: Record<string, string>;
   /** Webhook idempotency ledger, keyed on transactionReference. */
   seenReferences: Set<string>;
+  /** KYC status per businessId, set when a user submits or admin acts. */
+  kycStatuses: Map<string, import('@/types/api').KycStatus>;
   wallets: Wallet[];
   walletTransactions: WalletTransaction[];
   pendingPayments: Array<{
@@ -739,6 +741,7 @@ export function buildDb(): Db {
     assetCity,
     assetBusinessName,
     seenReferences: new Set<string>(),
+    kycStatuses: new Map<string, import('@/types/api').KycStatus>(),
     wallets,
     walletTransactions,
     pendingPayments,
