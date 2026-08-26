@@ -420,11 +420,17 @@ export default function LogFuel() {
               </div>
 
               {/* Save all button */}
+              {entries.length < 2 && entries.length > 0 && (
+                <p className="mt-4 text-sm text-ink-mute">Add at least one more entry so we can calculate your average daily spend.</p>
+              )}
+              {entries.length === 0 && (
+                <p className="mt-4 text-sm text-ink-mute">Add at least 2 entries to calculate your average daily fuel spend.</p>
+              )}
               <button
                 type="button"
                 onClick={handleSaveAll}
-                disabled={entries.length === 0 || saving || !effectiveBusinessId}
-                className="mt-5 w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
+                disabled={entries.length < 2 || saving || !effectiveBusinessId}
+                className="mt-3 w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
               >
                 {saving ? (
                   <span className="flex items-center justify-center gap-2">
@@ -432,7 +438,7 @@ export default function LogFuel() {
                     Saving your entries...
                   </span>
                 ) : (
-                  `Save ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} and continue`
+                  `Save ${entries.length} entries and continue`
                 )}
               </button>
             </GlassCard>
