@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { useSession } from '@/store/session';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ToastProvider, ToastViewport } from '@/components/ui/toast';
 import RequireRole from '@/components/layout/RequireRole';
@@ -15,6 +17,8 @@ import Asset from '@/routes/owner/Asset';
 import Wrapped from '@/routes/owner/Wrapped';
 import LogFuel from '@/routes/owner/LogFuel';
 import Kyc from '@/routes/owner/Kyc';
+import Wallet from '@/routes/owner/Wallet';
+import SolarOptions from '@/routes/owner/SolarOptions';
 import Applications from '@/routes/bank/Applications';
 import CreditFile from '@/routes/bank/CreditFile';
 import Portfolio from '@/routes/bank/Portfolio';
@@ -25,6 +29,10 @@ import Terms from '@/routes/legal/Terms';
 import NotFound from '@/routes/NotFound';
 
 export default function App() {
+  useEffect(() => {
+    useSession.getState().bootstrap();
+  }, []);
+
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <TooltipProvider delayDuration={200}>
@@ -45,6 +53,8 @@ export default function App() {
             <Route path="/wrapped/:id" element={<RequireRole role="owner"><Wrapped /></RequireRole>} />
             <Route path="/log-fuel" element={<RequireRole role="owner"><LogFuel /></RequireRole>} />
             <Route path="/kyc" element={<RequireRole role="owner"><Kyc /></RequireRole>} />
+            <Route path="/wallet" element={<RequireRole role="owner"><Wallet /></RequireRole>} />
+            <Route path="/solar-options" element={<RequireRole role="owner"><SolarOptions /></RequireRole>} />
 
             {/* Bank routes */}
             <Route path="/bank" element={<RequireRole role="bank"><Applications /></RequireRole>} />

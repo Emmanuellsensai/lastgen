@@ -73,12 +73,12 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { businessId, demoBusinessId, demoLoanId, demoQuoteId, demoAssetId } = useSession();
 
-  const effectiveBusinessId = API_MODE === 'live' ? businessId : demoBusinessId;
+  const effectiveBusinessId = businessId ?? demoBusinessId;
   // The live ids come from GET /businesses/:id/summary. The demo ids seed the
   // first paint so mock mode renders before the summary resolves.
-  const [assetId, setAssetId] = useState<string | null>(API_MODE === 'live' ? null : demoAssetId);
-  const [loanId, setLoanId] = useState<string | null>(API_MODE === 'live' ? null : demoLoanId);
-  const [quoteId, setQuoteId] = useState<string | null>(API_MODE === 'live' ? null : demoQuoteId);
+  const [assetId, setAssetId] = useState<string | null>(demoAssetId);
+  const [loanId, setLoanId] = useState<string | null>(demoLoanId);
+  const [quoteId, setQuoteId] = useState<string | null>(demoQuoteId);
 
   const [business, setBusiness] = useState<Business | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -233,8 +233,15 @@ export default function Dashboard() {
       <AppShell nav={<GlassNav left={<Link to="/app" className="flex items-center gap-2.5"><Logo variant="mark" /></Link>} right={<button type="button" onClick={() => { useSession.getState().signOut(); navigate("/login"); }} className="flex items-center gap-1.5 text-sm text-ink-mute hover:text-ink"><SignOut size={16} weight="regular" /> Log out</button>} />} >
         <div className="mx-auto max-w-lg">
           <GlassCard elevation={2} padding="lg">
-            <h1 className="font-display text-2xl text-ink">Welcome. Let's start with your fuel.</h1>
+            <h1 className="font-display text-2xl text-ink">
+              {business?.name ? `Welcome, ${business.name}.` : 'Welcome. Let\'s start with your fuel.'}
+            </h1>
             <p className="mt-3 text-ink-soft">We need a few weeks of fuel spending to size your solar system and give you a real quote. It takes about two minutes.</p>
+            <div className="mt-6 rounded-xl bg-paper-3 px-4 py-3">
+              <p className="text-sm text-ink-mute">Wallet balance</p>
+              <p className="mt-1 font-display text-2xl text-ink">₦0.00</p>
+              <p className="text-xs text-ink-mute">Fund your wallet to make loan payments</p>
+            </div>
             <div className="mt-8">
               <a href="/log-fuel" className="inline-flex items-center justify-center rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper hover:bg-blue">Tell us your fuel history</a>
             </div>
@@ -271,8 +278,6 @@ export default function Dashboard() {
       }
     >
       <div className="mx-auto max-w-3xl">
-        {/* Business summary hero */}
-        
         {/* Suspended banner */}
         {suspendedBanner && (
           <GlassCard padding="md" className="mb-6 border border-burn/30 bg-burn/5">
@@ -283,154 +288,6 @@ export default function Dashboard() {
               </div>
               <button type="button" onClick={() => setPayOpen(true)} className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-paper hover:bg-blue">Pay now</button>
             </div>
-          </GlassCard>
-        )}
-
-<GlassCard elevation={2} padding="lg">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="font-display text-2xl leading-tight text-ink md:text-3xl">
-                {business?.name ?? 'Your business'}
-              </h1>
-              <p className="mt-1 text-ink-soft">
-                {business?.city}, {business?.type}
-              </p>
-            </div>
-            {asset && <StatusPill status={asset.status} size="lg" />}
-          </div>
-          <div className="mt-6 flex flex-wrap items-end gap-8">
-            <div>
-              <p className="text-sm text-ink-mute">Burning right now</p>
-              <div className="mt-3">
-                <BurnCounter
-                  ratePerSecondKobo={burn ? Math.round(burn.dailyKobo / 86400) : 187}
-                  startTimestamp={new Date(new Date().setHours(0, 0, 0, 0)).toISOString()}
-                  size="md"
-                  label="Burned since midnight"
-                />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-ink-mute">Loan payment</p>
-              <Money kobo={quote?.monthlyPaymentKobo ?? 0} size="lg" className="text-success" />
-            </div>
-          </div>
-          {burn && quote && (
-            <div className="mt-4">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-3">
-                <div
-                  className="h-full rounded-full bg-success"
-                  style={{
-                    width: `${Math.min(100, ((burn.monthlyKobo - quote.monthlyPaymentKobo) / burn.monthlyKobo) * 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="mt-1 text-sm text-ink-mute">
-                You save{' '}
-                <Money kobo={burn.monthlyKobo - quote.monthlyPaymentKobo} size="sm" className="text-success" />
-              </p>
-            </div>
-          )}
-        </GlassCard>
-
-
-        {/* Application status stepper */}
-        <GlassCard elevation={1} padding="lg" className="mt-6">
-          <p className="text-sm text-ink-mute mb-4">Application progress</p>
-          <div className="flex items-center">
-            {steps.map((step, i) => (
-              <div key={step.label} className="flex items-center flex-1">
-                <div className="flex flex-col items-center flex-1">
-                  <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium", step.complete ? "bg-navy text-paper" : "bg-paper-3 text-ink-mute")} />
-                  <p className="mt-2 text-xs text-center text-ink-mute">{step.label}</p>
-                </div>
-                {i < steps.length - 1 && <div className={cn("h-0.5 flex-1 mx-1", step.complete ? "bg-navy" : "bg-paper-3")} />}
-              </div>
-            ))}
-          </div>
-        </GlassCard>
-
-        {/* Quick actions */}
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
-            <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
-              {hasLogs === false ? (
-                <>
-                  <Flame size={28} weight="bold" className="text-burn" />
-                  <h3 className="mt-3 font-display text-base text-ink">Tell us your fuel history</h3>
-                  <p className="mt-1 text-sm text-ink-soft">Takes about 2 minutes</p>
-                </>
-              ) : (
-                <>
-                  <Camera size={28} weight="bold" className="text-navy" />
-                  <h3 className="mt-3 font-display text-base text-ink">Log fuel</h3>
-                  <p className="mt-1 text-sm text-ink-soft">Record what you spent</p>
-                </>
-              )}
-            </GlassCard>
-          </Link>
-          <Link to={`/quote/${quoteId ?? demoQuoteId ?? ""}`}>
-            <GlassCard hoverable padding="lg" className="h-full">
-              <Receipt size={28} weight="bold" className="text-navy" />
-              <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
-              <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
-            </GlassCard>
-          </Link>
-        </div>
-
-        {/* Next payment card */}
-        {loan && quote && (
-          <GlassCard elevation={2} padding="lg" className="mt-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-ink-soft">Next payment</p>
-                <Money kobo={loan.monthlyPaymentKobo} size="lg" className="mt-1" />
-                <p className="mt-1 text-sm text-ink-mute">
-                  Due {relativeDate(loan.nextDueAt)}
-                </p>
-                <div className="mt-3">
-                  <div className="h-1 w-48 overflow-hidden rounded-full bg-paper-3">
-                    <div
-                      className="h-full rounded-full bg-navy"
-                      style={{ width: `${(monthsPaid() / quote.tenorMonths) * 100}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-ink-mute">
-                    Month {monthsPaid()} of {quote.tenorMonths}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate(`/asset/${assetId ?? demoAssetId ?? ""}`)}
-                className="flex items-center gap-2 self-start rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
-              >
-                Pay now
-              </button>
-            </div>
-          </GlassCard>
-        )}
-
-        {/* New user welcome state */}
-        {isNewUser && (
-          <GlassCard elevation={2} padding="lg" className="flex flex-col items-center text-center">
-            <h1 className="font-display text-2xl leading-tight text-ink">
-              Welcome. Let's start with your fuel.
-            </h1>
-            <p className="mt-4 max-w-md text-ink-soft">
-              We need a few weeks of fuel spending to size your solar system and
-              give you a real quote. It takes about two minutes.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/log-fuel')}
-              className="mt-6 rounded-lg bg-navy px-6 py-3 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
-            >
-              Tell us your fuel history
-            </button>
-            <p className="mt-3 text-sm text-ink-mute">
-              You can also come back to this later.
-            </p>
           </GlassCard>
         )}
 
@@ -490,8 +347,8 @@ export default function Dashboard() {
               <Stepper steps={steps} />
             </div>
 
-            {/* Quick actions - only Log fuel and Your quote */}
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Quick actions */}
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
                 <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
                   {hasLogs === false ? (
@@ -509,11 +366,18 @@ export default function Dashboard() {
                   )}
                 </GlassCard>
               </Link>
-              <Link to={quoteId ? `/quote/${quoteId}` : '#'}>
-                <GlassCard hoverable padding="lg" className="h-full">
+              <Link to="/solar-options">
+                <GlassCard hoverable padding="lg" className="h-full border border-navy/20 bg-navy/5">
                   <Receipt size={28} weight="bold" className="text-navy" />
+                  <h3 className="mt-3 font-display text-base text-ink">Get solar</h3>
+                  <p className="mt-1 text-sm text-ink-soft">See loan options for your shop</p>
+                </GlassCard>
+              </Link>
+              <Link to={quoteId ? `/quote/${quoteId}` : '/solar-options'}>
+                <GlassCard hoverable padding="lg" className="h-full">
+                  <Receipt size={28} weight="bold" className="text-ink-mute" />
                   <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
-                  <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
+                  <p className="mt-1 text-sm text-ink-soft">Review your solar plan</p>
                 </GlassCard>
               </Link>
             </div>

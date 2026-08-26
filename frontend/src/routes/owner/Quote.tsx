@@ -56,8 +56,9 @@ export default function Quote() {
   async function handleAccept() {
     setAccepting(true);
     try {
-      // TODO(BE): needs POST /quotes/:id/accept
-      // Expected: { creditFileId, status: 'PENDING' }
+      const quoteId = id ?? demoQuoteId;
+      if (!quoteId) throw new Error('No quote');
+      await api.quotes.accept(quoteId);
       setAccepted(true);
       setTimeout(() => { setAcceptOpen(false); }, 2000);
     } catch {
