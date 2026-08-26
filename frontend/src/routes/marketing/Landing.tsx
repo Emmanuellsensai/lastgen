@@ -398,11 +398,6 @@ export default function Landing() {
                       Sign in
                     </Link>
                   </li>
-                  <li>
-                    <Link to="/register-bank" className="hover:text-ink">
-                      Credit desk
-                    </Link>
-                  </li>
                 </ul>
               </div>
               <div>
