@@ -277,6 +277,30 @@ export default function LogFuel() {
                 Showing entries for {WINDOW_OPTIONS.find((o) => o.value.days === selectedWindow.days)?.label} ({range.label})
               </div>
 
+              {/* Average daily spend preview */}
+              {entries.filter(e => !e.label && e.amountNaira > 0).length >= 2 && selectedWindow && (
+                <div className="mt-4 rounded-xl bg-navy/5 border border-navy/20 px-4 py-3">
+                  <p className="text-xs text-ink-mute">Estimated average daily spend</p>
+                  {(() => {
+                    const real = entries.filter(e => !e.label && e.amountNaira > 0);
+                    const totalNaira = real.reduce((s, e) => s + e.amountNaira, 0);
+                    const dailyNaira = totalNaira / selectedWindow.days;
+                    const monthlyNaira = dailyNaira * 30;
+                    return (
+                      <div className="mt-1 flex items-end gap-4">
+                        <div>
+                          <p className="font-display text-xl text-ink">₦{Math.round(dailyNaira).toLocaleString()}<span className="text-sm text-ink-mute font-normal">/day</span></p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-ink-soft">₦{Math.round(monthlyNaira).toLocaleString()}<span className="text-xs text-ink-mute">/month</span></p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <p className="mt-1 text-xs text-ink-mute">Based on {entries.filter(e => !e.label).length} entries over {selectedWindow.days} days</p>
+                </div>
+              )}
+
               {/* Entries list */}
               <div className="mt-4">
                 {entries.length === 0 ? (
