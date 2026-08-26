@@ -12,7 +12,7 @@ import { AppShell } from '@/components/layout';
 import { GlassCard, GlassPanel } from '@/components/ui/glass';
 import { Toast, ToastTitle } from '@/components/ui/toast';
 import { Money } from '@/components/lastgen';
-import { api } from '@/lib/api';
+import { api, API_MODE } from '@/lib/api';
 import { useSession } from '@/store/session';
 import FuelIntakeModal from '@/routes/owner/FuelIntakeModal';
 
@@ -92,7 +92,11 @@ function dateToISO(dateStr: string): string {
 
 export default function LogFuel() {
   const navigate = useNavigate();
-  const { demoBusinessId } = useSession();
+  const { businessId, demoBusinessId } = useSession();
+  const effectiveBusinessId =
+    API_MODE === 'live'
+      ? (businessId ?? demoBusinessId)
+      : (demoBusinessId ?? businessId);
 
   /* Step 1: Time window */
   const [selectedWindow, setSelectedWindow] = useState<TimeWindow | null>(null);
@@ -101,7 +105,6 @@ export default function LogFuel() {
   /* Step 2: Entry collection */
   const [entries, setEntries] = useState<FuelEntry[]>([]);
   const [date, setDate] = useState(todayISO());
-  const [litres, setLitres] = useState('');
   const [amountNaira, setAmountNaira] = useState('');
   const [pricePerLitre, setPricePerLitre] = useState(String(DEFAULT_PRICE_PER_LITRE));
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -121,11 +124,17 @@ export default function LogFuel() {
   useEffect(() => {
     setEntries([]);
     setDate(todayISO());
-    setLitres('');
     setAmountNaira('');
     setPricePerLitre(String(DEFAULT_PRICE_PER_LITRE));
     setShowAdvanced(false);
   }, [selectedWindow?.days]);
+
+  const amountValue = parseFloat(amountNaira);
+  const priceValue = parseFloat(pricePerLitre);
+  const calculatedLitres =
+    amountValue > 0 && priceValue > 0 ? amountValue / priceValue : 0;
+  const calculatedLitresDisplay =
+    calculatedLitres > 0 ? calculatedLitres.toFixed(2) : '';
 
   const handleContinue = useCallback(() => {
     step2Ref.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,7 +143,7 @@ export default function LogFuel() {
   const addEntry = useCallback(() => {
     const amt = parseFloat(amountNaira);
     const ppl = parseFloat(pricePerLitre) || DEFAULT_PRICE_PER_LITRE;
-    const ltrs = litres ? parseFloat(litres) : amt / ppl;
+    const ltrs = amt > 0 && ppl > 0 ? amt / ppl : 0;
 
     if (!date || !amt || amt <= 0 || !ltrs || ltrs <= 0) return;
 
@@ -146,9 +155,8 @@ export default function LogFuel() {
       pricePerLitre: ppl,
     };
     setEntries((prev) => [...prev, entry]);
-    setLitres('');
     setAmountNaira('');
-  }, [date, litres, amountNaira, pricePerLitre]);
+  }, [date, amountNaira, pricePerLitre]);
 
   const removeEntry = useCallback((id: string) => {
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -168,7 +176,13 @@ export default function LogFuel() {
   }, []);
 
   const handleSaveAll = useCallback(async () => {
-    if (!demoBusinessId || entries.length === 0) return;
+    if (!effectiveBusinessId) {
+      setToastMsg('Could not find your business profile. Please refresh and try again.');
+      setToastTone('warning');
+      setToastOpen(true);
+      return;
+    }
+    if (entries.length === 0) return;
     setSaving(true);
     let savedCount = 0;
     let failed = false;
@@ -180,7 +194,7 @@ export default function LogFuel() {
         continue;
       }
       try {
-        await api.businesses.addFuelLog(demoBusinessId, {
+        await api.businesses.addFuelLog(effectiveBusinessId, {
           litres: entry.litres,
           amountKobo: Math.round(entry.amountNaira * 100),
           pricePerLitreKobo: Math.round(entry.pricePerLitre * 100),
@@ -204,9 +218,9 @@ export default function LogFuel() {
       setToastOpen(true);
       setTimeout(() => navigate('/app'), 1200);
     }
-  }, [demoBusinessId, entries, navigate]);
+  }, [effectiveBusinessId, entries, navigate]);
 
-  const addEntryDisabled = !date || !amountNaira || parseFloat(amountNaira) <= 0;
+  const addEntryDisabled = !date || calculatedLitres <= 0;
   const range = selectedWindow ? getDateRange(selectedWindow.days) : null;
 
   return (
@@ -349,8 +363,8 @@ export default function LogFuel() {
                       min="0"
                       step="0.1"
                       placeholder="0.0"
-                      value={litres}
-                      onChange={(e) => setLitres(e.target.value)}
+                      value={calculatedLitresDisplay}
+                      readOnly
                       className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink"
                     />
                   </div>
@@ -412,7 +426,7 @@ export default function LogFuel() {
               <button
                 type="button"
                 onClick={handleSaveAll}
-                disabled={entries.length === 0 || saving}
+                disabled={entries.length === 0 || saving || !effectiveBusinessId}
                 className="mt-5 w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
               >
                 {saving ? (
@@ -433,7 +447,7 @@ export default function LogFuel() {
       <FuelIntakeModal
         open={snapOpen}
         onOpenChange={setSnapOpen}
-        businessId={demoBusinessId ?? ''}
+        businessId={effectiveBusinessId ?? ''}
         onLogged={handleSnapLogged}
       />
 
