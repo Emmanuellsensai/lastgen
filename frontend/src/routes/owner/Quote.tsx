@@ -33,6 +33,7 @@ export default function Quote() {
   const [accepted, setAccepted] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
+  const [schedulePage, setSchedulePage] = useState(0);
 
   useEffect(() => {
     const quoteId = id ?? demoQuoteId;
@@ -67,6 +68,9 @@ export default function Quote() {
   }
 
   const rows = schedule.length > 0 ? schedule : quote ? estimatedRows(quote) : [];
+  const PAGE_SIZE = 12;
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pagedRows = rows.slice(schedulePage * PAGE_SIZE, (schedulePage + 1) * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -174,7 +178,7 @@ export default function Quote() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {pagedRows.map((row) => (
                 <TableRow key={row.n}>
                   <TableCell className="tabular">{row.n}</TableCell>
                   <TableCell>{row.dueAt}</TableCell>

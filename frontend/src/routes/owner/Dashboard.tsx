@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
 
 
   const prevStatus = useRef<Asset['status'] | null>(null);
@@ -109,10 +110,10 @@ export default function Dashboard() {
   const stepApplication = !!application?.submittedAt || application?.status === 'APPROVED';
   const stepInstalled = hasAsset;
   const steps = [
-    { label: 'Fuel logged', done: stepFuel },
-    { label: 'Quote reviewed', done: stepQuote },
-    { label: 'Application submitted', done: stepApplication },
-    { label: 'System installed', done: stepInstalled },
+    { label: 'Fuel logged', complete: stepFuel },
+    { label: 'Quote reviewed', complete: stepQuote },
+    { label: 'Application submitted', complete: stepApplication },
+    { label: 'System installed', complete: stepInstalled },
   ];
 
 
@@ -340,10 +341,10 @@ export default function Dashboard() {
             {steps.map((step, i) => (
               <div key={step.label} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
-                  <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium", step.done ? "bg-navy text-paper" : "bg-paper-3 text-ink-mute")} />
+                  <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium", step.complete ? "bg-navy text-paper" : "bg-paper-3 text-ink-mute")} />
                   <p className="mt-2 text-xs text-center text-ink-mute">{step.label}</p>
                 </div>
-                {i < steps.length - 1 && <div className={cn("h-0.5 flex-1 mx-1", step.done ? "bg-navy" : "bg-paper-3")} />}
+                {i < steps.length - 1 && <div className={cn("h-0.5 flex-1 mx-1", step.complete ? "bg-navy" : "bg-paper-3")} />}
               </div>
             ))}
           </div>
@@ -508,7 +509,7 @@ export default function Dashboard() {
                   )}
                 </GlassCard>
               </Link>
-              <Link to={effectiveQuoteId ? `/quote/${effectiveQuoteId}` : '#'}>
+              <Link to={quoteId ? `/quote/${quoteId}` : '#'}>
                 <GlassCard hoverable padding="lg" className="h-full">
                   <Receipt size={28} weight="bold" className="text-navy" />
                   <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
