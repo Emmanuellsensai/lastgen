@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, Microphone, PencilSimple, Trash } from '@phosphor-icons/react';
 import { AppShell, DEMO_IDS } from '@/components/layout';
@@ -10,9 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Toast, ToastTitle } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { useSession } from '@/store/session';
-import { API_MODE } from '@/lib/api';
-import type { Asset, Business, BurnProfile, FuelLog, Quote } from '@/types/api';
+import type { FuelLog } from '@/types/api';
 import FuelIntakeModal from './FuelIntakeModal';
 
 const PAGE_SIZE = 30;
@@ -55,6 +53,9 @@ export default function Burn() {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [toastTone, setToastTone] = useState<'success' | 'neutral'>('success');
+  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [logsOffset, setLogsOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   /* Fuel log history */
   const [logs, setLogs] = useState<FuelLog[]>([]);
@@ -247,6 +248,25 @@ export default function Burn() {
     }
   }
 
+  const typeValid = parseFloat(litres) > 0 && parseFloat(amountNaira) > 0 && parseFloat(pricePerLitre) > 0;
+
+  useEffect(() => {
+    api.fuelLogs.list(DEMO_IDS.businessId, 30, logsOffset).then((r) => {
+      if (logsOffset === 0) setFuelLogs(r.items);
+      else setFuelLogs((prev) => [...prev, ...r.items]);
+      setHasMore(r.items.length === 30);
+    }).catch(() => {/* ignore */});
+  }, [logsOffset]);
+
+  function relativeDate(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.floor(diff / 86_400_000);
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return days + " days ago";
+    return Math.floor(days / 7) + " weeks ago";
+  }
+
   return (
     <AppShell
       subNav={{
@@ -332,69 +352,30 @@ export default function Burn() {
         </div>
       </section>
 
+      
       {/* Fuel log history */}
       <section className="mt-16">
         <h2 className="font-display text-2xl text-ink">Fuel log history</h2>
-
-        {logsLoading ? (
-          <div className="mt-6 space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : logs.length === 0 ? (
-          <p className="mt-6 max-w-lg leading-relaxed text-ink-mute">
-            Nothing logged yet. Use one of the options above to add your first entry.
-          </p>
+        {fuelLogs.length === 0 ? (
+          <p className="mt-3 text-ink-mute">Nothing logged yet. Use one of the options above to add your first entry.</p>
         ) : (
           <>
-            <div className="mt-6 space-y-3">
-              {logs.map((log) => (
-                <GlassCard key={log.id} elevation={1} padding="md">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-ink">{timeAgo(log.loggedAt)}</p>
-                      <div className="mt-1 flex items-center gap-3">
-                        <span className="text-sm font-medium text-ink">{log.litres} L</span>
-                        <Money kobo={log.amountKobo} size="sm" />
-                        <span className="rounded-full bg-paper-3 px-2 py-0.5 text-xs text-ink-mute">
-                          {sourceLabel(log.source)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(log)}
-                        className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-paper-3 hover:text-ink"
-                        aria-label="Edit fuel log"
-                      >
-                        <PencilSimple size={16} weight="regular" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(log)}
-                        className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-paper-3 hover:text-burn"
-                        aria-label="Delete fuel log"
-                      >
-                        <Trash size={16} weight="regular" />
-                      </button>
-                    </div>
+            <div className="mt-6 flex flex-col gap-3">
+              {fuelLogs.map((log) => (
+                <div key={log.id} className="flex items-center justify-between rounded-lg border border-line/50 bg-paper px-4 py-3">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-ink-mute w-24">{relativeDate(log.loggedAt)}</span>
+                    <span className="text-sm text-ink-soft">{log.litres} L</span>
+                    <Money kobo={log.amountKobo} size="sm" />
                   </div>
-                </GlassCard>
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-full bg-paper-3 px-2 py-0.5 text-xs text-ink-mute">{log.source === "receipt" ? "Snap" : log.source === "manual" ? "Typed" : log.source}</span>
+                  </div>
+                </div>
               ))}
             </div>
             {hasMore && (
-              <div className="mt-4 text-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => loadLogs(logsOffset, false)}
-                  disabled={logsLoadingMore}
-                >
-                  {logsLoadingMore ? 'Loading...' : 'Load more'}
-                </Button>
-              </div>
+              <button type="button" onClick={() => setLogsOffset((o) => o + 30)} className="mt-4 text-sm text-navy hover:text-blue">Load more</button>
             )}
           </>
         )}

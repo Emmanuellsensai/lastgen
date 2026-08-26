@@ -13,6 +13,7 @@ import type { PillStatus } from '@/components/lastgen/StatusPill';
 import type { Asset } from '@/types/api';
 import { api } from '@/lib/api';
 import type { CreditFileDetail } from '@/types/api';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 function getRecommendation(file: CreditFileDetail): { label: string; tone: 'success' | 'warning' | 'burn' } {
   if (file.affordabilityRatio >= 1.4 && file.verifiedMonths >= 3) {
@@ -158,37 +159,48 @@ export default function CreditFile() {
         action: <StatusPill status={file.status as PillStatus} size="sm" />,
       }}
     >
-      {/* Recommendation header */}
-      <GlassCard elevation={2} padding="lg" className={`border-l-4 ${borderColor}`}>
-        <p className={`font-display text-xl text-${recommendation.tone === 'success' ? 'success' : recommendation.tone === 'warning' ? 'warning' : 'burn'}`}>
-          {recommendation.label}
-        </p>
-      </GlassCard>
 
-      {/* Monthly fuel spend sparkline */}
-      {burnSparklineData.length >= 2 && (
-        <GlassCard elevation={1} padding="lg" className="mt-5">
-          <p className="text-sm text-ink-mute">Monthly fuel spend</p>
+      {/* Recommendation header */}
+      {(() => {
+        const ratio = file.affordabilityRatio;
+        const months = file.verifiedMonths;
+        let label = "";
+        let borderColor = "border-success";
+        if (ratio >= 1.4 && months >= 3) {
+          label = "Based on " + months + " months of verified fuel spend, this business qualifies.";
+          borderColor = "border-success";
+        } else if (ratio >= 1.1) {
+          label = "Affordable but marginal. " + months + " months of data. Recommend approval with monitoring.";
+          borderColor = "border-warning";
+        } else {
+          label = "Affordability ratio is below threshold. Recommend additional data before approval.";
+          borderColor = "border-burn";
+        }
+        return (
+          <GlassCard elevation={2} padding="lg" className={"mb-6 border-l-4 " + borderColor}>
+            <p className="font-display text-xl text-ink">{label}</p>
+          </GlassCard>
+        );
+      })()}
+
+      {/* Monthly fuel spend */}
+      <GlassCard elevation={1} padding="lg" className="mb-6">
+        <p className="text-sm text-ink-mute">Monthly fuel spend</p>
+        {file.fuelLogs.length < 2 ? (
+          <p className="mt-3 text-ink-mute">Not enough data for a trend.</p>
+        ) : (
           <div className="mt-4">
             <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={burnSparklineData}>
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `\u20A6${(v / 100).toLocaleString('en-NG')}`} />
-                <Tooltip formatter={(v: unknown) => [`\u20A6${(Number(v) / 100).toLocaleString('en-NG')}`, 'Spend']} />
-                <Bar dataKey="amountKobo" fill="var(--lg-burn)" radius={[3, 3, 0, 0]} />
+              <BarChart data={file.fuelLogs.slice(-6).map((l) => ({ date: new Date(l.loggedAt).toLocaleDateString("en-NG", { month: "short" }), amount: l.amountKobo }))}>
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "₦" + (v / 100).toLocaleString()} />
+                <Bar dataKey="amount" fill="var(--lg-burn)" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </GlassCard>
-      )}
-      {burnSparklineData.length > 0 && burnSparklineData.length < 2 && (
-        <GlassCard elevation={1} padding="lg" className="mt-5">
-          <p className="text-sm text-ink-mute">Monthly fuel spend</p>
-          <p className="mt-2 text-ink-mute">Not enough data for a trend.</p>
-        </GlassCard>
-      )}
-
-      <div className="grid gap-8 pt-8 lg:grid-cols-[1fr_1fr] lg:gap-10">
+        )}
+      </GlassCard>
+      <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:gap-10">
         {/* Left: the proposal */}
         <div>
           <h2 className="font-display text-2xl text-ink">The proposal</h2>

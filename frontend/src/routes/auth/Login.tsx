@@ -34,6 +34,36 @@ export default function Login() {
     }
   }
 
+  async function handleGoogleLogin() {
+    setLoading(true);
+    try {
+      await useSession.getState().signInWithGoogle();
+      const state = useSession.getState();
+      if (state.isSignedIn) {
+        navigate(state.role === 'bank' ? '/admin' : '/app');
+      }
+    } catch {
+      setError('Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAppleLogin() {
+    setLoading(true);
+    try {
+      await useSession.getState().signInWithApple();
+      const state = useSession.getState();
+      if (state.isSignedIn) {
+        navigate(state.role === 'bank' ? '/admin' : '/app');
+      }
+    } catch {
+      setError('Apple sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper-2 px-5">
       <div className="w-full max-w-md">

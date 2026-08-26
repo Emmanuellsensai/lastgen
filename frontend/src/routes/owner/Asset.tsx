@@ -37,6 +37,7 @@ export default function Asset() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [meterData] = useState<{date:string;whGenerated:number}[]>([]);
   const prevStatus = useRef<AssetStatus | null>(null);
 
   /* Payment history */
@@ -253,19 +254,15 @@ export default function Asset() {
           <AccordionItem value="history">
             <AccordionTrigger className="py-5 text-base">Generation history</AccordionTrigger>
             <AccordionContent>
-              {meterLoading ? (
-                <p className="pt-2 text-ink-mute">Loading readings...</p>
-              ) : dailyData.length === 0 ? (
-                <p className="pt-2 leading-relaxed text-ink-mute">
-                  No generation data yet. Readings appear once your system is installed.
-                </p>
+              {meterData.length === 0 ? (
+                <p className="pt-2 text-ink-mute">No generation data yet. Readings appear once your system is installed.</p>
               ) : (
                 <div className="pt-2">
                   <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={dailyData}>
+                    <BarChart data={meterData}>
                       <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} unit=" kWh" tickFormatter={(v) => (v / 1000).toFixed(1)} />
-                      <Tooltip formatter={(v: unknown) => [`${(Number(v) / 1000).toFixed(2)} kWh`, 'Generated']} />
+                      <Tooltip formatter={(v) => [(Number(v) / 1000).toFixed(2) + " kWh", "Generated"]} />
                       <Bar dataKey="whGenerated" fill="var(--lg-navy)" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -277,37 +274,9 @@ export default function Asset() {
           <AccordionItem value="payments">
             <AccordionTrigger className="py-5 text-base">Payment history</AccordionTrigger>
             <AccordionContent>
-              {paymentsLoading ? (
-                <p className="pt-2 text-ink-mute">Loading payments...</p>
-              ) : payments.length === 0 ? (
-                <p className="pt-2 leading-relaxed text-ink-mute">
-                  No payments yet. Your first instalment appears here once it settles.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-3 pt-2">
-                  {payments.map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="flex items-center justify-between border-b border-line/50 pb-3 last:border-0 last:pb-0"
-                    >
-                      <div>
-                        <Money kobo={payment.amountKobo} size="sm" />
-                        <p className="mt-1 text-xs text-ink-mute">
-                          {new Date(payment.paidAt).toLocaleDateString('en-NG', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-ink-mute">{payment.source}</p>
-                        <p className="mt-1 font-mono text-xs text-ink-soft">{payment.reference}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* TODO(BE): needs GET /loans/:id/payments
+                  Expected: ListEnvelope<Payment> */}
+              <p className="pt-2 text-ink-mute">Payment history coming soon.</p>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
