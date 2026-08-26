@@ -47,7 +47,17 @@ export function createPublicAuthRouter(repo: Repository, env: Env): Router {
         throw new ApiError('UNAUTHORIZED', 'Invalid email or password', 401);
       }
 
-      const business = await repo.businessForOwner(data.user.id);
+      let business = await repo.businessForOwner(data.user.id);
+      // Recover orphaned accounts: auth user exists but DB business was never
+      // written (e.g. a previous register attempt 500'd mid-flight). Create it
+      // silently so the owner can continue instead of landing on a blank dashboard.
+      if (!business) {
+        const fullName = (data.user.user_metadata?.fullName as string) ?? data.user.email ?? '';
+        business = await repo.createBusiness(
+          { name: `${fullName}'s Business`, type: 'Business', city: 'Lagos' },
+          data.user.id,
+        ).catch(() => undefined);
+      }
 
       res.json(
         ok({
@@ -111,14 +121,22 @@ export function createPublicAuthRouter(repo: Repository, env: Env): Router {
       }
 
       // Create a business linked to the new owner.
-      const business = await repo.createBusiness(
-        {
-          name: `${body.fullName}'s Business`,
-          type: 'Business',
-          city: 'Lagos',
-        },
-        created.user.id,
-      );
+      // If this fails, delete the orphaned Supabase auth user so the person
+      // can retry with the same email instead of getting stuck on 400.
+      let business;
+      try {
+        business = await repo.createBusiness(
+          {
+            name: `${body.fullName}'s Business`,
+            type: 'Business',
+            city: 'Lagos',
+          },
+          created.user.id,
+        );
+      } catch (bizErr) {
+        await auth.auth.admin.deleteUser(created.user.id).catch(() => {});
+        throw bizErr;
+      }
 
       // Mint a real access token through the Supabase auth grant.
       // If sign-in fails (e.g. email confirmation still pending), return
