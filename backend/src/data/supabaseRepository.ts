@@ -931,10 +931,14 @@ export class SupabaseRepository implements Repository {
   /* ID generators                                                       */
   /* ------------------------------------------------------------------ */
 
-  /** Collision-safe ID. Uses crypto.randomUUID so IDs survive server restarts. */
+  /** Collision-safe, lexicographically time-ordered ID.
+   *  Base-36 millisecond timestamp prefix ensures newer IDs sort after older
+   *  ones even when DB timestamps collide (same millisecond), keeping
+   *  wallet-statement and other newest-first queries deterministic in tests. */
   private nextId(prefix: string): string {
-    const rand = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-    return `${prefix}_${rand}`;
+    const ts = Date.now().toString(36).padStart(9, '0');
+    const rand = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    return `${prefix}_${ts}${rand}`;
   }
 
   /** Monotonic serial counter for LG-/CTL- controller numbers. */
