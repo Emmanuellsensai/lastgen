@@ -12,7 +12,7 @@ import { AppShell } from '@/components/layout';
 import { GlassCard, GlassPanel } from '@/components/ui/glass';
 import { Toast, ToastTitle } from '@/components/ui/toast';
 import { Money } from '@/components/lastgen';
-import { api, API_MODE } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import FuelIntakeModal from '@/routes/owner/FuelIntakeModal';
 
@@ -93,10 +93,7 @@ function dateToISO(dateStr: string): string {
 export default function LogFuel() {
   const navigate = useNavigate();
   const { businessId, demoBusinessId } = useSession();
-  const effectiveBusinessId =
-    API_MODE === 'live'
-      ? (businessId ?? demoBusinessId)
-      : (demoBusinessId ?? businessId);
+  const effectiveBusinessId = businessId ?? demoBusinessId;
 
   /* Step 1: Time window */
   const [selectedWindow, setSelectedWindow] = useState<TimeWindow | null>(null);

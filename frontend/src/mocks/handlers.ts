@@ -855,6 +855,29 @@ const walletHandlers: HttpHandler[] = [
     return ok(wallet);
   }),
 
+  http.post(`${BASE}/wallets/fund`, async ({ request }) => {
+    await lag();
+    const wallet = db.wallets[0];
+    if (!wallet) return notFound('Wallet');
+    const body = (await request.json()) as { amountKobo?: number };
+    const amount = Math.round(body?.amountKobo ?? 0);
+    if (amount <= 0) return fail('VALIDATION', 'amountKobo must be greater than zero');
+    if (amount > 50_000_000) return fail('VALIDATION', 'Maximum single funding is ₦500,000');
+    wallet.balanceKobo += amount;
+    const reference = `TRF-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    db.walletTransactions.unshift({
+      id: `wtx_${Date.now()}`,
+      walletId: wallet.id,
+      ts: new Date().toISOString(),
+      direction: 'IN',
+      amountKobo: amount,
+      description: `Bank transfer (demo top-up)`,
+      reference,
+      category: 'credit',
+    });
+    return ok(wallet);
+  }),
+
   http.get(`${BASE}/payments/:ref/status`, async ({ params }) => {
     await lag();
     const ref = String(params.ref);
@@ -900,11 +923,45 @@ const walletHandlers: HttpHandler[] = [
     if (!body.email || !body.password || !body.fullName) {
       return fail('VALIDATION', 'All fields are required');
     }
+    const userId = `usr_${Date.now()}`;
+    const bizId = `biz_${Date.now()}`;
+    const business = {
+      id: bizId,
+      name: `${body.fullName}'s Business`,
+      type: 'Business',
+      city: 'Lagos',
+      generatorKva: 2.5,
+      hoursPerDay: 8,
+      createdAt: new Date().toISOString(),
+      medicalFlag: false,
+    };
+    db.businesses.push(business);
+    db.burnProfiles.push({
+      businessId: bizId,
+      litresPerDay: 0,
+      dailyKobo: 0,
+      monthlyKobo: 0,
+      annualKobo: 0,
+      daysObserved: 0,
+      verified: false,
+      computedAt: new Date().toISOString(),
+    });
+    // Pre-fund a wallet for the new user
+    const wallet = {
+      id: `wlt_${Date.now()}`,
+      businessId: bizId,
+      accountNumber: `${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+      bankCode: '035',
+      balanceKobo: 0,
+      currency: 'NGN',
+      createdAt: new Date().toISOString(),
+    };
+    db.wallets.push(wallet);
     return ok({
-      user: { id: 'demo-user-new', email: body.email, fullName: body.fullName },
+      user: { id: userId, email: body.email, fullName: body.fullName },
       role: 'owner',
-      businessId: DEMO_BUSINESS_ID,
-      accessToken: 'demo-token-xxx',
+      businessId: bizId,
+      accessToken: `tok_${userId}`,
     });
   }),
 
@@ -930,8 +987,8 @@ const adminHandlers: HttpHandler[] = [
           name: b.name,
           city: b.city,
           type: b.type,
-          createdAt: db.now.toISOString(),
-          kycStatus: 'pending' as KycStatus,
+          createdAt: (b as { createdAt?: string }).createdAt ?? db.now.toISOString(),
+          kycStatus: (db.kycStatuses.get(b.id) ?? 'unverified') as KycStatus,
           assetStatus: asset?.status ?? null,
           assetId: asset?.id ?? null,
           loanId: loan?.id ?? null,
@@ -984,24 +1041,26 @@ const kycHandlers: HttpHandler[] = [
   http.get(`${BASE}/businesses/:id/kyc`, async ({ params }) => {
     await lag();
     const businessId = String(params.id);
+    const status = db.kycStatuses.get(businessId) ?? 'unverified';
     return ok<KycRecord>({
       id: `kyc_${businessId}`,
       businessId,
       userId: 'usr_demo',
-      status: 'unverified',
-      submittedAt: null,
-      reviewedAt: null,
+      status,
+      submittedAt: status !== 'unverified' ? new Date(Date.now() - 3_600_000).toISOString() : null,
+      reviewedAt: (status === 'approved' || status === 'rejected') ? new Date().toISOString() : null,
       rejectionReason: null,
-      selfieUrl: null,
-      bankSlipUrl: null,
-      ninNumber: null,
-      ninVerified: false,
+      selfieUrl: status !== 'unverified' ? 'data:image/png;base64,demo' : null,
+      bankSlipUrl: status !== 'unverified' ? '/img/receipts/demo-slip.jpg' : null,
+      ninNumber: status !== 'unverified' ? '12345678901' : null,
+      ninVerified: status !== 'unverified',
     });
   }),
 
   http.post(`${BASE}/businesses/:id/kyc/submit`, async ({ params }) => {
     await new Promise((r) => setTimeout(r, 2000));
     const businessId = String(params.id);
+    db.kycStatuses.set(businessId, 'pending');
     return ok<KycRecord>({
       id: `kyc_${businessId}`,
       businessId,
@@ -1020,32 +1079,41 @@ const kycHandlers: HttpHandler[] = [
   http.get(`${BASE}/admin/kyc`, async () => {
     await lag();
     return ok({
-      items: db.businesses.map((b) => ({
-        id: `kyc_${b.id}`,
-        businessId: b.id,
-        businessName: b.name,
-        userId: 'usr_demo',
-        status: 'pending' as KycStatus,
-        submittedAt: new Date(Date.now() - 86_400_000).toISOString(),
-        reviewedAt: null,
-        rejectionReason: null,
-        selfieUrl: null,
-        bankSlipUrl: null,
-        ninNumber: '12345678901',
-        ninVerified: true,
-      })),
+      items: db.businesses.map((b) => {
+        const status = db.kycStatuses.get(b.id) ?? 'pending';
+        return {
+          id: `kyc_${b.id}`,
+          businessId: b.id,
+          businessName: b.name,
+          userId: 'usr_demo',
+          status: status as KycStatus,
+          submittedAt: new Date(Date.now() - 86_400_000).toISOString(),
+          reviewedAt: (status === 'approved' || status === 'rejected') ? new Date().toISOString() : null,
+          rejectionReason: null,
+          selfieUrl: null,
+          bankSlipUrl: null,
+          ninNumber: '12345678901',
+          ninVerified: true,
+        };
+      }),
     });
   }),
 
   http.post(`${BASE}/admin/kyc/:id/approve`, async ({ params }) => {
     await lag();
-    return ok({ id: String(params.id), status: 'approved' as KycStatus, reviewedAt: new Date().toISOString() });
+    const kycId = String(params.id); // format: kyc_<businessId>
+    const businessId = kycId.replace(/^kyc_/, '');
+    db.kycStatuses.set(businessId, 'approved');
+    return ok({ id: kycId, status: 'approved' as KycStatus, reviewedAt: new Date().toISOString() });
   }),
 
   http.post(`${BASE}/admin/kyc/:id/reject`, async ({ request, params }) => {
     await lag();
     const body = (await request.json()) as { reason: string };
-    return ok({ id: String(params.id), status: 'rejected' as KycStatus, rejectionReason: body.reason, reviewedAt: new Date().toISOString() });
+    const kycId = String(params.id);
+    const businessId = kycId.replace(/^kyc_/, '');
+    db.kycStatuses.set(businessId, 'rejected');
+    return ok({ id: kycId, status: 'rejected' as KycStatus, rejectionReason: body.reason, reviewedAt: new Date().toISOString() });
   }),
 ];
 

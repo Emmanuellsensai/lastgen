@@ -28,7 +28,8 @@ const LOADING_TEXTS = [
 ];
 
 export default function Kyc() {
-  const { demoBusinessId } = useSession();
+  const { businessId, demoBusinessId } = useSession();
+  const effectiveBusinessId = businessId ?? demoBusinessId;
   const [phase, setPhase] = useState<Phase>('check');
   const [record, setRecord] = useState<KycRecord | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -42,9 +43,9 @@ export default function Kyc() {
   const bankSlipInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!demoBusinessId) return;
+    if (!effectiveBusinessId) return;
     let cancelled = false;
-    api.kyc.get(demoBusinessId).then((r) => {
+    api.kyc.get(effectiveBusinessId).then((r) => {
       if (cancelled) return;
       setRecord(r);
       if (r.status === 'approved') {
@@ -56,7 +57,7 @@ export default function Kyc() {
       }
     });
     return () => { cancelled = true; };
-  }, [demoBusinessId]);
+  }, [effectiveBusinessId]);
 
   useEffect(() => {
     if (phase !== 'submitting') return;
@@ -85,7 +86,7 @@ export default function Kyc() {
   }
 
   async function handleSubmit() {
-    if (!demoBusinessId || !selectedFile || !bankSlipFile || !ninNumber) return;
+    if (!effectiveBusinessId || !selectedFile || !bankSlipFile || !ninNumber) return;
     setPhase('submitting');
     setError(null);
     try {
@@ -93,7 +94,7 @@ export default function Kyc() {
       form.append('selfie', selectedFile);
       form.append('bankSlip', bankSlipFile);
       form.append('ninNumber', ninNumber);
-      await api.kyc.submit(demoBusinessId, form);
+      await api.kyc.submit(effectiveBusinessId, form);
       setPhase('submitted');
     } catch {
       setError('Could not submit. Try again.');

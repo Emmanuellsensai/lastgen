@@ -15,6 +15,7 @@ import Asset from '@/routes/owner/Asset';
 import Wrapped from '@/routes/owner/Wrapped';
 import LogFuel from '@/routes/owner/LogFuel';
 import Kyc from '@/routes/owner/Kyc';
+import Wallet from '@/routes/owner/Wallet';
 import Applications from '@/routes/bank/Applications';
 import CreditFile from '@/routes/bank/CreditFile';
 import Portfolio from '@/routes/bank/Portfolio';
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/wrapped/:id" element={<RequireRole role="owner"><Wrapped /></RequireRole>} />
             <Route path="/log-fuel" element={<RequireRole role="owner"><LogFuel /></RequireRole>} />
             <Route path="/kyc" element={<RequireRole role="owner"><Kyc /></RequireRole>} />
+            <Route path="/wallet" element={<RequireRole role="owner"><Wallet /></RequireRole>} />
 
             {/* Bank routes */}
             <Route path="/bank" element={<RequireRole role="bank"><Applications /></RequireRole>} />

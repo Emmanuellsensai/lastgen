@@ -190,22 +190,49 @@ function UsersTab() {
         open={!!selected}
         onOpenChange={(v) => { if (!v) setSelected(null); }}
         title={selected?.name ?? ''}
-        description={`${selected?.city}, ${selected?.type}`}
+        description={`${selected?.city} · ${selected?.type}`}
       >
         {selected && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-ink-mute">KYC status</span>
-              <span className="text-sm text-ink">{selected.kycStatus}</span>
+          <div className="space-y-0 divide-y divide-line">
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">Business name</span>
+              <span className="text-sm font-medium text-ink">{selected.name}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-ink-mute">System status</span>
-              {selected.assetStatus ? <StatusPill status={selected.assetStatus} size="sm" /> : <span className="text-ink-mute">-</span>}
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">City</span>
+              <span className="text-sm text-ink">{selected.city}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-ink-mute">Loan balance</span>
-              {selected.loanBalanceKobo != null ? <Money kobo={selected.loanBalanceKobo} size="sm" /> : <span className="text-ink-mute">-</span>}
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">Business type</span>
+              <span className="text-sm text-ink">{selected.type}</span>
             </div>
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">KYC status</span>
+              <StatusPill
+                status={selected.kycStatus === 'approved' ? 'ACTIVE' : selected.kycStatus === 'rejected' ? 'SUSPENDED' : 'GRACE'}
+                size="sm"
+              />
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">Solar system</span>
+              {selected.assetStatus ? <StatusPill status={selected.assetStatus} size="sm" /> : <span className="text-sm text-ink-mute">Not installed</span>}
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">Loan balance</span>
+              {selected.loanBalanceKobo != null ? <Money kobo={selected.loanBalanceKobo} size="sm" /> : <span className="text-sm text-ink-mute">No active loan</span>}
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-ink-mute">Member since</span>
+              <span className="text-sm text-ink">
+                {new Date(selected.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+            {selected.loanId && (
+              <div className="flex items-center justify-between py-3">
+                <span className="text-sm text-ink-mute">Loan ID</span>
+                <span className="font-mono text-xs text-ink-mute">{selected.loanId}</span>
+              </div>
+            )}
           </div>
         )}
       </GlassSheet>
