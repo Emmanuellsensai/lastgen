@@ -302,7 +302,6 @@ interface WalletTxRow {
 export class SupabaseRepository implements Repository {
   readonly kind = 'supabase' as const;
 
-  private seq = 0;
   private serialSeqValue = 10_000;
   private walletSeqValue = 2_010_000_000;
 
@@ -932,10 +931,10 @@ export class SupabaseRepository implements Repository {
   /* ID generators                                                       */
   /* ------------------------------------------------------------------ */
 
-  /** Per-instance monotonic id sequence, same prefixes as the in-memory repo. */
+  /** Collision-safe ID. Uses crypto.randomUUID so IDs survive server restarts. */
   private nextId(prefix: string): string {
-    this.seq += 1;
-    return `${prefix}_${String(this.seq).padStart(5, '0')}`;
+    const rand = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+    return `${prefix}_${rand}`;
   }
 
   /** Monotonic serial counter for LG-/CTL- controller numbers. */
