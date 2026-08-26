@@ -121,18 +121,12 @@ export function createPublicAuthRouter(repo: Repository, env: Env): Router {
       );
 
       // Mint a real access token through the Supabase auth grant.
-      const { data: session, error: signInErr } = await auth.auth.signInWithPassword({
+      // If sign-in fails (e.g. email confirmation still pending), return
+      // success anyway so the user can log in on the next screen.
+      const { data: session } = await auth.auth.signInWithPassword({
         email: body.email,
         password: body.password,
       });
-      if (signInErr || !session.session) {
-        // User was created but sign-in failed; surface the sign-in error.
-        throw new ApiError(
-          'DATABASE_ERROR',
-          signInErr?.message ?? 'Registration sign-in failed',
-          500,
-        );
-      }
 
       res.status(201).json(
         ok({
@@ -143,7 +137,7 @@ export function createPublicAuthRouter(repo: Repository, env: Env): Router {
           },
           role: 'owner' as const,
           businessId: business.id,
-          accessToken: session.session.access_token,
+          accessToken: session?.session?.access_token ?? '',
         }),
       );
     })().catch(next);
