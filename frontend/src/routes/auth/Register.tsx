@@ -67,8 +67,9 @@ export default function Register() {
         return;
       }
       setPhase('setup');
-    } catch {
-      setError('Registration failed. Please try again.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '';
+      setError(msg || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
