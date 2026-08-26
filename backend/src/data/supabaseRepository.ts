@@ -2094,6 +2094,7 @@ export class SupabaseRepository implements Repository {
     let q = this.db.from('assets').select('*', { count: 'exact' });
     if (query.status) q = q.eq('status', query.status);
     if (query.city) q = q.eq('city', query.city);
+    if (query.businessId) q = q.eq('business_id', query.businessId);
     const res = await q.range(start, start + PAGE_SIZE - 1);
     if (res.error) {
       throw new ApiError(

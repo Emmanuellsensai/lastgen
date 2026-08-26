@@ -68,12 +68,12 @@ export function apiRouter(repo: Repository, env: Env): Router {
   );
   router.use(createSystemRouter(repo));
   router.use(createQuoteRouter(repo));
-  router.use(createCreditRouter(repo));
+  router.use(createCreditRouter(repo, env));
   router.use(createAssetRouter(repo));
   router.use(createLoanRouter(repo));
   router.use(createPaymentRouter(repo, adapter, env));
   router.use(createWalletRouter(repo, env));
-  router.use(createPortfolioRouter(repo));
+  router.use(createPortfolioRouter(repo, env));
   router.use(createImpactRouter(repo));
   // The credit desk: every route inside enforces the bank/admin role.
   router.use(createAdminRouter(repo, env));

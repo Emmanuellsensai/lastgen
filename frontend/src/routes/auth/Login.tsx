@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Globe, AppleLogo } from '@phosphor-icons/react';
+import { ArrowRight } from '@phosphor-icons/react';
 import { GlassCard } from '@/components/ui/glass';
 import { Logo } from '@/components/layout/Logo';
 import { Button } from '@/components/ui/button';
@@ -79,34 +79,6 @@ export default function Login() {
           {error && (
             <p className="mt-4 rounded-lg bg-burn/10 p-3 text-center text-sm text-burn">{error}</p>
           )}
-
-          <div className="mt-6 flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition-colors duration-200 ease-lg hover:bg-paper-2 disabled:opacity-50"
-            >
-              <Globe size={20} weight="regular" />
-              Continue with Google
-            </button>
-
-            <button
-              type="button"
-              onClick={handleAppleLogin}
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition-colors duration-200 ease-lg hover:bg-paper-2 disabled:opacity-50"
-            >
-              <AppleLogo size={20} weight="regular" />
-              Continue with Apple
-            </button>
-          </div>
-
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-line" />
-            <span className="text-xs text-ink-mute">or continue with email</span>
-            <div className="h-px flex-1 bg-line" />
-          </div>
 
           <form onSubmit={handleEmailLogin} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">

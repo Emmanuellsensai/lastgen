@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppShell } from '@/components/layout';
 import { GlassCard, GlassSheet } from '@/components/ui/glass';
 import { Money, StatusPill } from '@/components/lastgen';
@@ -13,6 +14,16 @@ import type { Asset } from '@/types/api';
 import { api } from '@/lib/api';
 import type { CreditFileDetail } from '@/types/api';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+
+function getRecommendation(file: CreditFileDetail): { label: string; tone: 'success' | 'warning' | 'burn' } {
+  if (file.affordabilityRatio >= 1.4 && file.verifiedMonths >= 3) {
+    return { label: `Based on ${file.verifiedMonths} months of verified fuel spend, this business qualifies.`, tone: 'success' };
+  }
+  if (file.affordabilityRatio >= 1.1) {
+    return { label: `Affordable but marginal. ${file.verifiedMonths} months of data. Recommend approval with monitoring.`, tone: 'warning' };
+  }
+  return { label: `Affordability ratio is below threshold. Recommend additional data before approval.`, tone: 'burn' };
+}
 
 export default function CreditFile() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +58,18 @@ export default function CreditFile() {
     return () => { cancelled = true; };
   }, [id]);
 
+  const burnSparklineData = useMemo(() => {
+    if (!file?.fuelLogs || file.fuelLogs.length < 2) return [];
+    const byMonth = new Map<string, number>();
+    for (const log of file.fuelLogs) {
+      const month = log.loggedAt.slice(0, 7); // YYYY-MM
+      byMonth.set(month, (byMonth.get(month) ?? 0) + log.amountKobo);
+    }
+    return Array.from(byMonth.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, amountKobo]) => ({ month, amountKobo }));
+  }, [file]);
+
   async function handleApprove() {
     if (!id || !file) return;
     setActionBusy(true);
@@ -70,7 +93,6 @@ export default function CreditFile() {
       await api.assets.suspend(linkedAsset.id, { reason: 'Missed payment' });
       const updated = await api.credit.application(id!);
       setFile(updated);
-      // Refresh linked asset
       const freshAsset = await api.assets.get(linkedAsset.id);
       setLinkedAsset(freshAsset);
       setSuspendConfirmOpen(false);
@@ -120,6 +142,14 @@ export default function CreditFile() {
       </AppShell>
     );
   }
+
+  const recommendation = getRecommendation(file);
+  const borderColor =
+    recommendation.tone === 'success'
+      ? 'border-success'
+      : recommendation.tone === 'warning'
+        ? 'border-warning'
+        : 'border-burn';
 
   return (
     <AppShell

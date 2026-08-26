@@ -697,6 +697,7 @@ export class InMemoryRepository implements Repository {
     let items = this.state.assets;
     if (query.status) items = items.filter((a) => a.status === query.status);
     if (query.city) items = items.filter((a) => this.state.assetCity[a.id] === query.city);
+    if (query.businessId) items = items.filter((a) => a.businessId === query.businessId);
 
     const total = items.length;
     const page = Math.max(1, query.page ?? 1);

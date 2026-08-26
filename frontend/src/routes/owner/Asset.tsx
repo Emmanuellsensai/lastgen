@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Wallet } from '@phosphor-icons/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -16,11 +16,19 @@ import PaymentSheet from './PaymentSheet';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import { Toast, ToastTitle } from '@/components/ui/toast';
-import type { Asset as AssetType, AssetStatus, Loan, Quote } from '@/types/api';
+import type { Asset as AssetType, AssetStatus, Loan, MeterReading, Payment, Quote } from '@/types/api';
+
+interface DailyReading {
+  date: string;
+  whGenerated: number;
+}
 
 export default function Asset() {
   const { id } = useParams<{ id: string }>();
   const { demoLoanId } = useSession();
+  // Resolved from GET /businesses/:id/summary once the asset tells us which
+  // business it belongs to; the demo id seeds mock mode.
+  const [effectiveLoanId, setEffectiveLoanId] = useState<string | null>(demoLoanId);
 
   const [asset, setAsset] = useState<AssetType | null>(null);
   const [loan, setLoan] = useState<Loan | null>(null);
@@ -32,6 +40,26 @@ export default function Asset() {
   const [meterData] = useState<{date:string;whGenerated:number}[]>([]);
   const prevStatus = useRef<AssetStatus | null>(null);
 
+  /* Payment history */
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+
+  /* Generation history */
+  const [meterReadings, setMeterReadings] = useState<MeterReading[]>([]);
+  const [meterLoading, setMeterLoading] = useState(true);
+
+  const dailyData = useMemo<DailyReading[]>(() => {
+    if (meterReadings.length === 0) return [];
+    const byDay = new Map<string, number>();
+    for (const r of meterReadings) {
+      const day = r.ts.split('T')[0];
+      byDay.set(day, (byDay.get(day) ?? 0) + r.whGenerated);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, whGenerated]) => ({ date, whGenerated }));
+  }, [meterReadings]);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -40,12 +68,20 @@ export default function Asset() {
         const a = await api.assets.get(id!);
         if (cancelled) return;
         setAsset(a);
-        if (demoLoanId) {
-          const l = await api.loans.get(demoLoanId);
-          if (!cancelled) setLoan(l);
-          const q = await api.quotes.get(useSession.getState().demoQuoteId!);
-          if (!cancelled) setQuote(q);
-        }
+
+        const summary = await api.businesses.summary(a.businessId).catch(() => null);
+        const loanId = summary?.loanId ?? demoLoanId;
+        const quoteId = summary?.quoteId ?? useSession.getState().demoQuoteId ?? null;
+        if (cancelled) return;
+        setEffectiveLoanId(loanId);
+
+        const [l, q] = await Promise.all([
+          loanId ? api.loans.get(loanId).catch(() => null) : null,
+          quoteId ? api.quotes.get(quoteId).catch(() => null) : null,
+        ]);
+        if (cancelled) return;
+        setLoan(l);
+        setQuote(q);
       } catch {
         // ignore
       } finally {
@@ -56,7 +92,42 @@ export default function Asset() {
     return () => { cancelled = true; };
   }, [id, demoLoanId]);
 
-  // Poll asset status every 2 seconds
+  /* Payment ledger for this system's loan. */
+  useEffect(() => {
+    if (!effectiveLoanId) {
+      setPaymentsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    api.loans
+      .payments(effectiveLoanId)
+      .then((res) => { if (!cancelled) setPayments(res.items); })
+      .catch(() => { if (!cancelled) setPayments([]); })
+      .finally(() => { if (!cancelled) setPaymentsLoading(false); });
+    return () => { cancelled = true; };
+  }, [effectiveLoanId]);
+
+  /* Fetch meter readings for generation history */
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().split('T')[0];
+    async function loadMeter() {
+      try {
+        const result = await api.assets.meter(id!, { from: thirtyDaysAgo, to: today });
+        if (!cancelled) setMeterReadings(result.items);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setMeterLoading(false);
+      }
+    }
+    loadMeter();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  // Poll asset status every 5 seconds
   useEffect(() => {
     if (!id) return;
     let active = true;
@@ -80,7 +151,7 @@ export default function Asset() {
       }
     };
     poll();
-    const timer = setInterval(poll, 2000);
+    const timer = setInterval(poll, 5000);
     return () => { active = false; clearInterval(timer); };
   }, [id]);
 
@@ -216,7 +287,7 @@ export default function Asset() {
       <PaymentSheet
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
-        loanId={demoLoanId ?? ''}
+        loanId={effectiveLoanId ?? ''}
         assetId={id ?? ''}
         amountKobo={loan?.monthlyPaymentKobo ?? 0}
       />

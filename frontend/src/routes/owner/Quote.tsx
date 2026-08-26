@@ -185,6 +185,30 @@ export default function Quote() {
               ))}
             </TableBody>
           </Table>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setSchedulePage((p) => Math.max(0, p - 1))}
+                disabled={schedulePage === 0}
+                className="text-sm text-navy disabled:text-ink-mute"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-ink-mute">
+                Page {schedulePage + 1} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSchedulePage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={schedulePage >= totalPages - 1}
+                className="text-sm text-navy disabled:text-ink-mute"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </GlassCard>
         <p className="mt-6 text-sm text-ink-mute">Quote reference {id ?? quote.id}.</p>
       </section>

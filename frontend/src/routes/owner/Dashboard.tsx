@@ -19,6 +19,7 @@ import { api, API_MODE } from '@/lib/api';
 import { useSession } from '@/store/session';
 import type {
   Asset,
+  AssetStatus,
   Business,
   BurnProfile,
   CreditFile,
@@ -26,6 +27,47 @@ import type {
   Loan,
   Quote,
 } from '@/types/api';
+
+/* ------------------------------------------------------------------ */
+/* Stepper                                                            */
+/* ------------------------------------------------------------------ */
+
+interface StepDef {
+  label: string;
+  complete: boolean;
+}
+
+function Stepper({ steps }: { steps: StepDef[] }) {
+  return (
+    <div className="flex items-center gap-0">
+      {steps.map((step, i) => (
+        <div key={step.label} className="flex items-center">
+          <div className="flex flex-col items-center">
+            <div
+              className={cn(
+                'h-4 w-4 rounded-full',
+                step.complete ? 'bg-navy' : 'bg-paper-3',
+              )}
+            />
+            <p className="mt-2 text-center text-xs text-ink-mute">{step.label}</p>
+          </div>
+          {i < steps.length - 1 && (
+            <div
+              className={cn(
+                'mx-2 h-0.5 w-10',
+                steps[i].complete ? 'bg-navy' : 'bg-paper-3',
+              )}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main Dashboard                                                     */
+/* ------------------------------------------------------------------ */
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -46,6 +88,7 @@ export default function Dashboard() {
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [application, setApplication] = useState<CreditFile | null>(null);
   const [hasLogs, setHasLogs] = useState<boolean | null>(null);
+  const [creditFile, setCreditFile] = useState<CreditFile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [payOpen, setPayOpen] = useState(false);
@@ -213,7 +256,10 @@ export default function Dashboard() {
           right={
             <button
               type="button"
-              onClick={() => { useSession.getState().signOut(); navigate('/login'); }}
+              onClick={() => {
+                useSession.getState().signOut();
+                navigate('/login');
+              }}
               className="flex items-center gap-1.5 text-sm text-ink-mute hover:text-ink"
             >
               <SignOut size={16} weight="regular" />
@@ -359,59 +405,201 @@ export default function Dashboard() {
                 className="flex items-center gap-2 self-start rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
               >
                 Pay now
-                <ArrowRight size={20} weight="regular" />
               </button>
             </div>
           </GlassCard>
         )}
 
-        {/* Recent fuel logs */}
-        {fuelLogs.length > 0 && (
-          <GlassCard elevation={2} padding="lg" className="mt-6" title="Recent fuel logs">
-            <div className="flex flex-col gap-3">
-              {fuelLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between border-b border-line/50 pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-ink-mute">{relativeDate(log.loggedAt)}</span>
-                    <span className="text-sm text-ink-soft">{log.litres}L</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Money kobo={log.amountKobo} size="sm" />
-                    <span className="rounded-full bg-paper-3 px-2 py-0.5 text-xs text-ink-mute">
-                      {log.source === 'receipt' ? 'snap' : log.source === 'manual' ? 'typed' : log.source}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Link
-              to="/burn"
-              className="mt-4 inline-flex items-center gap-1 text-sm text-navy transition-colors duration-200 ease-lg hover:text-blue"
+        {/* New user welcome state */}
+        {isNewUser && (
+          <GlassCard elevation={2} padding="lg" className="flex flex-col items-center text-center">
+            <h1 className="font-display text-2xl leading-tight text-ink">
+              Welcome. Let's start with your fuel.
+            </h1>
+            <p className="mt-4 max-w-md text-ink-soft">
+              We need a few weeks of fuel spending to size your solar system and
+              give you a real quote. It takes about two minutes.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/log-fuel')}
+              className="mt-6 rounded-lg bg-navy px-6 py-3 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
             >
-              See all
-              <ArrowRight size={16} weight="regular" />
-            </Link>
+              Tell us your fuel history
+            </button>
+            <p className="mt-3 text-sm text-ink-mute">
+              You can also come back to this later.
+            </p>
           </GlassCard>
         )}
 
-        {/* Footer row */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <GlassCard padding="md">
-            <div className="flex items-start gap-3">
-              <ChatCircle size={20} weight="regular" className="mt-0.5 text-ink-mute" />
-              <div>
-                <p className="font-display text-base text-ink">Need help?</p>
-                <p className="mt-1 text-sm text-ink-soft">Send us a message and we will get back to you.</p>
+        {/* Returning user: full dashboard */}
+        {!isNewUser && (
+          <>
+            {/* Business summary hero */}
+            <GlassCard elevation={2} padding="lg">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="font-display text-2xl leading-tight text-ink md:text-3xl">
+                    {business?.name ?? 'Your business'}
+                  </h1>
+                  <p className="mt-1 text-ink-soft">
+                    {business?.city}, {business?.type}
+                  </p>
+                </div>
+                {asset && <StatusPill status={asset.status} size="lg" />}
               </div>
+              <div className="mt-6 flex flex-wrap items-end gap-8">
+                <div>
+                  <p className="text-sm text-ink-mute">Burning right now</p>
+                  <div className="mt-3">
+                    <BurnCounter
+                      ratePerSecondKobo={burn ? Math.round(burn.dailyKobo / 86400) : 187}
+                      startTimestamp={new Date(new Date().setHours(0, 0, 0, 0)).toISOString()}
+                      size="md"
+                      label="Burned since midnight"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-ink-mute">Loan payment</p>
+                  <Money kobo={quote?.monthlyPaymentKobo ?? 0} size="lg" className="text-success" />
+                </div>
+              </div>
+              {burn && quote && (
+                <div className="mt-4">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-3">
+                    <div
+                      className="h-full rounded-full bg-success"
+                      style={{
+                        width: `${Math.min(100, ((burn.monthlyKobo - quote.monthlyPaymentKobo) / burn.monthlyKobo) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 text-sm text-ink-mute">
+                    You save{' '}
+                    <Money kobo={burn.monthlyKobo - quote.monthlyPaymentKobo} size="sm" className="text-success" />
+                  </p>
+                </div>
+              )}
+            </GlassCard>
+
+            {/* Application status stepper */}
+            <div className="mt-6">
+              <Stepper steps={steps} />
             </div>
-          </GlassCard>
-          <GlassCard padding="md">
-            <Link to="/legal/terms" className="block">
-              <p className="font-display text-base text-ink">Terms</p>
-              <p className="mt-1 text-sm text-ink-soft">Lastgen terms of service.</p>
-            </Link>
-          </GlassCard>
-        </div>
+
+            {/* Quick actions - only Log fuel and Your quote */}
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
+                <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
+                  {hasLogs === false ? (
+                    <>
+                      <Flame size={28} weight="bold" className="text-burn" />
+                      <h3 className="mt-3 font-display text-base text-ink">Tell us your fuel history</h3>
+                      <p className="mt-1 text-sm text-ink-soft">Takes about 2 minutes</p>
+                    </>
+                  ) : (
+                    <>
+                      <Camera size={28} weight="bold" className="text-navy" />
+                      <h3 className="mt-3 font-display text-base text-ink">Log fuel</h3>
+                      <p className="mt-1 text-sm text-ink-soft">Record what you spent</p>
+                    </>
+                  )}
+                </GlassCard>
+              </Link>
+              <Link to={effectiveQuoteId ? `/quote/${effectiveQuoteId}` : '#'}>
+                <GlassCard hoverable padding="lg" className="h-full">
+                  <Receipt size={28} weight="bold" className="text-navy" />
+                  <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
+                  <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
+                </GlassCard>
+              </Link>
+            </div>
+
+            {/* Next payment card */}
+            {loan && quote && (
+              <GlassCard elevation={2} padding="lg" className="mt-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-ink-soft">Next payment</p>
+                    <Money kobo={loan.monthlyPaymentKobo} size="lg" className="mt-1" />
+                    <p className="mt-1 text-sm text-ink-mute">
+                      Due {relativeDate(loan.nextDueAt)}
+                    </p>
+                    <div className="mt-3">
+                      <div className="h-1 w-48 overflow-hidden rounded-full bg-paper-3">
+                        <div
+                          className="h-full rounded-full bg-navy"
+                          style={{ width: `${(monthsPaid() / quote.tenorMonths) * 100}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-ink-mute">
+                        Month {monthsPaid()} of {quote.tenorMonths}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/asset/${asset?.id ?? demoAssetId}`)}
+                    className="flex items-center gap-2 self-start rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
+                  >
+                    Pay now
+                    <ArrowRight size={20} weight="regular" />
+                  </button>
+                </div>
+              </GlassCard>
+            )}
+
+            {/* Recent fuel logs */}
+            {fuelLogs.length > 0 && (
+              <GlassCard elevation={2} padding="lg" className="mt-6" title="Recent fuel logs">
+                <div className="flex flex-col gap-3">
+                  {fuelLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between border-b border-line/50 pb-3 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-ink-mute">{relativeDate(log.loggedAt)}</span>
+                        <span className="text-sm text-ink-soft">{log.litres}L</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Money kobo={log.amountKobo} size="sm" />
+                        <span className="rounded-full bg-paper-3 px-2 py-0.5 text-xs text-ink-mute">
+                          {log.source === 'receipt' ? 'snap' : log.source === 'manual' ? 'typed' : log.source}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Link
+                  to="/burn"
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-navy transition-colors duration-200 ease-lg hover:text-blue"
+                >
+                  See all
+                  <ArrowRight size={16} weight="regular" />
+                </Link>
+              </GlassCard>
+            )}
+
+            {/* Footer row */}
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <GlassCard padding="md">
+                <div className="flex items-start gap-3">
+                  <ChatCircle size={20} weight="regular" className="mt-0.5 text-ink-mute" />
+                  <div>
+                    <p className="font-display text-base text-ink">Need help?</p>
+                    <p className="mt-1 text-sm text-ink-soft">Send us a message and we will get back to you.</p>
+                  </div>
+                </div>
+              </GlassCard>
+              <GlassCard padding="md">
+                <Link to="/legal/terms" className="block">
+                  <p className="font-display text-base text-ink">Terms</p>
+                  <p className="mt-1 text-sm text-ink-soft">Lastgen terms of service.</p>
+                </Link>
+              </GlassCard>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Pay sheet */}
@@ -442,7 +630,7 @@ export default function Dashboard() {
 
       {/* Toast */}
       <Toast open={toastOpen} onOpenChange={setToastOpen} tone="success">
-        <ToastTitle>Payment received.</ToastTitle>
+        <ToastTitle>{toastMsg || 'Payment received.'}</ToastTitle>
       </Toast>
     </AppShell>
   );

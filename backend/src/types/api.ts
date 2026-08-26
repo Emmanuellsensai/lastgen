@@ -434,4 +434,6 @@ export interface PortfolioAssetsQuery {
   status?: AssetStatus;
   city?: string;
   page?: number;
+  /** Narrow the ledger to one business. */
+  businessId?: string;
 }

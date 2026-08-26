@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight } from '@phosphor-icons/react';
+import { ArrowRight, Warning } from '@phosphor-icons/react';
 import { GlassCard } from '@/components/ui/glass';
 import { Logo } from '@/components/layout/Logo';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ const BUSINESS_TYPES = ['Frozen food','Tailor','Barber','Printer','Welder','Mini
 
 export default function Register() {
   const navigate = useNavigate();
+  const [phase, setPhase] = useState<'account' | 'setup'>('account');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -20,6 +21,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 const [phase, setPhase] = useState('account' as 'account' | 'setup');  const [businessType, setBusinessType] = useState('');  const [city, setCity] = useState('');  const [generatorKva, setGeneratorKva] = useState('');  const [setupLoading, setSetupLoading] = useState(false);  const [setupError, setSetupError] = useState('');
+
+  // Setup phase state
+  const [businessType, setBusinessType] = useState(BUSINESS_TYPES[0]);
+  const [city, setCity] = useState(CITIES[0]);
+  const [generatorKva, setGeneratorKva] = useState('5');
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState('');
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
