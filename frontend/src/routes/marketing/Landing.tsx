@@ -399,8 +399,8 @@ export default function Landing() {
                     </Link>
                   </li>
                   <li>
-                    <Link to="/login-bank" className="hover:text-ink">
-                      Sign in as a bank
+                    <Link to="/register-bank" className="hover:text-ink">
+                      Credit desk
                     </Link>
                   </li>
                 </ul>
@@ -409,8 +409,8 @@ export default function Landing() {
                 <p className="mb-4 font-medium text-ink">Partners</p>
                 <ul className="flex flex-col gap-3 text-ink-mute">
                   <li>
-                    <Link to="/register-bank" className="hover:text-ink">
-                      Credit desk
+                    <Link to="/login-bank" className="hover:text-ink">
+                      Sign in as a bank
                     </Link>
                   </li>
                   <li>
