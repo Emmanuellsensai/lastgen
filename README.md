@@ -1,6 +1,6 @@
 # Lastgen — Solar Financing for Nigerian SMEs
 
-> **HackFest 2025 Submission** · Track: Fintech / Climate
+> **HackFest 2025 Submission** · Track: Sustainability
 
 ---
 
@@ -9,9 +9,9 @@
 | Name | Role |
 |------|------|
 | Emmanuel Usang | Full-stack Lead |
-| [Team member 2] | Frontend / UX |
-| [Team member 3] | Backend / API |
-| [Team member 4] | Product / Research |
+| Micheal Samuel | Frontend / UX |
+| Uchechukwu Jeremiah | Backend / API |
+| Oyelabi Timileyin | Product / Research |
 
 ---
 
@@ -21,8 +21,8 @@
 |---------|-----|
 | Frontend (Vercel) | https://lastgen-frontend.vercel.app |
 | Backend API (Render) | https://lastgen-backend.onrender.com |
-| Demo login (owner) | Click **"Sign in as owner"** on the login page |
-| Demo login (bank) | Click **"Sign in as bank"** on the login page |
+| Demo login (owner) | Click [**"Sign in as owner"**](https://lastgen-frontend.vercel.app/login) on the login page |
+| Demo login (bank) | Click [**"Sign in as bank"**](https://lastgen-frontend.vercel.app/login-bank) on the login page | 
 
 > The app runs in **mock mode** by default — all data is seeded and in-memory. No real money moves.
 
@@ -30,7 +30,7 @@
 
 ## The Problem
 
-Over 40 million Nigerian small businesses run diesel generators for 6–12 hours every day. A typical SME spends ₦80,000–₦200,000 per month on fuel — money that buys nothing: no asset, no equity, no savings. Solar is the obvious fix, but the upfront cost (₦1.5M–₦4M) is out of reach without financing, and banks won't lend without a verified income signal.
+Over 40 million Nigerian small businesses run diesel generators for 6–12 hours every day. A typical SME spends ₦80,000–₦200,000 per month on fuel, money that buys nothing: no asset, no equity, no savings. Solar is the obvious fix, but the upfront cost (₦1.5M–₦4M) is out of reach without financing, and banks won't lend without a verified income signal.
 
 **The data is already there — it just isn't being used.** Every fuel receipt, every generator log, is proof of income that no lender is reading.
 
