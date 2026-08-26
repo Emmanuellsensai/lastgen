@@ -11,6 +11,7 @@ import {
   Sun,
   Trophy,
   Wallet,
+  SolarPanel,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { DEMO_BUSINESS_ID } from '@/mocks/seed';
@@ -119,6 +120,12 @@ export const OWNER_NAV_GROUPS: NavGroup[] = [
         label: 'Wallet',
         icon: Wallet,
         matchPrefix: '/wallet',
+      },
+      {
+        to: '/solar-options',
+        label: 'Solar loan',
+        icon: SolarPanel,
+        matchPrefix: '/solar-options',
       },
       {
         to: `/wrapped/${DEMO_IDS.businessId}`,
