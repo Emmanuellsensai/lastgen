@@ -23,6 +23,8 @@
 | Backend API (Render) | https://lastgen-backend.onrender.com |
 | Demo login (owner) | Click [**"Sign in as owner"**](https://lastgen-frontend.vercel.app/login) on the login page |
 | Demo login (bank) | Click [**"Sign in as bank"**](https://lastgen-frontend.vercel.app/login-bank) on the login page | 
+| Demo Video | Click [**"LASTGEN DEMO VIDEO"**](https://www.loom.com/share/8b96250fbb39440cb6bff282ed98eebf) GO TO LOOM | 
+
 
 > The app runs in **mock mode** by default — all data is seeded and in-memory. No real money moves.
 
