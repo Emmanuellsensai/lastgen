@@ -241,7 +241,30 @@ const businessHandlers: HttpHandler[] = [
   http.post(`${BASE}/businesses/:id/fuel-logs`, async ({ params, request }) => {
     await lag();
     const businessId = String(params.id);
-    if (!businessById(businessId)) return notFound('Business');
+    // Auto-create the business and burn profile if the db was reset (hot-reload)
+    // while the user's Zustand session still holds an old businessId.
+    if (!businessById(businessId)) {
+      db.businesses.push({
+        id: businessId,
+        name: 'My Business',
+        type: 'Business',
+        city: 'Lagos',
+        generatorKva: 2.5,
+        hoursPerDay: 8,
+        createdAt: new Date().toISOString(),
+        medicalFlag: false,
+      });
+      db.burnProfiles.push({
+        businessId,
+        litresPerDay: 0,
+        dailyKobo: 0,
+        monthlyKobo: 0,
+        annualKobo: 0,
+        daysObserved: 0,
+        verified: false,
+        computedAt: new Date().toISOString(),
+      });
+    }
     const body = (await request.json()) as {
       litres: number;
       amountKobo: number;
@@ -317,8 +340,22 @@ const businessHandlers: HttpHandler[] = [
 
   http.get(`${BASE}/businesses/:id/burn`, async ({ params }) => {
     await lag();
-    const profile = db.burnProfiles.find((p) => p.businessId === String(params.id));
-    return profile ? ok(profile) : notFound('Burn profile');
+    const businessId = String(params.id);
+    let profile = db.burnProfiles.find((p) => p.businessId === businessId);
+    if (!profile) {
+      profile = {
+        businessId,
+        litresPerDay: 0,
+        dailyKobo: 0,
+        monthlyKobo: 0,
+        annualKobo: 0,
+        daysObserved: 0,
+        verified: false,
+        computedAt: new Date().toISOString(),
+      };
+      db.burnProfiles.push(profile);
+    }
+    return ok(profile);
   }),
 ];
 
