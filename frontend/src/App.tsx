@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { useSession } from '@/store/session';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ToastProvider, ToastViewport } from '@/components/ui/toast';
 import RequireRole from '@/components/layout/RequireRole';
@@ -27,6 +29,10 @@ import Terms from '@/routes/legal/Terms';
 import NotFound from '@/routes/NotFound';
 
 export default function App() {
+  useEffect(() => {
+    useSession.getState().bootstrap();
+  }, []);
+
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <TooltipProvider delayDuration={200}>
