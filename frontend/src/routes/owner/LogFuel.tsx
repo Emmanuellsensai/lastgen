@@ -213,7 +213,7 @@ export default function LogFuel() {
       setToastMsg(`All ${savedCount} entries saved.`);
       setToastTone('success');
       setToastOpen(true);
-      setTimeout(() => navigate('/app'), 1200);
+      setTimeout(() => navigate('/solar-options'), 1200);
     }
   }, [effectiveBusinessId, entries, navigate]);
 

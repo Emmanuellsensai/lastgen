@@ -347,8 +347,8 @@ export default function Dashboard() {
               <Stepper steps={steps} />
             </div>
 
-            {/* Quick actions - only Log fuel and Your quote */}
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Quick actions */}
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
                 <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
                   {hasLogs === false ? (
@@ -366,11 +366,18 @@ export default function Dashboard() {
                   )}
                 </GlassCard>
               </Link>
-              <Link to={quoteId ? `/quote/${quoteId}` : '#'}>
-                <GlassCard hoverable padding="lg" className="h-full">
+              <Link to="/solar-options">
+                <GlassCard hoverable padding="lg" className="h-full border border-navy/20 bg-navy/5">
                   <Receipt size={28} weight="bold" className="text-navy" />
+                  <h3 className="mt-3 font-display text-base text-ink">Get solar</h3>
+                  <p className="mt-1 text-sm text-ink-soft">See loan options for your shop</p>
+                </GlassCard>
+              </Link>
+              <Link to={quoteId ? `/quote/${quoteId}` : '/solar-options'}>
+                <GlassCard hoverable padding="lg" className="h-full">
+                  <Receipt size={28} weight="bold" className="text-ink-mute" />
                   <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
-                  <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
+                  <p className="mt-1 text-sm text-ink-soft">Review your solar plan</p>
                 </GlassCard>
               </Link>
             </div>
