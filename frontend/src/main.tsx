@@ -13,39 +13,50 @@ async function startMocks() {
     const { worker } = await import('./mocks/browser');
     await worker.start({ onUnhandledRequest: 'bypass' });
   } catch (error) {
-    // Some embedded browsers refuse to register a service worker. Render the
-    // app anyway: the shells are static, and data calls surface their own
-    // error state rather than leaving a blank page behind.
     console.warn('Mock service worker did not start, continuing without it.', error);
   }
 }
 
 /**
- * Bridge the Supabase auth session to the API client's bearer token.
- * This must run on every app startup and listen for session changes so that:
- *   1. A page refresh preserves the auth token (Supabase persists the session
- *      in localStorage; we read it once on boot).
- *   2. Google / Apple OAuth redirects land with a fresh session that needs to
- *      be forwarded to the API client.
- *   3. Token refreshes (Supabase auto-refresh) keep the API client current.
+ * Bridge the auth session to the API client's bearer token.
+ *
+ * Two sources of truth exist:
+ * 1. The Zustand session store (`lastgen.session` in localStorage) — populated
+ *    by signInWithEmail / register which call setAuthToken() at login time, but
+ *    the module-level `authToken` in api.ts resets on page reload.
+ * 2. The Supabase browser client — populated by Google / Apple OAuth, which
+ *    never calls setAuthToken() at all.
+ *
+ * We read BOTH on boot so every login path works after a page refresh.
  */
 async function initAuth() {
   try {
-    const { hasSupabaseConfig, supabase } = await import('@/lib/supabase');
-    if (!hasSupabaseConfig || !supabase) return;
-
     const { setAuthToken } = await import('@/lib/api');
 
-    // 1. Seed the token from the current session (handles page refresh).
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      setAuthToken(session.access_token);
-    }
+    // 1. Restore the token from the persisted Zustand session store.
+    //    signInWithEmail / register store `accessToken` here on login.
+    try {
+      const raw = localStorage.getItem('lastgen.session');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { state?: { accessToken?: string | null } };
+        const token = parsed?.state?.accessToken;
+        if (token) {
+          setAuthToken(token);
+        }
+      }
+    } catch { /* corrupt storage — ignore */ }
 
-    // 2. Listen for future sign-in / sign-out / token-refresh events.
-    supabase.auth.onAuthStateChange((_event, newSession) => {
-      setAuthToken(newSession?.access_token ?? null);
-    });
+    // 2. Also listen for the Supabase session (covers Google / Apple OAuth).
+    const { hasSupabaseConfig, supabase } = await import('@/lib/supabase');
+    if (hasSupabaseConfig && supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        setAuthToken(session.access_token);
+      }
+      supabase.auth.onAuthStateChange((_event, newSession) => {
+        setAuthToken(newSession?.access_token ?? null);
+      });
+    }
   } catch {
     // Non-critical: if Supabase isn't configured the app runs in mock mode.
   }
@@ -53,7 +64,7 @@ async function initAuth() {
 
 async function bootstrap() {
   await startMocks();
-  // Bridge Supabase session → API bearer token before any component renders.
+  // Bridge session → API bearer token BEFORE any component renders.
   await initAuth();
 
   createRoot(document.getElementById('root') as HTMLElement).render(
