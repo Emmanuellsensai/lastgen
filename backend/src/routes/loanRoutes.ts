@@ -27,7 +27,10 @@ export function createLoanRouter(repo: Repository): Router {
 
   router.get('/loans/:id/payments', (req, res, next) => {
     void (async () => {
-      res.json(ok({ items: await repo.paymentsFor(req.params.id) }));
+      const loan = await repo.getLoan(req.params.id);
+      if (!loan) throw new ApiError('NOT_FOUND', 'Loan not found', 404);
+      const items = await repo.paymentsFor(req.params.id);
+      res.json(ok({ items }));
     })().catch(next);
   });
 
