@@ -1,4 +1,4 @@
-# Lastgen — Solar Financing for Nigerian SMEs
+# Lastgen: Solar Financing for Nigerian SMEs
 
 > **HackFest 2025 Submission** · Track: Sustainability
 
