@@ -313,6 +313,18 @@ export default function Wrapped() {
 
   const selectedLabel = selectedDays ? labelForDays(selectedDays) : '';
 
+    async function handleShare() {
+    if (navigator.share) {
+      await navigator.share({
+        title: businessName + " — Lastgen",
+        text: "We saved " + NAIRA + (wrappedData?.nairaSavedKobo ? (wrappedData.nairaSavedKobo / 100).toLocaleString("en-NG") : "") + " on fuel in the last " + selectedLabel + " by switching to solar with Lastgen.",
+        url: window.location.href,
+      });
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+    }
+  }
+
   const handleShowImpact = useCallback(async () => {
     if (!selectedDays || !demoBusinessId) return;
     setLoading(true);
@@ -443,28 +455,7 @@ export default function Wrapped() {
 
                   <p className="mt-10 font-display text-[13px] opacity-70">Made with Lastgen</p>
                 </div>
-                <p className="mt-8 text-base opacity-80">Screenshot this and send it to someone.</p>
-                <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (navigator.share) {
-                      try {
-                        await navigator.share({
-                          title: `${businessName} - Lastgen`,
-                          text: `We saved \u20A6${(wrappedData.nairaSavedKobo / 100).toLocaleString('en-NG')} on fuel in the last ${selectedLabel}, by switching to solar with Lastgen.`,
-                          url: window.location.href,
-                        });
-                      } catch { /* user cancelled */ }
-                    } else {
-                      await navigator.clipboard.writeText(window.location.href);
-                    }
-                  }}
-                  className="mt-4 flex items-center gap-2 rounded-lg border border-current/30 px-4 py-2 text-sm font-medium transition-colors duration-200 ease-lg hover:bg-current/10"
-                >
-                  <ShareNetwork size={18} weight="bold" />
-                  Share
-                </button>
+                <button type="button" onClick={handleShare} className="mt-8 flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-medium opacity-80 transition-opacity hover:opacity-100"><ShareNetwork size={18} weight="regular" /> Share</button>
               </>
             ),
           },

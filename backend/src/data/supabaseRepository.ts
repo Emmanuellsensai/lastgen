@@ -50,6 +50,7 @@ import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
+  AcceptQuoteResult,
   AdminOrder,
   AdminUser,
   Asset,
@@ -57,6 +58,7 @@ import type {
   BankUser,
   Business,
   BurnProfile,
+  BusinessSummary,
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
@@ -209,6 +211,7 @@ interface CreditFileRow {
   status: CreditFileStatus;
   decline_reason: string | null;
   created_at: string;
+  submitted_at: string | null;
 }
 
 interface AssetRow {
@@ -594,46 +597,15 @@ export class SupabaseRepository implements Repository {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Business summary                                                   */
-  /* ------------------------------------------------------------------ */
-
-  async businessSummary(
-    businessId: string,
-  ): Promise<{ assetId: string | null; loanId: string | null; quoteId: string | null }> {
-    const asset = await this.loadAssetByBusiness(businessId);
-    const loan = asset ? await this.loadLoanByAsset(asset.id) : undefined;
-    const cfRow = await this.run(
-      this.db
-        .from('credit_files')
-        .select('quote_id')
-        .eq('business_id', businessId)
-        .limit(1)
-        .maybeSingle(),
-    );
-    return {
-      assetId: asset?.id ?? null,
-      loanId: loan?.id ?? null,
-      quoteId: (cfRow as { quote_id: string } | null)?.quote_id ?? null,
-    };
-  }
-
-  /* ------------------------------------------------------------------ */
   /* Fuel logs and burn                                                  */
   /* ------------------------------------------------------------------ */
 
-  async deleteFuelLog(businessId: string, logId: string): Promise<void> {
-    await this.findBusinessOrThrow(businessId);
-    const row = await this.run(
-      this.db
-        .from('fuel_logs')
-        .select('id')
-        .eq('id', logId)
-        .eq('business_id', businessId)
-        .maybeSingle(),
-    );
-    if (!row) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
-    await this.run(this.db.from('fuel_logs').delete().eq('id', logId));
-    await this.runRecomputeBurn(businessId);
+  businessSummary(id: string): Promise<BusinessSummary> {
+    return this.computeBusinessSummary(id);
+  }
+
+  applicationFor(businessId: string): Promise<CreditFile | null> {
+    return this.loadApplicationFor(businessId);
   }
 
   addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog> {
@@ -650,6 +622,10 @@ export class SupabaseRepository implements Repository {
 
   fuelLogsFor(businessId: string, limit?: number): Promise<FuelLog[]> {
     return this.loadFuelLogs(businessId, limit);
+  }
+
+  deleteFuelLog(businessId: string, logId: string): Promise<void> {
+    return this.runDeleteFuelLog(businessId, logId);
   }
 
   burnProfileFor(businessId: string): Promise<BurnProfile | undefined> {
@@ -672,26 +648,16 @@ export class SupabaseRepository implements Repository {
   /* Quotes                                                              */
   /* ------------------------------------------------------------------ */
 
-  async acceptQuote(
-    quoteId: string,
-  ): Promise<{ creditFileId: string; status: string }> {
-    const qRow = await this.run(
-      this.db.from('quotes').select('id').eq('id', quoteId).maybeSingle(),
-    );
-    if (!qRow) throw new ApiError('NOT_FOUND', 'Quote not found', 404);
-    const cfRow = await this.run(
-      this.db.from('credit_files').select('id,status').eq('quote_id', quoteId).maybeSingle(),
-    );
-    if (!cfRow) throw new ApiError('NOT_FOUND', 'Credit file not found for this quote', 404);
-    return { creditFileId: cfRow.id, status: cfRow.status };
-  }
-
   createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote> {
     return this.runCreateQuote(businessId, input);
   }
 
   getQuote(id: string): Promise<Quote | undefined> {
     return this.loadQuote(id);
+  }
+
+  acceptQuote(quoteId: string): Promise<AcceptQuoteResult> {
+    return this.runAcceptQuote(quoteId);
   }
 
   /* ------------------------------------------------------------------ */
@@ -753,24 +719,16 @@ export class SupabaseRepository implements Repository {
     return this.loadLoan(id);
   }
 
-  async paymentsForLoan(loanId: string): Promise<Payment[]> {
-    const rows =
-      (await this.run(
-        this.db
-          .from('payments')
-          .select('*')
-          .eq('loan_id', loanId)
-          .order('paid_at', { ascending: false }),
-      )) ?? [];
-    return rows.map((row: PaymentRow) => this.mapPayment(row));
-  }
-
   loanByAsset(assetId: string): Promise<Loan | undefined> {
     return this.loadLoanByAsset(assetId);
   }
 
   scheduleFor(loanId: string): Promise<Installment[]> {
     return this.loadSchedule(loanId);
+  }
+
+  paymentsFor(loanId: string): Promise<Payment[]> {
+    return this.loadPayments(loanId);
   }
 
   payLoan(
@@ -1625,7 +1583,12 @@ export class SupabaseRepository implements Repository {
       depositKobo,
       monthlyPaymentKobo: payment,
       aprBps: DEFAULT_APR_BPS,
-      totalPayableKobo: payment * input.tenorMonths + depositKobo,
+      totalPayableKobo:
+        depositKobo +
+        buildSchedule(principal, DEFAULT_APR_BPS, input.tenorMonths, new Date()).reduce(
+          (sum, row) => sum + row.principalKobo + row.interestKobo,
+          0,
+        ),
       monthlySavingsKobo,
       savingsPct: Math.round((monthlySavingsKobo / burn.monthlyKobo) * 1000) / 10,
       breakEvenMonth: breakEvenMonth(depositKobo, monthlySavingsKobo),
@@ -1662,6 +1625,90 @@ export class SupabaseRepository implements Repository {
     );
 
     return quote;
+  }
+
+  private async computeBusinessSummary(id: string): Promise<BusinessSummary> {
+    await this.findBusinessOrThrow(id);
+    const asset = await this.loadAssetByBusiness(id);
+    const loan = asset ? await this.loadLoanByAsset(asset.id) : undefined;
+    // Newest quote wins: the owner works from the quote they just generated.
+    const quoteRow = await this.run(
+      this.db
+        .from('quotes')
+        .select('id')
+        .eq('business_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    );
+    return {
+      assetId: asset?.id ?? null,
+      loanId: loan?.id ?? null,
+      quoteId: quoteRow?.id ?? null,
+    };
+  }
+
+  private async loadApplicationFor(businessId: string): Promise<CreditFile | null> {
+    await this.findBusinessOrThrow(businessId);
+    const row = await this.run(
+      this.db
+        .from('credit_files')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    );
+    return row ? this.loadCreditFile(row) : null;
+  }
+
+  private async runAcceptQuote(quoteId: string): Promise<AcceptQuoteResult> {
+    if (!(await this.loadQuote(quoteId))) {
+      throw new ApiError('NOT_FOUND', 'Quote not found', 404);
+    }
+    const row = await this.run(
+      this.db.from('credit_files').select('*').eq('quote_id', quoteId).maybeSingle(),
+    );
+    if (!row) throw new ApiError('NOT_FOUND', 'Credit file not found', 404);
+    // Idempotent: the first accept stamps the file, later ones read it back.
+    if (!row.submitted_at) {
+      await this.run(
+        this.db
+          .from('credit_files')
+          .update({ submitted_at: (await this.now()).toISOString() })
+          .eq('id', row.id),
+      );
+    }
+    return { creditFileId: row.id, status: row.status };
+  }
+
+  private async runDeleteFuelLog(businessId: string, logId: string): Promise<void> {
+    await this.findBusinessOrThrow(businessId);
+    const row = await this.run(
+      this.db
+        .from('fuel_logs')
+        .select('id')
+        .eq('id', logId)
+        .eq('business_id', businessId)
+        .maybeSingle(),
+    );
+    if (!row) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
+    await this.run(this.db.from('fuel_logs').delete().eq('id', logId));
+    await this.runRecomputeBurn(businessId);
+  }
+
+  private async loadPayments(loanId: string): Promise<Payment[]> {
+    await this.findLoanOrThrow(loanId);
+    const rows =
+      (await this.run(
+        this.db
+          .from('payments')
+          .select('*')
+          .eq('loan_id', loanId)
+          .eq('status', 'SUCCESS')
+          .order('paid_at', { ascending: false }),
+      )) ?? [];
+    return rows.map((row: PaymentRow) => this.mapPayment(row));
   }
 
   private async loadCreditFiles(status?: CreditFileStatus): Promise<CreditFile[]> {
@@ -1702,6 +1749,7 @@ export class SupabaseRepository implements Repository {
       verifiedMonths: row.verified_months,
       status: row.status,
       createdAt: row.created_at,
+      submittedAt: row.submitted_at ?? undefined,
     };
   }
 
@@ -2053,6 +2101,7 @@ export class SupabaseRepository implements Repository {
     let q = this.db.from('assets').select('*', { count: 'exact' });
     if (query.status) q = q.eq('status', query.status);
     if (query.city) q = q.eq('city', query.city);
+    if (query.businessId) q = q.eq('business_id', query.businessId);
     const res = await q.range(start, start + PAGE_SIZE - 1);
     if (res.error) {
       throw new ApiError(

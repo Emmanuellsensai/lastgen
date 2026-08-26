@@ -1,15 +1,11 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
-import { AppShell, DeviceFrame, DEMO_IDS } from '@/components/layout';
+import { AppShell, DeviceFrame } from '@/components/layout';
 import { Logo } from '@/components/layout/Logo';
 import { GlassCard, GlassNav, GlassPanel } from '@/components/ui/glass';
 import { BurnCounter, Money, PhotoStrip, StatusPill } from '@/components/lastgen';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/cn';
 import {
   Accordion,
   AccordionContent,
@@ -164,162 +160,6 @@ const FAQ = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Savings Calculator                                                 */
-/* ------------------------------------------------------------------ */
-
-const PETROL_LITRES_PER_KWH = 0.40;
-const DIESEL_LITRES_PER_KWH = 0.30;
-
-function SavingsCalculator() {
-  const [fuelType, setFuelType] = useState<'petrol' | 'diesel'>('petrol');
-  const [kva, setKva] = useState('5');
-  const [hoursPerDay, setHoursPerDay] = useState('8');
-  const [pricePerLitre, setPricePerLitre] = useState('1100');
-  const [priceEdited, setPriceEdited] = useState(false);
-
-  // Update price default when fuel type changes (unless user edited)
-  const handleFuelType = (type: 'petrol' | 'diesel') => {
-    setFuelType(type);
-    if (!priceEdited) {
-      setPricePerLitre(type === 'petrol' ? '1100' : '950');
-    }
-  };
-
-  const kvaNum = parseFloat(kva) || 0;
-  const hoursNum = parseFloat(hoursPerDay) || 0;
-  const priceNum = parseFloat(pricePerLitre) || 0;
-
-  const consumptionRate = fuelType === 'petrol' ? PETROL_LITRES_PER_KWH : DIESEL_LITRES_PER_KWH;
-  const litresPerHour = kvaNum * consumptionRate;
-  const litresPerDay = litresPerHour * hoursNum;
-  const nairaPerDay = litresPerDay * priceNum;
-  const nairaPerMonth = nairaPerDay * 22;
-  const estimatedLoanPayment = nairaPerMonth * 0.70;
-  const monthlySaving = nairaPerMonth - estimatedLoanPayment;
-
-  const hasValues = kvaNum > 0 && hoursNum > 0 && priceNum > 0;
-
-  return (
-    <GlassCard elevation={2} padding="lg">
-      <p className="font-display text-lg text-ink">See what you could save</p>
-      <p className="mt-1 text-sm text-ink-soft">Estimate your monthly savings with solar.</p>
-
-      {/* Fuel type toggle */}
-      <div className="mt-5">
-        <div className="flex rounded-lg bg-paper-3 p-1 w-fit">
-          <button
-            type="button"
-            onClick={() => handleFuelType('petrol')}
-            className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors duration-200',
-              fuelType === 'petrol' ? 'bg-paper text-ink shadow-sm' : 'text-ink-mute hover:text-ink',
-            )}
-          >
-            Petrol
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFuelType('diesel')}
-            className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors duration-200',
-              fuelType === 'diesel' ? 'bg-paper text-ink shadow-sm' : 'text-ink-mute hover:text-ink',
-            )}
-          >
-            Diesel
-          </button>
-        </div>
-      </div>
-
-      {/* Inputs */}
-      <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="calc-kva">Generator size (kVA)</Label>
-          <Input
-            id="calc-kva"
-            type="number"
-            min="1"
-            max="100"
-            step="0.5"
-            value={kva}
-            onChange={(e) => setKva(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="calc-hours">Hours per day</Label>
-          <Input
-            id="calc-hours"
-            type="number"
-            min="1"
-            max="24"
-            step="1"
-            value={hoursPerDay}
-            onChange={(e) => setHoursPerDay(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5 sm:col-span-2">
-          <Label htmlFor="calc-price">Price per litre (naira)</Label>
-          <Input
-            id="calc-price"
-            type="number"
-            min="0"
-            step="1"
-            value={pricePerLitre}
-            onChange={(e) => {
-              setPricePerLitre(e.target.value);
-              setPriceEdited(true);
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Results */}
-      <div className="mt-6 grid grid-cols-3 gap-4">
-        <div>
-          <p className="text-sm text-ink-mute">You spend now</p>
-          {hasValues ? (
-            <Money kobo={Math.round(nairaPerMonth * 100)} size="lg" className="mt-2 block text-burn" />
-          ) : (
-            <p className="font-display mt-2 text-2xl text-ink">-</p>
-          )}
-        </div>
-        <div>
-          <p className="text-sm text-ink-mute">You would pay Lastgen</p>
-          {hasValues ? (
-            <Money kobo={Math.round(estimatedLoanPayment * 100)} size="lg" className="mt-2 block text-navy" />
-          ) : (
-            <p className="font-display mt-2 text-2xl text-ink">-</p>
-          )}
-        </div>
-        <div>
-          <p className="text-sm text-ink-mute">You keep</p>
-          {hasValues ? (
-            <Money kobo={Math.round(monthlySaving * 100)} size="lg" className="mt-2 block text-success" />
-          ) : (
-            <p className="font-display mt-2 text-2xl text-ink">-</p>
-          )}
-        </div>
-      </div>
-
-      {/* Disclaimer */}
-      <p className="mt-5 text-xs text-ink-mute">
-        Based on {fuelType} at ₦{pricePerLitre || '0'}/litre, {hasValues ? litresPerDay.toFixed(1) : '0'}L/day.
-        Your actual quote depends on a verified fuel log.
-      </p>
-
-      {/* CTA */}
-      <div className="mt-5">
-        <Button asChild size="lg">
-          <Link to="/register">
-            Get started
-            <ArrowRight size={20} weight="regular" />
-          </Link>
-        </Button>
-      </div>
-    </GlassCard>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -393,11 +233,6 @@ export default function Landing() {
               />
             </div>
           </GlassPanel>
-        </div>
-
-        {/* Savings calculator widget */}
-        <div className="mt-8 w-full">
-          <SavingsCalculator />
         </div>
 
         <div className="hidden justify-center lg:flex">
@@ -553,7 +388,7 @@ export default function Landing() {
                     </Link>
                   </li>
                   <li>
-                    <Link to={`/quote/${DEMO_IDS.quoteId}`} className="hover:text-ink">
+                    <Link to="/login" className="hover:text-ink">
                       Quote
                     </Link>
                   </li>

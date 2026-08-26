@@ -26,12 +26,14 @@ import { transition } from '../services/assetStateMachine.js';
 import { computeImpact } from '../services/impactEngine.js';
 import { breakEvenMonth, buildSchedule, monthlyPaymentKobo } from '../services/leaseEngine.js';
 import type {
+  AcceptQuoteResult,
   AdminOrder,
   AdminUser,
   Asset,
   BankUser,
   Business,
   BurnProfile,
+  BusinessSummary,
   CreateBusinessBody,
   CreateFuelLogBody,
   CreateQuoteBody,
@@ -170,36 +172,26 @@ export class InMemoryRepository implements Repository {
     return this.state.businesses.find((b) => b.id === id);
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Business summary                                                   */
-  /* ------------------------------------------------------------------ */
-
-  async businessSummary(
-    businessId: string,
-  ): Promise<{ assetId: string | null; loanId: string | null; quoteId: string | null }> {
-    const asset = await this.assetByBusiness(businessId);
+  async businessSummary(id: string): Promise<BusinessSummary> {
+    await this.findBusinessOrThrow(id);
+    const asset = await this.assetByBusiness(id);
     const loan = asset ? await this.loanByAsset(asset.id) : undefined;
-    const cf = this.state.creditFiles.find((f) => f.businessId === businessId);
+    // Newest quote wins: the owner works from the quote they just generated.
+    const quotes = this.state.quotes.filter((q) => q.businessId === id);
+    const quote = quotes[quotes.length - 1];
     return {
       assetId: asset?.id ?? null,
       loanId: loan?.id ?? null,
-      quoteId: cf?.quote?.id ?? null,
+      quoteId: quote?.id ?? null,
     };
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Fuel logs and burn                                                  */
-  /* ------------------------------------------------------------------ */
-
-  async deleteFuelLog(businessId: string, logId: string): Promise<void> {
+  async applicationFor(businessId: string): Promise<CreditFile | null> {
     await this.findBusinessOrThrow(businessId);
-    const idx = this.state.fuelLogs.findIndex(
-      (l) => l.id === logId && l.businessId === businessId,
-    );
-    if (idx === -1) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
-    this.state.fuelLogs.splice(idx, 1);
-    await this.recomputeBurn(businessId);
+    const files = this.state.creditFiles.filter((f) => f.businessId === businessId);
+    return files[files.length - 1] ?? null;
   }
+
 
   async addFuelLog(businessId: string, input: CreateFuelLogBody): Promise<FuelLog> {
     await this.findBusinessOrThrow(businessId);
@@ -245,6 +237,16 @@ export class InMemoryRepository implements Repository {
     return limit === undefined ? logs : logs.slice(-limit);
   }
 
+  async deleteFuelLog(businessId: string, logId: string): Promise<void> {
+    await this.findBusinessOrThrow(businessId);
+    const idx = this.state.fuelLogs.findIndex(
+      (l) => l.id === logId && l.businessId === businessId,
+    );
+    if (idx === -1) throw new ApiError('NOT_FOUND', 'Fuel log not found', 404);
+    this.state.fuelLogs.splice(idx, 1);
+    await this.recomputeBurn(businessId);
+  }
+
   async burnProfileFor(businessId: string): Promise<BurnProfile | undefined> {
     return this.state.burnProfiles.find((p) => p.businessId === businessId);
   }
@@ -287,16 +289,6 @@ export class InMemoryRepository implements Repository {
   /* ------------------------------------------------------------------ */
   /* Quotes                                                              */
   /* ------------------------------------------------------------------ */
-
-  async acceptQuote(
-    quoteId: string,
-  ): Promise<{ creditFileId: string; status: string }> {
-    const quote = this.state.quotes.find((q) => q.id === quoteId);
-    if (!quote) throw new ApiError('NOT_FOUND', 'Quote not found', 404);
-    const cf = this.state.creditFiles.find((f) => f.quote.id === quoteId);
-    if (!cf) throw new ApiError('NOT_FOUND', 'Credit file not found for this quote', 404);
-    return { creditFileId: cf.id, status: cf.status };
-  }
 
   async createQuote(businessId: string, input: CreateQuoteBody): Promise<Quote> {
     await this.findBusinessOrThrow(businessId);
@@ -372,6 +364,17 @@ export class InMemoryRepository implements Repository {
 
   async getQuote(id: string): Promise<Quote | undefined> {
     return this.state.quotes.find((q) => q.id === id);
+  }
+
+  async acceptQuote(quoteId: string): Promise<AcceptQuoteResult> {
+    const quote = await this.getQuote(quoteId);
+    if (!quote) throw new ApiError('NOT_FOUND', 'Quote not found', 404);
+    // createQuote already opened the underwriting file; accepting stamps it as
+    // submitted so a repeat accept resolves to the same credit file.
+    const file = this.state.creditFiles.find((f) => f.quote.id === quoteId);
+    if (!file) throw new ApiError('NOT_FOUND', 'Credit file not found', 404);
+    file.submittedAt ??= this.state.now.toISOString();
+    return { creditFileId: file.id, status: file.status };
   }
 
   /* ------------------------------------------------------------------ */
@@ -523,18 +526,19 @@ export class InMemoryRepository implements Repository {
     return this.state.loans.find((l) => l.id === id);
   }
 
-  async paymentsForLoan(loanId: string): Promise<Payment[]> {
-    return this.state.payments
-      .filter((p) => p.loanId === loanId)
-      .sort((a, b) => b.paidAt.localeCompare(a.paidAt));
-  }
-
   async loanByAsset(assetId: string): Promise<Loan | undefined> {
     return this.state.loans.find((l) => l.assetId === assetId);
   }
 
   async scheduleFor(loanId: string): Promise<Installment[]> {
     return this.state.installments[loanId] ?? [];
+  }
+
+  async paymentsFor(loanId: string): Promise<Payment[]> {
+    await this.findLoanOrThrow(loanId);
+    return this.state.payments
+      .filter((p) => p.loanId === loanId && p.status === 'SUCCESS')
+      .sort((a, b) => b.paidAt.localeCompare(a.paidAt));
   }
 
   async payLoan(
@@ -695,6 +699,7 @@ export class InMemoryRepository implements Repository {
     let items = this.state.assets;
     if (query.status) items = items.filter((a) => a.status === query.status);
     if (query.city) items = items.filter((a) => this.state.assetCity[a.id] === query.city);
+    if (query.businessId) items = items.filter((a) => a.businessId === query.businessId);
 
     const total = items.length;
     const page = Math.max(1, query.page ?? 1);

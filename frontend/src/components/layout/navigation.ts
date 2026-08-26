@@ -10,6 +10,8 @@ import {
   SquaresFour,
   Sun,
   Trophy,
+  Wallet,
+  SolarPanel,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { DEMO_BUSINESS_ID } from '@/mocks/seed';
@@ -88,7 +90,7 @@ export const NAV_GROUPS: NavGroup[] = [
 export const OWNER_PRIMARY_NAV: NavItem[] = [
   { to: '/app', label: 'Home', icon: House },
   { to: '/burn', label: 'Burn', icon: Flame, matchPrefix: '/burn' },
-  { to: `/asset/${DEMO_IDS.assetId}`, label: 'Systems', icon: Sun, matchPrefix: '/asset' },
+  { to: '/wallet', label: 'Wallet', icon: Wallet, matchPrefix: '/wallet' },
   { to: '/kyc', label: 'Verify', icon: ShieldCheck, matchPrefix: '/kyc' },
   { to: '/demo', label: 'More', icon: DotsThreeCircle, matchPrefix: '/demo' },
 ];
@@ -112,6 +114,18 @@ export const OWNER_NAV_GROUPS: NavGroup[] = [
         label: 'Your systems',
         icon: Sun,
         matchPrefix: '/asset',
+      },
+      {
+        to: '/wallet',
+        label: 'Wallet',
+        icon: Wallet,
+        matchPrefix: '/wallet',
+      },
+      {
+        to: '/solar-options',
+        label: 'Solar loan',
+        icon: SolarPanel,
+        matchPrefix: '/solar-options',
       },
       {
         to: `/wrapped/${DEMO_IDS.businessId}`,

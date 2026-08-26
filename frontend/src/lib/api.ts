@@ -3,6 +3,7 @@
 // change and nothing in the UI has to know which one is running.
 
 import type {
+  AcceptQuoteResult,
   AdvanceTimeBody,
   ApiEnvelope,
   ApiMode,
@@ -10,6 +11,7 @@ import type {
   ApproveResult,
   Asset,
   Business,
+  BusinessSummary,
   BurnProfile,
   CreateBusinessBody,
   CreateFuelLogBody,
@@ -30,6 +32,7 @@ import type {
   MissPaymentBody,
   PagedEnvelope,
   PayBody,
+  Payment,
   PayResult,
   PortfolioAssetsQuery,
   PortfolioStats,
@@ -147,6 +150,10 @@ export const api = {
         query: { year: options?.year, days: options?.days },
       }),
     quote: (id: string, body: CreateQuoteBody) => post<Quote>(`/businesses/${id}/quote`, body),
+    /** Live asset/loan/quote ids for this business — how the dashboard bootstraps. */
+    summary: (id: string) => request<BusinessSummary>(`/businesses/${id}/summary`),
+    /** The business's latest credit file, or null before the first quote. */
+    application: (id: string) => request<CreditFile | null>(`/businesses/${id}/application`),
   },
 
   systems: {
@@ -156,6 +163,7 @@ export const api = {
 
   quotes: {
     get: (id: string) => request<Quote>(`/quotes/${id}`),
+    accept: (id: string) => post<AcceptQuoteResult>(`/quotes/${id}/accept`),
   },
 
   credit: {
@@ -179,6 +187,7 @@ export const api = {
     get: (id: string) => request<Loan>(`/loans/${id}`),
     pay: (id: string, body: PayBody) => post<PayResult>(`/loans/${id}/pay`, body),
     schedule: (id: string) => request<ListEnvelope<Installment>>(`/loans/${id}/schedule`),
+    payments: (id: string) => request<ListEnvelope<Payment>>(`/loans/${id}/payments`),
   },
 
   portfolio: {
@@ -198,6 +207,7 @@ export const api = {
   wallets: {
     create: (body: CreateWalletBody) => post<Wallet>('/wallets/create', body),
     balance: () => request<Wallet>('/wallets/balance'),
+    fund: (amountKobo: number) => post<Wallet>('/wallets/fund', { amountKobo }),
     statement: (query: { limit?: number } = {}) =>
       request<ListEnvelope<WalletTransaction>>('/wallets/statement', { query: { ...query } }),
   },
@@ -211,6 +221,10 @@ export const api = {
     list: (businessId: string, limit = 30, offset = 0) =>
       request<PagedEnvelope<FuelLog>>(`/businesses/${businessId}/fuel-logs`, {
         query: { limit, offset },
+      }),
+    remove: (businessId: string, logId: string) =>
+      request<{ ok: true }>(`/businesses/${businessId}/fuel-logs/${logId}`, {
+        method: 'DELETE',
       }),
   },
 

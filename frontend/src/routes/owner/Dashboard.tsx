@@ -71,16 +71,14 @@ function Stepper({ steps }: { steps: StepDef[] }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const {
-    businessId,
-    demoBusinessId,
-    demoLoanId,
-    demoQuoteId,
-    demoAssetId,
-  } = useSession();
+  const { businessId, demoBusinessId, demoLoanId, demoQuoteId, demoAssetId } = useSession();
 
-  const effectiveBusinessId =
-    API_MODE === 'live' ? businessId : demoBusinessId;
+  const effectiveBusinessId = businessId ?? demoBusinessId;
+  // The live ids come from GET /businesses/:id/summary. The demo ids seed the
+  // first paint so mock mode renders before the summary resolves.
+  const [assetId, setAssetId] = useState<string | null>(demoAssetId);
+  const [loanId, setLoanId] = useState<string | null>(demoLoanId);
+  const [quoteId, setQuoteId] = useState<string | null>(demoQuoteId);
 
   const [business, setBusiness] = useState<Business | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -88,6 +86,7 @@ export default function Dashboard() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [burn, setBurn] = useState<BurnProfile | null>(null);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [application, setApplication] = useState<CreditFile | null>(null);
   const [hasLogs, setHasLogs] = useState<boolean | null>(null);
   const [creditFile, setCreditFile] = useState<CreditFile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,133 +94,108 @@ export default function Dashboard() {
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
 
-  /* Asset status polling */
+
+  const prevStatus = useRef<Asset['status'] | null>(null);
   const [suspendedBanner, setSuspendedBanner] = useState(false);
-  const prevAssetStatus = useRef<AssetStatus | null>(null);
+
+  const isNewUser = !burn || burn.daysObserved === 0;
+  const hasQuote = !!quote;
+  const hasAsset = !!asset;
+
+  // Application status stepper steps
+  const stepFuel = !!burn && burn.daysObserved > 0;
+  const stepQuote = hasQuote;
+  const stepApplication = !!application?.submittedAt || application?.status === 'APPROVED';
+  const stepInstalled = hasAsset;
+  const steps = [
+    { label: 'Fuel logged', complete: stepFuel },
+    { label: 'Quote reviewed', complete: stepQuote },
+    { label: 'Application submitted', complete: stepApplication },
+    { label: 'System installed', complete: stepInstalled },
+  ];
+
+
 
   useEffect(() => {
-    if (!effectiveBusinessId) {
-      setLoading(false);
-      return;
-    }
+    if (!effectiveBusinessId) return;
     let cancelled = false;
     async function load() {
+      const id = effectiveBusinessId!;
       try {
-        const effectiveAssetId =
-          API_MODE === 'live' ? null : demoAssetId;
-        const effectiveLoanId =
-          API_MODE === 'live' ? null : demoLoanId;
-        const effectiveQuoteId =
-          API_MODE === 'live' ? null : demoQuoteId;
-
-        const b = await api.businesses.get(effectiveBusinessId!);
+        const [b, summary] = await Promise.all([
+          api.businesses.get(id),
+          api.businesses.summary(id),
+        ]);
         if (cancelled) return;
         setBusiness(b);
+        setAssetId(summary.assetId);
+        setLoanId(summary.loanId);
+        setQuoteId(summary.quoteId);
 
-        // Load asset: in live mode fetch from portfolio
-        if (API_MODE === 'live') {
-          try {
-            const assets = await api.portfolio.assets({ businessId: effectiveBusinessId! });
-            if (!cancelled && assets.items.length > 0) {
-              const a = assets.items[0];
-              setAsset(a);
-              prevAssetStatus.current = a.status;
-              if (a.status === 'SUSPENDED') setSuspendedBanner(true);
-              // Fetch loan from the asset
-              try {
-                const l = await api.loans.get(`loan_${a.id}`);
-                if (!cancelled) setLoan(l);
-              } catch { /* loan may not exist yet */ }
-            }
-          } catch { /* no assets yet */ }
-          // Fetch quote
-          try {
-            const quotes = await api.credit.applications({ businessId: effectiveBusinessId! } as never);
-            if (!cancelled && quotes.items.length > 0) {
-              const cf = quotes.items[0];
-              setCreditFile(cf);
-              setQuote(cf.quote);
-            }
-          } catch { /* no quote yet */ }
-        } else {
-          // Mock mode: use demo IDs
-          const [a, l, q] = await Promise.all([
-            effectiveAssetId ? api.assets.get(effectiveAssetId) : Promise.resolve(null),
-            effectiveLoanId ? api.loans.get(effectiveLoanId) : Promise.resolve(null),
-            effectiveQuoteId ? api.quotes.get(effectiveQuoteId) : Promise.resolve(null),
-          ]);
-          if (!cancelled) {
-            setAsset(a);
-            setLoan(l);
-            setQuote(q);
-            if (a) prevAssetStatus.current = a.status;
-            if (a?.status === 'SUSPENDED') setSuspendedBanner(true);
-          }
+        // Everything below is optional: a business with no quote, no asset or
+        // no loan still renders the parts of the dashboard it does have.
+        const [a, l, q, fl, br, app] = await Promise.all([
+          summary.assetId ? api.assets.get(summary.assetId).catch(() => null) : null,
+          summary.loanId ? api.loans.get(summary.loanId).catch(() => null) : null,
+          summary.quoteId ? api.quotes.get(summary.quoteId).catch(() => null) : null,
+          api.fuelLogs.list(id, 5).catch(() => null),
+          api.businesses.burn(id).catch(() => null),
+          api.businesses.application(id).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setAsset(a);
+        setLoan(l);
+        setQuote(q);
+        setBurn(br);
+        setApplication(app);
+        if (fl) {
+          setFuelLogs(fl.items);
+          setHasLogs(fl.items.length > 0);
         }
-
-        // Fuel logs
-        try {
-          const fl = await api.fuelLogs.list(effectiveBusinessId!, 5);
-          if (!cancelled) {
-            setFuelLogs(fl.items);
-            setHasLogs(fl.items.length > 0);
-          }
-        } catch { /* ignore */ }
-
-        // Burn profile
-        try {
-          const br = await api.businesses.burn(effectiveBusinessId!);
-          if (!cancelled) setBurn(br);
-        } catch { /* burn may not exist yet */ }
-
       } catch {
-        // ignore
+        // The business itself could not be read; the empty state covers it.
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [effectiveBusinessId, demoAssetId, demoLoanId, demoQuoteId]);
+  }, [effectiveBusinessId]);
 
-  /* Poll asset status every 5 seconds for suspension changes */
+  // Poll asset status every 5 seconds for suspension banner
   useEffect(() => {
-    if (!asset) return;
+    if (!assetId) return;
     let active = true;
     const poll = async () => {
       try {
-        const fresh = await api.assets.get(asset.id);
-        if (!active) return;
-        const prev = prevAssetStatus.current;
-        if (prev && prev !== fresh.status) {
-          if (fresh.status === 'SUSPENDED') {
-            setSuspendedBanner(true);
-          } else if (prev === 'SUSPENDED' && fresh.status === 'ACTIVE') {
-            setSuspendedBanner(false);
-            setToastMsg('System restored. You are back on solar.');
-            setToastOpen(true);
+        const fresh = await api.assets.get(assetId);
+        if (active) {
+          if (prevStatus.current && prevStatus.current !== fresh.status) {
+            if (fresh.status === 'SUSPENDED') setSuspendedBanner(true);
+            else if (prevStatus.current === 'SUSPENDED') { setSuspendedBanner(false); setToastOpen(true); }
           }
+          if (fresh.status === 'SUSPENDED') setSuspendedBanner(true);
+          prevStatus.current = fresh.status;
+          setAsset(fresh);
         }
-        prevAssetStatus.current = fresh.status;
-        setAsset(fresh);
-      } catch { /* retry next interval */ }
+      } catch { /* retry */ }
     };
+    poll();
     const timer = setInterval(poll, 5000);
     return () => { active = false; clearInterval(timer); };
-  }, [asset]);
-
-  const [toastMsg, setToastMsg] = useState('');
+  }, [assetId]);
 
   async function handlePay() {
-    const effectiveLoanId = API_MODE === 'live' ? loan?.id : demoLoanId;
-    if (!effectiveLoanId) return;
+    if (!loanId) return;
     setPaying(true);
     try {
-      await api.loans.pay(effectiveLoanId, { source: 'wallet' });
+      await api.loans.pay(loanId, { source: 'wallet' });
       setPayOpen(false);
       setToastOpen(true);
-      const updated = await api.loans.get(effectiveLoanId);
+      // Refresh loan
+      const updated = await api.loans.get(loanId);
       setLoan(updated);
     } catch {
       // ignore
@@ -244,33 +218,37 @@ export default function Dashboard() {
     return quote.tenorMonths - Math.ceil(loan.balanceKobo / loan.monthlyPaymentKobo);
   }
 
-  /* Derived state */
-  const isNewUser = !burn || burn.daysObserved === 0;
-  const hasQuote = !!quote;
-  const hasAsset = !!asset;
-
-  const effectiveQuoteId = API_MODE === 'live' ? quote?.id : demoQuoteId;
-
-  const steps: StepDef[] = [
-    { label: 'Fuel logged', complete: !!burn && burn.daysObserved > 0 },
-    { label: 'Quote reviewed', complete: hasQuote },
-    {
-      label: 'Application submitted',
-      complete:
-        creditFile?.status === 'PENDING' ||
-        creditFile?.status === 'APPROVED',
-    },
-    {
-      label: 'System installed',
-      complete: hasAsset && asset?.status !== undefined,
-    },
-  ];
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper-2">
         <p className="text-ink-mute">Loading your dashboard...</p>
       </div>
+    );
+  }
+
+  // New user state
+  if (isNewUser) {
+    return (
+      <AppShell nav={<GlassNav left={<Link to="/app" className="flex items-center gap-2.5"><Logo variant="mark" /></Link>} right={<button type="button" onClick={() => { useSession.getState().signOut(); navigate("/login"); }} className="flex items-center gap-1.5 text-sm text-ink-mute hover:text-ink"><SignOut size={16} weight="regular" /> Log out</button>} />} >
+        <div className="mx-auto max-w-lg">
+          <GlassCard elevation={2} padding="lg">
+            <h1 className="font-display text-2xl text-ink">
+              {business?.name ? `Welcome, ${business.name}.` : 'Welcome. Let\'s start with your fuel.'}
+            </h1>
+            <p className="mt-3 text-ink-soft">We need a few weeks of fuel spending to size your solar system and give you a real quote. It takes about two minutes.</p>
+            <div className="mt-6 rounded-xl bg-paper-3 px-4 py-3">
+              <p className="text-sm text-ink-mute">Wallet balance</p>
+              <p className="mt-1 font-display text-2xl text-ink">₦0.00</p>
+              <p className="text-xs text-ink-mute">Fund your wallet to make loan payments</p>
+            </div>
+            <div className="mt-8">
+              <a href="/log-fuel" className="inline-flex items-center justify-center rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper hover:bg-blue">Tell us your fuel history</a>
+            </div>
+            <p className="mt-4 text-sm text-ink-mute">You can also come back to this later.</p>
+          </GlassCard>
+        </div>
+      </AppShell>
     );
   }
 
@@ -300,49 +278,16 @@ export default function Dashboard() {
       }
     >
       <div className="mx-auto max-w-3xl">
-        {/* Suspension banner - persistent, above everything */}
+        {/* Suspended banner */}
         {suspendedBanner && (
-          <GlassCard padding="md" className="mb-6 border-l-4 border-burn">
+          <GlassCard padding="md" className="mb-6 border border-burn/30 bg-burn/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Warning size={20} weight="bold" className="text-burn" />
-                <div>
-                  <p className="font-medium text-ink">
-                    Your system has been suspended. Pay to restore it.
-                  </p>
-                </div>
+                <Warning size={24} weight="bold" className="text-burn" />
+                <p className="text-ink">Your system has been suspended. Pay to restore it.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setPayOpen(true)}
-                className="rounded-lg border border-burn px-4 py-2 text-sm font-medium text-burn transition-colors duration-200 ease-lg hover:bg-burn/10"
-              >
-                Pay now
-              </button>
+              <button type="button" onClick={() => setPayOpen(true)} className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-paper hover:bg-blue">Pay now</button>
             </div>
-          </GlassCard>
-        )}
-
-        {/* New user welcome state */}
-        {isNewUser && (
-          <GlassCard elevation={2} padding="lg" className="flex flex-col items-center text-center">
-            <h1 className="font-display text-2xl leading-tight text-ink">
-              Welcome. Let's start with your fuel.
-            </h1>
-            <p className="mt-4 max-w-md text-ink-soft">
-              We need a few weeks of fuel spending to size your solar system and
-              give you a real quote. It takes about two minutes.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/log-fuel')}
-              className="mt-6 rounded-lg bg-navy px-6 py-3 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue"
-            >
-              Tell us your fuel history
-            </button>
-            <p className="mt-3 text-sm text-ink-mute">
-              You can also come back to this later.
-            </p>
           </GlassCard>
         )}
 
@@ -402,8 +347,8 @@ export default function Dashboard() {
               <Stepper steps={steps} />
             </div>
 
-            {/* Quick actions - only Log fuel and Your quote */}
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Quick actions */}
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               <Link to={hasLogs === false ? '/log-fuel' : '/burn'}>
                 <GlassCard hoverable padding="lg" className={cn('h-full', hasLogs === null && 'opacity-50')}>
                   {hasLogs === false ? (
@@ -421,11 +366,18 @@ export default function Dashboard() {
                   )}
                 </GlassCard>
               </Link>
-              <Link to={effectiveQuoteId ? `/quote/${effectiveQuoteId}` : '#'}>
-                <GlassCard hoverable padding="lg" className="h-full">
+              <Link to="/solar-options">
+                <GlassCard hoverable padding="lg" className="h-full border border-navy/20 bg-navy/5">
                   <Receipt size={28} weight="bold" className="text-navy" />
+                  <h3 className="mt-3 font-display text-base text-ink">Get solar</h3>
+                  <p className="mt-1 text-sm text-ink-soft">See loan options for your shop</p>
+                </GlassCard>
+              </Link>
+              <Link to={quoteId ? `/quote/${quoteId}` : '/solar-options'}>
+                <GlassCard hoverable padding="lg" className="h-full">
+                  <Receipt size={28} weight="bold" className="text-ink-mute" />
                   <h3 className="mt-3 font-display text-base text-ink">Your quote</h3>
-                  <p className="mt-1 text-sm text-ink-soft">See your solar plan</p>
+                  <p className="mt-1 text-sm text-ink-soft">Review your solar plan</p>
                 </GlassCard>
               </Link>
             </div>

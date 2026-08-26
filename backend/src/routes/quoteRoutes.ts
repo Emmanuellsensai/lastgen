@@ -26,8 +26,7 @@ export function createQuoteRouter(repo: Repository): Router {
 
   router.post('/quotes/:id/accept', (req, res, next) => {
     void (async () => {
-      const result = await repo.acceptQuote(req.params.id);
-      res.status(201).json(ok(result));
+      res.status(201).json(ok(await repo.acceptQuote(req.params.id)));
     })().catch(next);
   });
 

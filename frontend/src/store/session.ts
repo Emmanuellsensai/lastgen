@@ -62,10 +62,9 @@ export const useSession = create<SessionState>()(
         }),
 
       signInWithEmail: async (email, _password) => {
-        const { api, setAuthToken, API_MODE } = await import('@/lib/api');
+        const { api, API_MODE, setAuthToken } = await import('@/lib/api');
 
         if (API_MODE === 'live') {
-          // Live mode: route through backend, which creates the business record
           const result = await api.auth.login({ email, password: _password });
           setAuthToken(result.accessToken);
           set({
@@ -79,7 +78,6 @@ export const useSession = create<SessionState>()(
             isAdmin: result.role === 'bank',
           });
         } else {
-          // Mock mode: call mock endpoint
           const result = await api.auth.login({ email, password: _password });
           set({
             email: result.user.email,
@@ -105,7 +103,6 @@ export const useSession = create<SessionState>()(
           const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
           if (error) throw error;
         } else {
-          // Mock mode: demo shortcut
           get().signIn('owner');
         }
       },
@@ -117,13 +114,12 @@ export const useSession = create<SessionState>()(
           const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
           if (error) throw error;
         } else {
-          // Mock mode: demo shortcut
           get().signIn('owner');
         }
       },
 
       register: async (body) => {
-        const { api, setAuthToken, API_MODE } = await import('@/lib/api');
+        const { api, API_MODE, setAuthToken } = await import('@/lib/api');
 
         if (API_MODE === 'live') {
           const result = await api.auth.register(body);
@@ -158,13 +154,11 @@ export const useSession = create<SessionState>()(
       },
 
       bootstrap: async () => {
-        const { API_MODE } = await import('@/lib/api');
+        const { API_MODE } = await import("@/lib/api");
         if (API_MODE !== 'live') return;
         const state = useSession.getState();
         if (!state.businessId) return;
         try {
-          // TODO(BE): needs GET /businesses/:id/summary
-          // Expected response: { assetId, loanId, quoteId }
           // Until that endpoint exists, components fetch individually
         } catch { /* ignore */ }
       },

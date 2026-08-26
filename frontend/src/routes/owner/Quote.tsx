@@ -1,115 +1,77 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle } from '@phosphor-icons/react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { AppShell } from '@/components/layout';
 import { GlassCard, GlassPanel, GlassSheet } from '@/components/ui/glass';
 import { Money } from '@/components/lastgen';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Toast, ToastTitle } from '@/components/ui/toast';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
-import type { Quote as QuoteType, Installment, BurnProfile } from '@/types/api';
+import type { Quote as QuoteType, BurnProfile, Installment } from '@/types/api';
 
-const PAGE_SIZE = 12;
+function estimatedRows(q: QuoteType): {n:number;dueAt:string;principalKobo:number;interestKobo:number;balanceKobo:number}[] {
+  const r = q.aprBps / 10000;
+  const principal = Math.round(q.monthlyPaymentKobo * (1 - r));
+  const interest = Math.round(q.monthlyPaymentKobo * r);
+  return Array.from({length: 3}, (_, i) => ({ n: i + 1, dueAt: 'TBD', balanceKobo: 0, principalKobo: principal, interestKobo: interest }));
+}
 
 export default function Quote() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { businessId, demoLoanId, demoBusinessId } = useSession();
+  const { businessId, demoBusinessId, demoQuoteId } = useSession();
+  const effectiveBusinessId = businessId ?? demoBusinessId;
 
   const [quote, setQuote] = useState<QuoteType | null>(null);
   const [burn, setBurn] = useState<BurnProfile | null>(null);
-  const [schedule, setSchedule] = useState<Installment[]>([]);
+  const [schedule] = useState<Installment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
   const [schedulePage, setSchedulePage] = useState(0);
 
-  /* Accept flow */
-  const [acceptOpen, setAcceptOpen] = useState(false);
-  const [accepting, setAccepting] = useState(false);
-  const [accepted, setAccepted] = useState(false);
-
   useEffect(() => {
-    if (!id) return;
+    const quoteId = id ?? demoQuoteId;
+    if (!quoteId) return;
     let cancelled = false;
     async function load() {
       try {
-        const q = await api.quotes.get(id!);
-        if (cancelled) return;
-        setQuote(q);
-
-        // Load burn for comparison
-        const effectiveBusinessId = businessId || demoBusinessId;
-        if (effectiveBusinessId) {
-          try {
-            const br = await api.businesses.burn(effectiveBusinessId);
-            if (!cancelled) setBurn(br);
-          } catch { /* burn may not exist */ }
-        }
-
-        // Load repayment schedule
-        const effectiveLoanId = demoLoanId;
-        if (effectiveLoanId) {
-          try {
-            const sched = await api.loans.schedule(effectiveLoanId);
-            if (!cancelled) setSchedule(sched.items);
-          } catch { /* schedule may not exist yet */ }
-        }
-      } catch {
-        // ignore
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+        const [q, b] = await Promise.all([
+          api.quotes.get(quoteId as string),
+          effectiveBusinessId ? api.businesses.burn(effectiveBusinessId).catch(() => null) : Promise.resolve(null),
+        ]);
+        if (!cancelled) { setQuote(q); if (b) setBurn(b); }
+      } catch { /* ignore */ }
+      finally { if (!cancelled) setLoading(false); }
     }
     load();
     return () => { cancelled = true; };
-  }, [id, businessId, demoBusinessId, demoLoanId]);
+  }, [id, demoQuoteId, effectiveBusinessId]);
 
   async function handleAccept() {
-    if (!id) return;
     setAccepting(true);
     try {
-      // TODO(BE): needs POST /quotes/:id/accept
-      // Expected request: { quoteId }
-      // Expected response: { creditFileId, status: 'PENDING' }
-      // Until available: show success state
+      const quoteId = id ?? demoQuoteId;
+      if (!quoteId) throw new Error('No quote');
+      await api.quotes.accept(quoteId);
       setAccepted(true);
+      setTimeout(() => { setAcceptOpen(false); }, 2000);
     } catch {
-      // ignore
+      setToastOpen(true);
     } finally {
       setAccepting(false);
     }
   }
 
-  /* If no real schedule, show estimated rows */
-  const estimatedSchedule: Installment[] = schedule.length > 0
-    ? schedule
-    : quote
-      ? Array.from({ length: 3 }, (_, i) => {
-          const interest = Math.round(quote.monthlyPaymentKobo * (quote.aprBps / 10000));
-          const principal = quote.monthlyPaymentKobo - interest;
-          return {
-            n: i + 1,
-            dueAt: new Date(Date.now() + (i + 1) * 30 * 86_400_000).toISOString(),
-            principalKobo: principal,
-            interestKobo: interest,
-            balanceKobo: quote.totalPayableKobo - quote.monthlyPaymentKobo * (i + 1),
-          };
-        })
-      : [];
-
-  const totalPages = Math.ceil(estimatedSchedule.length / PAGE_SIZE);
-  const pageItems = estimatedSchedule.slice(
-    schedulePage * PAGE_SIZE,
-    (schedulePage + 1) * PAGE_SIZE,
-  );
+  const rows = schedule.length > 0 ? schedule : quote ? estimatedRows(quote) : [];
+  const PAGE_SIZE = 12;
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pagedRows = rows.slice(schedulePage * PAGE_SIZE, (schedulePage + 1) * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -126,12 +88,13 @@ export default function Quote() {
       </AppShell>
     );
   }
+  const savingsPct = burn ? Math.round(((burn.monthlyKobo - quote.monthlyPaymentKobo) / burn.monthlyKobo) * 100) : 0;
 
   return (
     <AppShell
       subNav={{
-        title: 'Your quote',
-        backTo: '/burn',
+        title: "Your quote",
+        backTo: "/burn",
         action: (
           <Button size="sm" variant="blue" onClick={() => setAcceptOpen(true)}>
             Accept this quote
@@ -143,21 +106,21 @@ export default function Quote() {
       <GlassPanel elevation={2} className="rounded-lg p-7 md:p-10">
         <p className="text-sm text-ink-mute">You would pay, every month</p>
         <Money kobo={quote.monthlyPaymentKobo} size="xl" className="mt-3 block text-ink" />
-        <p className="mt-6 text-lg leading-relaxed text-ink-soft">
-          Against a fuel bill of <Money kobo={burn?.monthlyKobo ?? 0} size="md" /> a month.
-        </p>
+        {burn && (
+          <p className="mt-6 text-lg leading-relaxed text-ink-soft">
+            Against a fuel bill of <Money kobo={burn.monthlyKobo} size="md" /> a month.
+          </p>
+        )}
       </GlassPanel>
 
       {/* Savings */}
       <section className="mt-16">
         <h2 className="font-display text-2xl text-ink">What you keep</h2>
-
         <GlassCard elevation={1} padding="lg" className="mt-6" header={<Badge variant="success">Worth doing</Badge>}>
           <p className="text-sm text-ink-mute">Left in your pocket each month</p>
           <Money kobo={quote.monthlySavingsKobo} size="xl" signed className="mt-3 block text-success" />
           <p className="mt-6 max-w-md leading-relaxed text-ink-soft">
-            That is {quote.savingsPct}% of what you currently burn. The deposit pays itself back by month
-            {quote.breakEvenMonth}.
+            That is {savingsPct} percent of what you currently burn.
           </p>
         </GlassCard>
       </section>
@@ -165,7 +128,6 @@ export default function Quote() {
       {/* Terms */}
       <section className="mt-16">
         <h2 className="font-display text-2xl text-ink">The terms</h2>
-
         <div className="mt-6 grid gap-5 sm:grid-cols-3">
           <GlassCard elevation={1} padding="lg">
             <p className="text-sm text-ink-mute">Term</p>
@@ -185,33 +147,26 @@ export default function Quote() {
       {/* System spec */}
       <section className="mt-16">
         <h2 className="font-display text-2xl text-ink">What gets installed</h2>
-
         <GlassCard elevation={1} padding="lg" className="mt-6">
           <dl className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-ink-mute">System</dt>
-              <dd className="mt-1 font-medium text-ink">{quote.system.name}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-mute">Panels</dt>
-              <dd className="mt-1 font-medium text-ink">{quote.system.panelW.toLocaleString()} W</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-mute">Battery</dt>
-              <dd className="mt-1 font-medium text-ink">{quote.system.batteryKwh} kWh</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-mute">Inverter</dt>
-              <dd className="mt-1 font-medium text-ink">{quote.system.inverterKva} kVA</dd>
-            </div>
+            {[
+              { label: "System", value: quote.system.name },
+              { label: "Panels", value: quote.system.panelW.toLocaleString() + " W" },
+              { label: "Battery", value: quote.system.batteryKwh + " kWh" },
+              { label: "Inverter", value: quote.system.inverterKva + " kVA" },
+            ].map((row) => (
+              <div key={row.label}>
+                <dt className="text-sm text-ink-mute">{row.label}</dt>
+                <dd className="mt-1 font-medium text-ink">{row.value}</dd>
+              </div>
+            ))}
           </dl>
         </GlassCard>
       </section>
 
       {/* Schedule */}
       <section className="mt-16">
-        <h2 className="font-display text-2xl text-ink">Your first payments</h2>
-
+        <h2 className="font-display text-2xl text-ink">Repayment schedule</h2>
         <GlassCard elevation={1} padding="sm" className="mt-6">
           <Table>
             <TableHeader>
@@ -224,19 +179,13 @@ export default function Quote() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pageItems.map((row) => (
+              {pagedRows.map((row) => (
                 <TableRow key={row.n}>
                   <TableCell className="tabular">{row.n}</TableCell>
-                  <TableCell>{new Date(row.dueAt).toLocaleDateString('en-NG', { month: 'short', year: 'numeric' })}</TableCell>
-                  <TableCell>
-                    <Money kobo={row.principalKobo} size="sm" />
-                  </TableCell>
-                  <TableCell>
-                    <Money kobo={row.interestKobo} size="sm" />
-                  </TableCell>
-                  <TableCell>
-                    <Money kobo={row.balanceKobo} size="sm" />
-                  </TableCell>
+                  <TableCell>{row.dueAt}</TableCell>
+                  <TableCell><Money kobo={row.principalKobo} size="sm" /></TableCell>
+                  <TableCell><Money kobo={row.interestKobo} size="sm" /></TableCell>
+                  <TableCell>{row.balanceKobo != null ? <Money kobo={row.balanceKobo} size="sm" /> : "-"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -266,57 +215,43 @@ export default function Quote() {
             </div>
           )}
         </GlassCard>
-
-        <p className="mt-6 text-sm text-ink-mute">Quote reference {id ?? 'unknown'}.</p>
+        <p className="mt-6 text-sm text-ink-mute">Quote reference {id ?? quote.id}.</p>
       </section>
-
       {/* Accept sheet */}
       <GlassSheet
         open={acceptOpen}
         onOpenChange={setAcceptOpen}
         title="Accept your quote."
-        footer={
-          !accepted ? (
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setAcceptOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAccept} disabled={accepting}>
-                {accepting ? 'Submitting...' : 'Yes, submit my application'}
-              </Button>
-            </div>
-          ) : undefined
-        }
+        footer={!accepted ? (
+          <button
+            type="button"
+            onClick={handleAccept}
+            disabled={accepting}
+            className="w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
+          >
+            {accepting ? "Submitting..." : "Yes, submit my application"}
+          </button>
+        ) : undefined}
       >
         {accepted ? (
-          <div className="flex flex-col items-center py-6 text-center">
-            <CheckCircle size={48} weight="bold" className="text-success" />
-            <p className="mt-4 font-display text-lg text-ink">Application submitted.</p>
-            <p className="mt-2 text-ink-soft">
-              A credit officer will review this and get back to you.
-            </p>
-            <Button
-              size="sm"
-              className="mt-6"
-              onClick={() => {
-                setAcceptOpen(false);
-                navigate('/app');
-              }}
-            >
-              Back to dashboard
-            </Button>
+          <div className="flex flex-col items-center py-8">
+            <p className="font-display text-xl text-ink">Application submitted.</p>
+            <p className="mt-3 text-center text-ink-soft">A credit officer will review this and get back to you.</p>
           </div>
         ) : (
           <div>
-            <Money kobo={quote?.monthlyPaymentKobo ?? 0} size="xl" className="mt-2" />
-            <p className="mt-6 text-sm leading-relaxed text-ink-soft">
-              By accepting, you agree to make {quote?.tenorMonths} monthly payments of{' '}
-              <Money kobo={quote?.monthlyPaymentKobo ?? 0} size="sm" className="inline" />.
+            <Money kobo={quote.monthlyPaymentKobo} size="lg" className="mt-2" />
+            <p className="mt-4 text-sm leading-relaxed text-ink-soft">
+              By accepting, you agree to make {quote.tenorMonths} monthly payments.
               Your system will be installed within 5 business days of approval.
             </p>
           </div>
         )}
       </GlassSheet>
+
+      <Toast open={toastOpen} onOpenChange={setToastOpen} tone="danger">
+        <ToastTitle>Something went wrong. Please try again.</ToastTitle>
+      </Toast>
     </AppShell>
   );
 }

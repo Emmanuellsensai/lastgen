@@ -11,7 +11,9 @@ import { ApiError } from '../middleware/errorHandler.js';
 // the backend proxies Supabase auth so the frontend keeps using the same
 // API contract regardless of mode.
 
-export function createAuthRouter(repo: Repository, env: Env): Router {
+// Public (pre-auth-boundary) router: login and register do not require a
+// bearer token — they are the endpoints that produce one.
+export function createPublicAuthRouter(repo: Repository, env: Env): Router {
   const router = Router();
 
   // POST /auth/login — demo shim or live Supabase password grant.
@@ -146,6 +148,13 @@ export function createAuthRouter(repo: Repository, env: Env): Router {
       );
     })().catch(next);
   });
+
+  return router;
+}
+
+// Authenticated router: routes that require a valid bearer token.
+export function createAuthRouter(repo: Repository, _env: Env): Router {
+  const router = Router();
 
   // POST /auth/verify-nin — KYC verification shim.
   router.post('/auth/verify-nin', (req, res, next) => {

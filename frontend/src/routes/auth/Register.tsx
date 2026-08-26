@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Warning } from '@phosphor-icons/react';
+import { ArrowRight } from '@phosphor-icons/react';
 import { GlassCard } from '@/components/ui/glass';
 import { Logo } from '@/components/layout/Logo';
 import { Button } from '@/components/ui/button';
@@ -20,17 +20,7 @@ const BUSINESS_TYPES = [
   'Bakery',
   'Other',
 ];
-
-const CITIES = [
-  'Lagos',
-  'Abuja',
-  'Ibadan',
-  'Port Harcourt',
-  'Kano',
-  'Enugu',
-  'Kaduna',
-  'Other',
-];
+const CITIES = ['Lagos', 'Abuja', 'Ibadan', 'Port Harcourt', 'Kano', 'Enugu', 'Kaduna', 'Other'];
 
 export default function Register() {
   const navigate = useNavigate();
@@ -43,7 +33,6 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Setup phase state
   const [businessType, setBusinessType] = useState(BUSINESS_TYPES[0]);
   const [city, setCity] = useState(CITIES[0]);
   const [generatorKva, setGeneratorKva] = useState('5');
@@ -64,6 +53,7 @@ export default function Register() {
       setError('Password must be at least 6 characters');
       return;
     }
+
     setLoading(true);
     setError('');
     try {
@@ -76,29 +66,22 @@ export default function Register() {
     }
   }
 
-  async function handleSetup(e: React.FormEvent) {
-    e.preventDefault();
-    const state = useSession.getState();
-    if (!state.businessId) {
-      // No business ID from registration, skip setup
-      navigate('/app');
-      return;
-    }
+  async function handleBusinessSetup() {
     setSetupLoading(true);
     setSetupError('');
     try {
-      const kva = parseFloat(generatorKva) || 5;
+      const kva = generatorKva ? parseFloat(generatorKva) : 5;
       const business = await api.businesses.create({
         name: `${fullName}'s Business`,
-        type: businessType,
-        city,
+        type: businessType || 'Other',
+        city: city || 'Lagos',
         generatorKva: kva,
         hoursPerDay: 8,
       });
       useSession.getState().setBusinessId(business.id);
       navigate('/app');
     } catch {
-      setSetupError('Could not create business. Please try again.');
+      setSetupError('Could not save your business. Try again.');
     } finally {
       setSetupLoading(false);
     }
@@ -112,59 +95,43 @@ export default function Register() {
             <Logo variant="mark" />
             <span className="font-display text-xl leading-none text-ink">Lastgen</span>
           </div>
-
           <GlassCard elevation={2} padding="lg">
             <h1 className="text-center font-display text-2xl text-ink">Tell us about your business.</h1>
             <p className="mt-2 text-center text-ink-soft">This helps us size the right system for you.</p>
-
             {setupError && (
-              <div className="mt-4 rounded-lg bg-burn/10 p-3">
-                <div className="flex items-center gap-2 text-sm text-burn">
-                  <Warning size={16} weight="bold" />
-                  {setupError}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => { setSetupError(''); }}
-                >
-                  Try again
-                </Button>
-              </div>
+              <p className="mt-4 rounded-lg bg-burn/10 p-3 text-center text-sm text-burn">{setupError}</p>
             )}
-
-            <form onSubmit={handleSetup} className="mt-6 flex flex-col gap-4">
+            <div className="mt-6 flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="businessType">Business type</Label>
                 <select
                   id="businessType"
                   value={businessType}
                   onChange={(e) => setBusinessType(e.target.value)}
-                  disabled={setupLoading}
-                  className="flex w-full rounded-lg border border-line bg-paper px-4 py-3 text-sm text-ink transition-colors duration-200 ease-lg focus:border-blue focus:outline-none disabled:opacity-50"
+                  className="rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink"
                 >
-                  {BUSINESS_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
+                  {BUSINESS_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
                 </select>
               </div>
-
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="city">City</Label>
                 <select
                   id="city"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  disabled={setupLoading}
-                  className="flex w-full rounded-lg border border-line bg-paper px-4 py-3 text-sm text-ink transition-colors duration-200 ease-lg focus:border-blue focus:outline-none disabled:opacity-50"
+                  className="rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink"
                 >
                   {CITIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
-
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="generatorKva">Generator size (kVA)</Label>
                 <Input
@@ -176,25 +143,22 @@ export default function Register() {
                   placeholder="e.g. 5.5"
                   value={generatorKva}
                   onChange={(e) => setGeneratorKva(e.target.value)}
-                  disabled={setupLoading}
                 />
               </div>
-
-              <Button type="submit" disabled={setupLoading} className="w-full">
-                {setupLoading ? 'Creating business...' : 'Continue'}
+            </div>
+            <div className="mt-6 flex flex-col gap-3">
+              <Button type="button" onClick={handleBusinessSetup} disabled={setupLoading} className="w-full">
+                {setupLoading ? 'Saving...' : 'Continue'}
                 {!setupLoading && <ArrowRight size={20} weight="regular" />}
               </Button>
-            </form>
-
-            <p className="mt-6 text-center">
               <button
                 type="button"
                 onClick={() => navigate('/app')}
-                className="text-sm text-ink-mute transition-colors duration-200 ease-lg hover:text-ink"
+                className="text-center text-sm text-ink-mute hover:text-ink-soft"
               >
                 Skip for now
               </button>
-            </p>
+            </div>
           </GlassCard>
         </div>
       </div>
@@ -213,9 +177,7 @@ export default function Register() {
           <h1 className="text-center font-display text-2xl text-ink">Create your account</h1>
           <p className="mt-2 text-center text-ink-soft">Get started with Lastgen</p>
 
-          {error && (
-            <p className="mt-4 rounded-lg bg-burn/10 p-3 text-center text-sm text-burn">{error}</p>
-          )}
+          {error && <p className="mt-4 rounded-lg bg-burn/10 p-3 text-center text-sm text-burn">{error}</p>}
 
           <form onSubmit={handleRegister} className="mt-6 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">

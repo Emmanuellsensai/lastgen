@@ -92,7 +92,8 @@ function dateToISO(dateStr: string): string {
 
 export default function LogFuel() {
   const navigate = useNavigate();
-  const { demoBusinessId } = useSession();
+  const { businessId, demoBusinessId } = useSession();
+  const effectiveBusinessId = businessId ?? demoBusinessId;
 
   /* Step 1: Time window */
   const [selectedWindow, setSelectedWindow] = useState<TimeWindow | null>(null);
@@ -101,7 +102,6 @@ export default function LogFuel() {
   /* Step 2: Entry collection */
   const [entries, setEntries] = useState<FuelEntry[]>([]);
   const [date, setDate] = useState(todayISO());
-  const [litres, setLitres] = useState('');
   const [amountNaira, setAmountNaira] = useState('');
   const [pricePerLitre, setPricePerLitre] = useState(String(DEFAULT_PRICE_PER_LITRE));
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -121,11 +121,17 @@ export default function LogFuel() {
   useEffect(() => {
     setEntries([]);
     setDate(todayISO());
-    setLitres('');
     setAmountNaira('');
     setPricePerLitre(String(DEFAULT_PRICE_PER_LITRE));
     setShowAdvanced(false);
   }, [selectedWindow?.days]);
+
+  const amountValue = parseFloat(amountNaira);
+  const priceValue = parseFloat(pricePerLitre);
+  const calculatedLitres =
+    amountValue > 0 && priceValue > 0 ? amountValue / priceValue : 0;
+  const calculatedLitresDisplay =
+    calculatedLitres > 0 ? calculatedLitres.toFixed(2) : '';
 
   const handleContinue = useCallback(() => {
     step2Ref.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,7 +140,7 @@ export default function LogFuel() {
   const addEntry = useCallback(() => {
     const amt = parseFloat(amountNaira);
     const ppl = parseFloat(pricePerLitre) || DEFAULT_PRICE_PER_LITRE;
-    const ltrs = litres ? parseFloat(litres) : amt / ppl;
+    const ltrs = amt > 0 && ppl > 0 ? amt / ppl : 0;
 
     if (!date || !amt || amt <= 0 || !ltrs || ltrs <= 0) return;
 
@@ -146,9 +152,8 @@ export default function LogFuel() {
       pricePerLitre: ppl,
     };
     setEntries((prev) => [...prev, entry]);
-    setLitres('');
     setAmountNaira('');
-  }, [date, litres, amountNaira, pricePerLitre]);
+  }, [date, amountNaira, pricePerLitre]);
 
   const removeEntry = useCallback((id: string) => {
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -168,7 +173,13 @@ export default function LogFuel() {
   }, []);
 
   const handleSaveAll = useCallback(async () => {
-    if (!demoBusinessId || entries.length === 0) return;
+    if (!effectiveBusinessId) {
+      setToastMsg('Could not find your business profile. Please refresh and try again.');
+      setToastTone('warning');
+      setToastOpen(true);
+      return;
+    }
+    if (entries.length === 0) return;
     setSaving(true);
     let savedCount = 0;
     let failed = false;
@@ -180,7 +191,7 @@ export default function LogFuel() {
         continue;
       }
       try {
-        await api.businesses.addFuelLog(demoBusinessId, {
+        await api.businesses.addFuelLog(effectiveBusinessId, {
           litres: entry.litres,
           amountKobo: Math.round(entry.amountNaira * 100),
           pricePerLitreKobo: Math.round(entry.pricePerLitre * 100),
@@ -202,11 +213,11 @@ export default function LogFuel() {
       setToastMsg(`All ${savedCount} entries saved.`);
       setToastTone('success');
       setToastOpen(true);
-      setTimeout(() => navigate('/app'), 1200);
+      setTimeout(() => navigate('/solar-options'), 1200);
     }
-  }, [demoBusinessId, entries, navigate]);
+  }, [effectiveBusinessId, entries, navigate]);
 
-  const addEntryDisabled = !date || !amountNaira || parseFloat(amountNaira) <= 0;
+  const addEntryDisabled = !date || calculatedLitres <= 0;
   const range = selectedWindow ? getDateRange(selectedWindow.days) : null;
 
   return (
@@ -265,6 +276,30 @@ export default function LogFuel() {
               <div className="mt-3 rounded-md bg-paper-3 px-3 py-2 text-sm text-ink-mute">
                 Showing entries for {WINDOW_OPTIONS.find((o) => o.value.days === selectedWindow.days)?.label} ({range.label})
               </div>
+
+              {/* Average daily spend preview */}
+              {entries.filter(e => !e.label && e.amountNaira > 0).length >= 2 && selectedWindow && (
+                <div className="mt-4 rounded-xl bg-navy/5 border border-navy/20 px-4 py-3">
+                  <p className="text-xs text-ink-mute">Estimated average daily spend</p>
+                  {(() => {
+                    const real = entries.filter(e => !e.label && e.amountNaira > 0);
+                    const totalNaira = real.reduce((s, e) => s + e.amountNaira, 0);
+                    const dailyNaira = totalNaira / selectedWindow.days;
+                    const monthlyNaira = dailyNaira * 30;
+                    return (
+                      <div className="mt-1 flex items-end gap-4">
+                        <div>
+                          <p className="font-display text-xl text-ink">₦{Math.round(dailyNaira).toLocaleString()}<span className="text-sm text-ink-mute font-normal">/day</span></p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-ink-soft">₦{Math.round(monthlyNaira).toLocaleString()}<span className="text-xs text-ink-mute">/month</span></p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <p className="mt-1 text-xs text-ink-mute">Based on {entries.filter(e => !e.label).length} entries over {selectedWindow.days} days</p>
+                </div>
+              )}
 
               {/* Entries list */}
               <div className="mt-4">
@@ -349,8 +384,8 @@ export default function LogFuel() {
                       min="0"
                       step="0.1"
                       placeholder="0.0"
-                      value={litres}
-                      onChange={(e) => setLitres(e.target.value)}
+                      value={calculatedLitresDisplay}
+                      readOnly
                       className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink"
                     />
                   </div>
@@ -409,11 +444,17 @@ export default function LogFuel() {
               </div>
 
               {/* Save all button */}
+              {entries.length < 2 && entries.length > 0 && (
+                <p className="mt-4 text-sm text-ink-mute">Add at least one more entry so we can calculate your average daily spend.</p>
+              )}
+              {entries.length === 0 && (
+                <p className="mt-4 text-sm text-ink-mute">Add at least 2 entries to calculate your average daily fuel spend.</p>
+              )}
               <button
                 type="button"
                 onClick={handleSaveAll}
-                disabled={entries.length === 0 || saving}
-                className="mt-5 w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
+                disabled={entries.length < 2 || saving || !effectiveBusinessId}
+                className="mt-3 w-full rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-paper transition-colors duration-200 ease-lg hover:bg-blue disabled:opacity-50"
               >
                 {saving ? (
                   <span className="flex items-center justify-center gap-2">
@@ -421,7 +462,7 @@ export default function LogFuel() {
                     Saving your entries...
                   </span>
                 ) : (
-                  `Save ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} and continue`
+                  `Save ${entries.length} entries and continue`
                 )}
               </button>
             </GlassCard>
@@ -433,7 +474,7 @@ export default function LogFuel() {
       <FuelIntakeModal
         open={snapOpen}
         onOpenChange={setSnapOpen}
-        businessId={demoBusinessId ?? ''}
+        businessId={effectiveBusinessId ?? ''}
         onLogged={handleSnapLogged}
       />
 

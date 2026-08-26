@@ -187,7 +187,7 @@ All types are in `frontend/src/types/api.ts`. The backend must match these shape
 
 | Path | Component | Description |
 |------|-----------|-------------|
-| `/` | Landing | Marketing page with savings calculator |
+| `/` | Landing | Marketing page |
 | `/register` | Register | Account creation + business setup |
 | `/login` | Login | Email/password sign in |
 | `/app` | Dashboard | Owner dashboard with stepper, burn, quick actions |
